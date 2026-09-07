@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import IdleTimer from "@/components/IdleTimer";
+import { PatientFlowProvider } from "@/context/PatientFlowContext";
 import "./globals.css";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -24,9 +25,11 @@ export default function RootLayout({
         className={`${plusJakartaSans.variable} font-sans antialiased`}
         suppressHydrationWarning={true}
       >
-        <IdleTimer timeoutMinutes={5}>
-          {children}
-        </IdleTimer>
+        <PatientFlowProvider>
+          <IdleTimer timeoutMinutes={5}>
+            {children}
+          </IdleTimer>
+        </PatientFlowProvider>
       </body>
     </html>
   );

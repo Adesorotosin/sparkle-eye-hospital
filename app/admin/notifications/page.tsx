@@ -8,12 +8,15 @@ import {
   Plus,
   Sliders,
   Radio,
-  CheckCircle2,
   XCircle,
+  Bell,
 } from "lucide-react";
 
 export default function NotificationsAlertCenterPage() {
   const [activeTab, setActiveTab] = useState("All");
+
+  // Filter state for notifications feed
+  const [filter, setFilter] = useState("All Notifications");
 
   // Automated Alert Rules Toggles State
   const [alertRules, setAlertRules] = useState({
@@ -179,6 +182,27 @@ export default function NotificationsAlertCenterPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT COLUMN (2/3 Width): NOTIFICATION LIST */}
           <div className="lg:col-span-2 space-y-4">
+            {/* FILTER HEADER BAR */}
+            <div className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-[#4F46E5]" />
+                <span className="text-xs font-bold text-[#0F172A]">
+                  Active Feed
+                </span>
+              </div>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="text-xs font-medium border border-[#CBD5E1] rounded-lg px-2.5 py-1.5 bg-white text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+              >
+                <option>All Notifications</option>
+                <option>Emergency Only</option>
+                <option>Announcements</option>
+                <option>Clinical</option>
+                <option>Finance</option>
+              </select>
+            </div>
+
             {/* Card 1: Emergency Alert */}
             <div className="bg-[#FEF2F2] rounded-xl border border-[#FCA5A5] p-6 shadow-sm relative overflow-hidden">
               <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#DC2626]" />
@@ -434,7 +458,7 @@ export default function NotificationsAlertCenterPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>  
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Search,
   Plus,
@@ -10,8 +11,6 @@ import {
   Edit,
   UserCheck,
   Printer,
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
 } from "lucide-react";
 
@@ -110,7 +109,12 @@ export default function PatientDirectoryPage() {
             <div className="w-8 h-8 rounded-xl bg-[#0B7285] text-white flex items-center justify-center font-bold text-sm">
               <Sparkles className="w-4 h-4 fill-current" />
             </div>
-            <span>Sparkle <span className="font-normal text-slate-600 text-sm">Eye Specialist</span></span>
+            <span>
+              Sparkle{" "}
+              <span className="font-normal text-slate-600 text-sm">
+                Eye Specialist
+              </span>
+            </span>
           </div>
 
           {/* Navigation Links */}
@@ -205,9 +209,12 @@ export default function PatientDirectoryPage() {
             </div>
           </div>
 
-          <button className="w-full sm:w-auto px-5 py-2.5 bg-[#6B21A8] hover:bg-[#581c87] text-white font-bold text-xs rounded-xl shadow-xs transition">
+          <Link
+            href="/doctor/patients/SESH-2026-089/encounter"
+            className="w-full sm:w-auto px-5 py-2.5 bg-[#6B21A8] hover:bg-[#581c87] text-white text-center font-bold text-xs rounded-xl shadow-xs transition"
+          >
             Start New Visit
-          </button>
+          </Link>
         </div>
 
         {/* TWO-COLUMN LAYOUT */}
@@ -304,13 +311,29 @@ export default function PatientDirectoryPage() {
                         </td>
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2 text-slate-400">
-                            <button className="p-1 hover:text-[#0B7285] transition">
+                            {/* Start Clinical Exam Link */}
+                            <Link
+                              href={`/doctor/patients/${patient.id}/encounter`}
+                              title="Start Exam / Encounter"
+                              className="p-1 hover:text-[#0B7285] hover:bg-slate-100 rounded transition"
+                            >
                               <Stethoscope className="w-4 h-4" />
-                            </button>
-                            <button className="p-1 hover:text-[#0B7285] transition">
+                            </Link>
+
+                            {/* View EMR Record Link */}
+                            <Link
+                              href={`/doctor/patients/${patient.id}`}
+                              title="Review Patient EMR"
+                              className="p-1 hover:text-[#0B7285] hover:bg-slate-100 rounded transition"
+                            >
                               <FileText className="w-4 h-4" />
-                            </button>
-                            <button className="p-1 hover:text-[#0B7285] transition">
+                            </Link>
+
+                            {/* Edit Info */}
+                            <button
+                              title="Edit Patient Info"
+                              className="p-1 hover:text-[#0B7285] hover:bg-slate-100 rounded transition"
+                            >
                               <Edit className="w-4 h-4" />
                             </button>
                           </div>
