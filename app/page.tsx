@@ -7,7 +7,7 @@ import Image from "next/image";
 import { authenticateStaff, ROLE_REDIRECT_MAP } from "@/lib/auth";
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberWorkstation, setRememberWorkstation] = useState(true);
@@ -23,17 +23,18 @@ export default function LoginPage() {
       // 1. Authenticate credentials via API
       const user = await authenticateStaff(username, password);
 
-      // 2. Set client cookies to guarantee middleware detection
-      document.cookie = "is_logged_in=true; path=/; max-age=86400;";
-      document.cookie = `user_role=${user.role}; path=/; max-age=86400;`;
+      // 2. Set client cookies (enforce uppercase role & SameSite safety)
+      const formattedRole = String(user.role).toUpperCase();
+      document.cookie = "is_logged_in=true; path=/; max-age=86400; SameSite=Lax";
+      document.cookie = `user_role=${formattedRole}; path=/; max-age=86400; SameSite=Lax`;
 
       // 3. Save token client-side if requested
       if (rememberWorkstation) {
         localStorage.setItem("sparkle_staff_token", user.token);
       }
 
-      // 4. Determine target route based on role
-      const targetRoute = ROLE_REDIRECT_MAP[user.role] || "/admin";
+      // 4. Determine target route based on role (fallback to existing /doctor route)
+      const targetRoute = ROLE_REDIRECT_MAP[user.role] || "/doctor";
 
       // 5. Hard refresh to send new cookies directly to middleware
       window.location.href = targetRoute;
@@ -121,6 +122,7 @@ export default function LoginPage() {
                 <input
                   type="text"
                   required
+                  suppressHydrationWarning
                   placeholder="e.g. admin, doc_adams, cashier1"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -139,6 +141,7 @@ export default function LoginPage() {
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  suppressHydrationWarning
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

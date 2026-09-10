@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState } from "react";
 import Link from "next/link";
@@ -34,7 +34,7 @@ export default function ExecutiveOverviewDashboard() {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer focus:outline-hidden shadow-2xs"
+              className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer focus:outline-none shadow-xs"
             >
               <option>Last 30 Days</option>
               <option>Last 7 Days</option>
@@ -49,7 +49,7 @@ export default function ExecutiveOverviewDashboard() {
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer focus:outline-hidden shadow-2xs"
+              className="w-full appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-2 pr-8 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer focus:outline-none shadow-xs"
             >
               <option>Department: All Departments</option>
               <option>Department: Ophthalmology</option>
@@ -63,7 +63,7 @@ export default function ExecutiveOverviewDashboard() {
           {/* Export Button -> Routes to Reports */}
           <Link
             href="/admin/reports"
-            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-4 py-2 rounded-xl text-xs transition flex items-center gap-2 shadow-2xs"
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-4 py-2 rounded-xl text-xs transition flex items-center gap-2 shadow-xs"
           >
             <Download className="w-3.5 h-3.5 text-slate-500" />
             Export PDF/Excel
@@ -76,13 +76,13 @@ export default function ExecutiveOverviewDashboard() {
         {/* Card 1: Total Revenue -> Links to Reports */}
         <Link 
           href="/admin/reports" 
-          className="group bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs relative overflow-hidden border-l-4 border-l-indigo-600 hover:border-slate-300 transition-all"
+          className="group bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-[#6D4AFF] hover:border-slate-300 transition-all"
         >
           <div className="flex justify-between items-start">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               Total Revenue
             </span>
-            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-[#6D4AFF] transition-colors" />
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
             &#8358;42.5M
@@ -93,16 +93,12 @@ export default function ExecutiveOverviewDashboard() {
           </div>
         </Link>
 
-        {/* Card 2: Active Encounters -> Links to Patients EMR */}
-        <Link 
-          href="/patients"
-          className="group bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs relative overflow-hidden border-l-4 border-l-sky-500 hover:border-slate-300 transition-all"
-        >
+        {/* Card 2: Active Patient Encounters (Static Card) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-sky-500">
           <div className="flex justify-between items-start">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               Active Patient Encounters
             </span>
-            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-sky-500 transition-colors" />
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
             1,240
@@ -111,18 +107,14 @@ export default function ExecutiveOverviewDashboard() {
             <TrendingUp className="w-3 h-3" />
             +4.1% <span className="text-slate-400 font-normal">vs last period</span>
           </div>
-        </Link>
+        </div>
 
-        {/* Card 3: Average Wait Time -> Links to Triage Module */}
-        <Link 
-          href="/triage"
-          className="group bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs relative overflow-hidden border-l-4 border-l-amber-500 hover:border-slate-300 transition-all"
-        >
+        {/* Card 3: Average Wait Time (Static Card) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-amber-500">
           <div className="flex justify-between items-start">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               Average Wait Time
             </span>
-            <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-amber-500 transition-colors" />
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
             18 mins
@@ -131,10 +123,10 @@ export default function ExecutiveOverviewDashboard() {
             <TrendingDown className="w-3 h-3 text-emerald-600" />
             -2.5% <span className="text-slate-400 font-normal">vs last period</span>
           </div>
-        </Link>
+        </div>
 
-        {/* Card 4: OR Occupancy Rate */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs relative overflow-hidden border-l-4 border-l-emerald-500 flex items-center justify-between">
+        {/* Card 4: OR Occupancy Rate (Static Card) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-emerald-500 flex items-center justify-between">
           <div>
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               OR Occupancy Rate
@@ -157,7 +149,7 @@ export default function ExecutiveOverviewDashboard() {
       {/* CHARTS SECTION */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Chart: Revenue vs HMO Claims */}
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
             <div>
               <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
@@ -169,7 +161,7 @@ export default function ExecutiveOverviewDashboard() {
             </div>
             <div className="flex items-center gap-4 text-xs font-semibold">
               <span className="flex items-center gap-1.5 text-slate-600">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[#6D4AFF]"></span>
                 Revenue
               </span>
               <span className="flex items-center gap-1.5 text-slate-600">
@@ -187,8 +179,8 @@ export default function ExecutiveOverviewDashboard() {
               preserveAspectRatio="none"
             >
               <defs>
-                <linearGradient id="indigoGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.3" />
+                <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6D4AFF" stopOpacity="0.3" />
                   <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
                 </linearGradient>
                 <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
@@ -205,18 +197,18 @@ export default function ExecutiveOverviewDashboard() {
               {/* Area Fills */}
               <path
                 d="M 0 110 Q 125 60 250 20 T 500 30 L 500 170 L 0 170 Z"
-                fill="url(#indigoGrad)"
+                fill="url(#purpleGrad)"
               />
               <path
                 d="M 0 135 Q 125 95 250 65 T 500 75 L 500 170 L 0 170 Z"
                 fill="url(#skyGrad)"
               />
 
-              {/* Line 1: Revenue (Indigo) */}
+              {/* Line 1: Revenue (Brand Purple) */}
               <path
                 d="M 0 110 Q 125 60 250 20 T 500 30"
                 fill="none"
-                stroke="#4f46e5"
+                stroke="#6D4AFF"
                 strokeWidth="3"
                 strokeLinecap="round"
               />
@@ -242,7 +234,7 @@ export default function ExecutiveOverviewDashboard() {
         </div>
 
         {/* Right Chart: Patient Volume by Specialty */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
           <div>
             <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
               Patient Volume by Eye Specialty
@@ -259,7 +251,7 @@ export default function ExecutiveOverviewDashboard() {
                   <span>486 patients</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-600 rounded-full w-[78%]"></div>
+                  <div className="h-full bg-[#6D4AFF] rounded-full w-[78%]"></div>
                 </div>
               </div>
 
@@ -270,7 +262,7 @@ export default function ExecutiveOverviewDashboard() {
                   <span>312 patients</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 rounded-full w-[58%]"></div>
+                  <div className="h-full bg-[#8566FF] rounded-full w-[58%]"></div>
                 </div>
               </div>
 
@@ -281,7 +273,7 @@ export default function ExecutiveOverviewDashboard() {
                   <span>198 patients</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-400 rounded-full w-[38%]"></div>
+                  <div className="h-full bg-[#A188FF] rounded-full w-[38%]"></div>
                 </div>
               </div>
 
@@ -292,7 +284,7 @@ export default function ExecutiveOverviewDashboard() {
                   <span>124 patients</span>
                 </div>
                 <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-300 rounded-full w-[22%]"></div>
+                  <div className="h-full bg-[#C2B2FF] rounded-full w-[22%]"></div>
                 </div>
               </div>
             </div>
@@ -303,7 +295,7 @@ export default function ExecutiveOverviewDashboard() {
       {/* BOTTOM TABLES & BREAKDOWN GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Top Referring Physicians */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs">
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs">
           <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
             Top Referring Physicians
           </h2>
@@ -321,7 +313,7 @@ export default function ExecutiveOverviewDashboard() {
                 </strong>
               </div>
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600 rounded-full w-[85%]"></div>
+                <div className="h-full bg-[#6D4AFF] rounded-full w-[85%]"></div>
               </div>
               <span className="text-xs font-extrabold text-slate-800 text-right min-w-[70px]">
                 142 referrals
@@ -337,7 +329,7 @@ export default function ExecutiveOverviewDashboard() {
                 </strong>
               </div>
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full w-[60%]"></div>
+                <div className="h-full bg-[#8566FF] rounded-full w-[60%]"></div>
               </div>
               <span className="text-xs font-extrabold text-slate-800 text-right min-w-[70px]">
                 98 referrals
@@ -353,7 +345,7 @@ export default function ExecutiveOverviewDashboard() {
                 </strong>
               </div>
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-400 rounded-full w-[50%]"></div>
+                <div className="h-full bg-[#A188FF] rounded-full w-[50%]"></div>
               </div>
               <span className="text-xs font-extrabold text-slate-800 text-right min-w-[70px]">
                 87 referrals
@@ -369,7 +361,7 @@ export default function ExecutiveOverviewDashboard() {
                 </strong>
               </div>
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-300 rounded-full w-[38%]"></div>
+                <div className="h-full bg-[#C2B2FF] rounded-full w-[38%]"></div>
               </div>
               <span className="text-xs font-extrabold text-slate-800 text-right min-w-[70px]">
                 63 referrals
@@ -379,7 +371,7 @@ export default function ExecutiveOverviewDashboard() {
         </div>
 
         {/* Insurance Claims Summary */}
-        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
           <div>
             <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
               Insurance Claims Summary
@@ -441,7 +433,10 @@ export default function ExecutiveOverviewDashboard() {
 
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs mt-4">
             <span className="text-slate-500 font-bold">Total Submitted</span>
-            <Link href="/billing" className="font-extrabold text-indigo-600 hover:text-indigo-800 text-sm flex items-center gap-1 transition-colors">
+            <Link 
+              href="/billing" 
+              className="font-extrabold text-[#6D4AFF] hover:text-[#5837E6] text-sm flex items-center gap-1 transition-colors"
+            >
               &#8358;36.4M <ArrowUpRight className="w-3.5 h-3.5" />
             </Link>
           </div>

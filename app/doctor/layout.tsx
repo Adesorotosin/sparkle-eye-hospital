@@ -2,20 +2,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Users, 
   Kanban, 
   Stethoscope, 
-  CreditCard,
   Package,
   Calendar,
-  Bell, 
   Search, 
   LogOut, 
-  ChevronDown, 
-  Sparkles
+  ChevronDown
 } from "lucide-react";
 
 export default function DoctorLayout({ children }: { children: React.ReactNode }) {
@@ -44,7 +42,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     { name: "Overview", href: "/doctor", icon: LayoutDashboard },
     { name: "Patient Records", href: "/doctor/patients", icon: Users },
     { name: "Workflow Queue", href: "/doctor/kanban", icon: Kanban },
-    { name: "Surgical Suite", href: "/doctor/patients/20458712/surgery", icon: Stethoscope },
+    { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope },
     { name: "Appointments", href: "/appointments", icon: Calendar },
     { name: "Optical Inventory", href: "/inventory", icon: Package },
   ];
@@ -55,16 +53,25 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       {/* GLOBAL APPLICATION SIDEBAR */}
       <aside className="w-72 bg-[#0B132B] text-white p-6 flex flex-col justify-between shrink-0 border-r border-slate-800 min-h-screen sticky top-0">
         <div className="space-y-6">
-          {/* Hospital Brand */}
+          
+          {/* Hospital Brand & Public Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center text-white shadow-md">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-slate-900 overflow-hidden border border-slate-800 flex items-center justify-center shrink-0 relative shadow-xs">
+              <Image
+                src="/Logo.png"
+                alt="Sparkle Eye Hospital Logo"
+                width={40}
+                height={40}
+                className="object-contain p-1"
+                priority
+              />
             </div>
-            <div>
-              <h1 className="font-extrabold text-sm text-white tracking-tight">
+
+            <div className="min-w-0">
+              <h1 className="font-extrabold text-sm text-white tracking-tight leading-none truncate">
                 Sparkle Eye Hospital
               </h1>
-              <span className="text-[10px] text-purple-300 font-bold tracking-wider uppercase">
+              <span className="text-[10px] text-purple-300 font-bold tracking-wider uppercase block mt-1">
                 Physician &amp; Staff Portal
               </span>
             </div>
@@ -89,7 +96,11 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
             </span>
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href;
+              // Precise path matching logic
+              const isActive = 
+                pathname === item.href || 
+                (item.href !== "/doctor" && pathname?.startsWith(`${item.href}/`));
+
               return (
                 <Link
                   key={item.name}
@@ -107,7 +118,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
             })}
           </nav>
 
-          {/* ACTIVE PATIENT CARD RETAINED IN SIDEBAR */}
+          {/* ACTIVE PATIENT CARD */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-inner">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Patient</span>
@@ -165,31 +176,6 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
 
       {/* MAIN VIEWPORT WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0">
-        
-        {/* TOP STREAMLINED HEADER */}
-        <header className="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-3 w-96">
-            <div className="relative w-full">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search patient records, charts, or orders... (⌘K)"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-12 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-600 transition"
-              />
-              <span className="absolute right-2.5 top-2 text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-mono">
-                ⌘K
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button className="relative w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition cursor-pointer">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
-            </button>
-          </div>
-        </header>
-
         {/* CHILD PAGE CONTENT */}
         <main className="flex-1 flex flex-col overflow-y-auto">
           {children}

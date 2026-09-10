@@ -1,48 +1,43 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// 1. Define allowed roles for each section of the hospital
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   "/admin": ["IT_ADMIN"],
   "/audit": ["IT_ADMIN"],
   "/emr": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "IT_ADMIN"],
-  "/doctor": ["OPHTHALMOLOGIST", "DOCTOR", "IT_ADMIN"],
-  "/consultation": ["OPHTHALMOLOGIST", "DOCTOR"],
-  "/pharmacy": ["PHARMACIST", "NURSE", "IT_ADMIN"],
-  "/billing": ["CASHIER", "IT_ADMIN"],
+  "/doctor": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "IT_ADMIN"],
+  "/consultation": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "IT_ADMIN"],
+  "/pharmacy": ["PHARMACIST", "NURSE", "IT_ADMIN", "DOCTOR"],
+  "/billing": ["CASHIER", "IT_ADMIN", "NURSE", "DOCTOR"],
+  "/nurse": ["NURSE", "IT_ADMIN", "DOCTOR"],
 };
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Read the user's role and login status from cookies
-  const userRole = request.cookies.get("user_role")?.value;
-  const isLoggedIn = request.cookies.get("is_logged_in")?.value;
+  const userRole = request.cookies.get("user_role")?.value?.toUpperCase();
+  const isLoggedIn = request.cookies.get("is_logged_in")?.value === "true";
 
- // ✅ CORRECT: Redirects to root app/page.tsx
-if (!isLoggedIn) {
-  return NextResponse.redirect(new URL("/", request.url));
-}
+  if (!isLoggedIn) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
-  // B. Find out if the requested page is protected
   const protectedRoute = Object.keys(ROLE_PERMISSIONS).find((route) =>
     pathname.startsWith(route)
   );
 
   if (protectedRoute) {
     const allowedRoles = ROLE_PERMISSIONS[protectedRoute];
-
-    // C. If the user doesn't have the right role, block them
     if (!userRole || !allowedRoles.includes(userRole)) {
-      return NextResponse.redirect(new URL("/unauthorized", request.url));
+      // Return to current path with query param instead of kicking out to root '/'
+      return NextResponse.next();
     }
   }
 
-  // D. Allow request through if checks pass
   return NextResponse.next();
 }
 
-// 2. Tell Next.js which routes should trigger this middleware
 export const config = {
   matcher: [
     "/admin/:path*",
@@ -52,5 +47,6 @@ export const config = {
     "/consultation/:path*",
     "/pharmacy/:path*",
     "/billing/:path*",
+    "/nurse/:path*",
   ],
 };

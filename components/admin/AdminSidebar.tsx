@@ -2,9 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
-  Building2,
   LayoutDashboard,
   Users,
   ShieldAlert,
@@ -52,7 +52,7 @@ export default function AdminSidebar({
 
   return (
     <aside
-      className={`bg-slate-900 text-slate-300 border-r border-slate-800 h-screen fixed left-0 top-0 flex flex-col justify-between z-40 transition-all duration-300 ${
+      className={`bg-[#0F172A] text-slate-300 border-r border-slate-800 h-screen fixed left-0 top-0 flex flex-col justify-between z-40 transition-all duration-300 ${
         collapsed ? "w-20" : "w-64"
       }`}
     >
@@ -65,15 +65,22 @@ export default function AdminSidebar({
               collapsed ? "justify-center w-full" : ""
             }`}
           >
-            <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm shrink-0">
-              <Building2 className="w-5 h-5" />
+            <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
+              <Image
+                src="/logo.png"
+                alt="Sparkle Eye Specialist Hospital Logo"
+                width={36}
+                height={36}
+                className="object-contain"
+                priority
+              />
             </div>
             {!collapsed && (
               <div className="transition-opacity duration-200">
                 <h1 className="font-bold text-base leading-tight text-white whitespace-nowrap">
                   Sparkle Eye
                 </h1>
-                <p className="text-[10px] tracking-wider text-slate-400 uppercase font-medium whitespace-nowrap">
+                <p className="text-[10px] tracking-wider text-purple-300 uppercase font-semibold whitespace-nowrap mt-0.5">
                   Specialist Hospital
                 </p>
               </div>
@@ -91,9 +98,9 @@ export default function AdminSidebar({
                 key={item.href}
                 href={item.href}
                 title={collapsed ? item.name : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                   active
-                    ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                    ? "bg-[#6D4AFF] text-white font-semibold shadow-md shadow-[#6D4AFF]/20"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 } ${collapsed ? "justify-center" : ""}`}
               >

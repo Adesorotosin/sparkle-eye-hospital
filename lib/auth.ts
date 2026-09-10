@@ -2,10 +2,10 @@
 
 export const ROLE_REDIRECT_MAP: Record<string, string> = {
   IT_ADMIN: "/admin",
-  OPHTHALMOLOGIST: "/doctor", // Updated to your new doctor dashboard
-  DOCTOR: "/doctor",          // Updated to your new doctor dashboard
+  OPHTHALMOLOGIST: "/doctor",
+  DOCTOR: "/doctor",
   PHARMACIST: "/pharmacy",
-  NURSE: "/pharmacy",
+  NURSE: "/nurse",              // <-- MUST BE /nurse
   CASHIER: "/billing",
   RECEPTIONIST: "/reception",
 };
@@ -23,5 +23,5 @@ export async function authenticateStaff(username: string, password: string) {
     throw new Error(data.error || "Authentication failed");
   }
 
-  return data.user; // Returns { staffId, name, role, token }
+  return data.user;
 }
