@@ -4,10 +4,10 @@ import { db } from "@/lib/db"; // Replace with your actual DB instance (Prisma, 
 // --- PATCH: Temporarily Suspend or Reactivate Staff ---
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params as a Promise
     const body = await request.json();
     const { isActive } = body;
 
@@ -19,7 +19,7 @@ export async function PATCH(
     }
 
     // Update active status without setting deletedAt
-    const updatedStaff = await db.staff.update({
+    const updatedStaff = await (db as any).staff.update({
       where: { id },
       data: {
         isActive,
@@ -45,13 +45,13 @@ export async function PATCH(
 // --- DELETE: Soft-Delete / Permanent Deactivation ---
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ Await params as a Promise
 
     // Perform Soft Delete (Deactivate user without removing historical audit logs)
-    const updatedStaff = await db.staff.update({
+    const updatedStaff = await (db as any).staff.update({
       where: { id },
       data: {
         isActive: false,
