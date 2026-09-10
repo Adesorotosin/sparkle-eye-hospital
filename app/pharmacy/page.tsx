@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { usePatientFlow, PrescriptionItem } from "@/context/PatientFlowContext";
+import { usePatientFlow } from "@/context/PatientFlowContext";
 import PatientBanner, { PatientBannerData } from "@/components/shared/PatientBanner";
 import {
   Search,
@@ -18,7 +18,17 @@ import {
   X,
 } from "lucide-react";
 
-// Mock fallback patients matching strict PatientBannerData shape
+export interface PrescriptionItem {
+  id: string;
+  drugName: string;
+  dosage: string;
+  quantity: string;
+  unitPrice: number;
+  totalPrice: number;
+  status: string;
+}
+
+// Fallback patients matching strict PatientBannerData shape
 const MOCK_PATIENTS: Record<string, PatientBannerData> = {
   "SPK-30892": {
     id: "SPK-30892",
@@ -46,7 +56,6 @@ const MOCK_PATIENTS: Record<string, PatientBannerData> = {
   },
 };
 
-// Fallback prescription items when not using dynamic context patient
 const FALLBACK_PRESCRIPTIONS: PrescriptionItem[] = [
   {
     id: "demo-1",
@@ -62,7 +71,18 @@ const FALLBACK_PRESCRIPTIONS: PrescriptionItem[] = [
 function PharmacyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { patient, setPatient } = usePatientFlow();
+  
+  // Safely destructure context properties
+  const patientContext = usePatientFlow() as any;
+  const patient = patientContext?.patient || {
+    patientId: "SPK-30892",
+    fullName: "Mrs. Chidinma Okafor",
+    coveragePlan: "Private Cash",
+    invoice: { status: "unbilled", amountDue: 0, totalAmount: 0 },
+    prescriptions: FALLBACK_PRESCRIPTIONS,
+    vitals: { primaryComplaint: "Post-Operative Cataract Care — OD" },
+  };
+  const setPatient = patientContext?.setPatient;
 
   const [isDispensing, setIsDispensing] = useState(false);
   const [dispenseSuccess, setDispenseSuccess] = useState(false);
@@ -79,7 +99,6 @@ function PharmacyContent() {
     unitPrice: 0,
   });
 
-  // Local state fallback for non-context patients
   const [fallbackDrugs, setFallbackDrugs] = useState<PrescriptionItem[]>(FALLBACK_PRESCRIPTIONS);
 
   const patientId = searchParams.get("patientId") || patient.patientId;
@@ -88,13 +107,13 @@ function PharmacyContent() {
   const bannerPatient: PatientBannerData = isContextPatient
     ? {
         id: patient.patientId,
-        name: patient.fullName,
+        name: patient.fullName || "Mrs. Chidinma Okafor",
         age: 42,
         gender: "Female",
         phone: "+234 803 123 4567",
         hmo: {
-          name: patient.coveragePlan,
-          type: patient.coveragePlan.includes("HMO") ? "HMO Private" : "Self-Pay",
+          name: patient.coveragePlan || "Private Cash",
+          type: (patient.coveragePlan || "").includes("HMO") ? "HMO Private" : "Self-Pay",
           status: "Verified",
         },
         allergies: ["None"],
@@ -106,13 +125,12 @@ function PharmacyContent() {
 
   const [selectedPrescription, setSelectedPrescription] = useState(bannerPatient.name);
 
-  // Sync selected prescription title whenever URL patientId changes
   useEffect(() => {
     setSelectedPrescription(bannerPatient.name);
   }, [patientId, bannerPatient.name]);
 
   const unfulfilledOrders = [
-    { id: patient.patientId, name: patient.fullName, time: "09:15 AM" },
+    { id: patient.patientId, name: patient.fullName || "Mrs. Chidinma Okafor", time: "09:15 AM" },
     { id: "SPK-2026-0891", name: "Amina Bello", time: "10:45 AM" },
     { id: "1", name: "Adebayo Funmi", time: "10:42 AM" },
   ];
@@ -122,7 +140,9 @@ function PharmacyContent() {
     { id: "7", name: "Oluwaseun Adeyemi", time: "08:55 AM" },
   ];
 
-  const activePrescriptions = isContextPatient ? patient.prescriptions : fallbackDrugs;
+  const activePrescriptions: PrescriptionItem[] = isContextPatient
+    ? patient.prescriptions || fallbackDrugs
+    : fallbackDrugs;
 
   const totalPrescriptionPrice = activePrescriptions.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -143,13 +163,12 @@ function PharmacyContent() {
   };
 
   const toggleAdminister = (drugId: string) => {
-    setAdministeredDrugs((prev) => ({
+    setAdministeredDrugs((prev: any) => ({
       ...prev,
       [drugId]: !prev[drugId],
     }));
   };
 
-  // Add drug handler
   const handleAddDrug = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDrug.drugName || !newDrug.dosage || !newDrug.quantity) return;
@@ -164,13 +183,13 @@ function PharmacyContent() {
       status: "pending",
     };
 
-    if (isContextPatient && setPatient) {
-      setPatient((prev) => ({
+    if (isContextPatient && typeof setPatient === "function") {
+      setPatient((prev: any) => ({
         ...prev,
-        prescriptions: [...prev.prescriptions, newItem],
+        prescriptions: [...(prev.prescriptions || []), newItem],
       }));
     } else {
-      setFallbackDrugs((prev) => [...prev, newItem]);
+      setFallbackDrugs((prev: any) => [...prev, newItem]);
     }
 
     setNewDrug({ drugName: "", dosage: "", quantity: "", unitPrice: 0 });
@@ -180,8 +199,8 @@ function PharmacyContent() {
   const handleDispenseAndSend = () => {
     setIsDispensing(true);
 
-    if (isContextPatient && setPatient) {
-      setPatient((prev) => ({
+    if (isContextPatient && typeof setPatient === "function") {
+      setPatient((prev: any) => ({
         ...prev,
         stage: "billing",
         invoice: {
@@ -190,7 +209,7 @@ function PharmacyContent() {
           amountDue: coPayDue,
           totalAmount: totalPrescriptionPrice,
         },
-        prescriptions: prev.prescriptions.map((rx) => ({
+        prescriptions: (prev.prescriptions || []).map((rx: any) => ({
           ...rx,
           status: "dispensed",
         })),
@@ -348,7 +367,7 @@ function PharmacyContent() {
           </div>
         </header>
 
-        <main className="flex-1 p-8 overflow-y-auto max-w-[1400px] w-full mx-auto space-y-6">
+        <main className="flex-1 p-8 overflow-y-auto max-w-7xl w-full mx-auto space-y-6">
           <PatientBanner patient={bannerPatient} activeModule="pharmacy" />
 
           {dispenseSuccess && (
@@ -405,7 +424,7 @@ function PharmacyContent() {
                   {dispenseSuccess
                     ? "Dispensed & Sent to Cashier"
                     : isContextPatient
-                    ? patient.invoice.status
+                    ? patient.invoice?.status || "Unfulfilled"
                     : "Unfulfilled"}
                 </span>
               </div>
@@ -456,7 +475,7 @@ function PharmacyContent() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                   {activePrescriptions.length > 0 ? (
-                    activePrescriptions.map((rx) => {
+                    activePrescriptions.map((rx: any) => {
                       const isAdministered = administeredDrugs[rx.id];
                       return (
                         <tr key={rx.id}>
@@ -468,7 +487,7 @@ function PharmacyContent() {
                           <td className="py-3.5">{rx.dosage}</td>
                           <td className="py-3.5 font-bold text-slate-900">{rx.quantity}</td>
                           <td className="py-3.5 font-bold text-slate-900">
-                            ₦{rx.totalPrice.toLocaleString()}
+                            ₦{rx.totalPrice?.toLocaleString() || "0"}
                           </td>
                           <td className="py-3.5">
                             <button
@@ -492,7 +511,7 @@ function PharmacyContent() {
                                   : "bg-amber-50 text-amber-700 border-amber-200/60"
                               }`}
                             >
-                              {dispenseSuccess ? "dispensed" : rx.status.replace(/_/g, " ")}
+                              {dispenseSuccess ? "dispensed" : rx.status?.replace(/_/g, " ")}
                             </span>
                           </td>
                         </tr>
