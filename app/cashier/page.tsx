@@ -12,13 +12,15 @@ import {
   Calendar,
   Receipt,
   Filter,
+  Eye,
+  Sparkles,
 } from "lucide-react";
 import { usePatientFlow } from "@/context/PatientFlowContext";
 
 export default function CashierDashboard() {
   const router = useRouter();
   const { patient } = usePatientFlow();
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">("all");
 
@@ -69,19 +71,28 @@ export default function CashierDashboard() {
       {/* TOP HEADER */}
       <header className="w-full bg-[#3F1D85] text-white px-6 py-3.5 flex flex-col md:flex-row items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#7E57C2] flex items-center justify-center font-bold text-white shadow-xs">
-            ✦
+          {/* BRAND LOGO ICON */}
+          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-[#7E57C2] to-[#5E35B1] border border-purple-400/30 flex items-center justify-center shadow-xs group">
+            <Eye className="w-5 h-5 text-white stroke-[2.2]" />
+            <Sparkles className="w-3 h-3 text-amber-300 absolute -top-1 -right-1 animate-pulse" />
           </div>
+
           <div>
-            <h1 className="text-sm font-bold tracking-wide">Sparkle Eye Specialist Hospital</h1>
-            <p className="text-[11px] text-purple-200/80 font-medium">Cashier Dashboard & Billing Queue</p>
+            <h1 className="text-sm font-extrabold tracking-wide text-white leading-tight">
+              Sparkle Eye Specialist Hospital
+            </h1>
+            <p className="text-[11px] text-purple-200/80 font-medium">
+              Cashier Dashboard &amp; Billing Queue
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-6 text-xs text-purple-100 font-medium">
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-purple-300" />
-            <span>Cashier: <strong className="text-white">Folake Adeyemi</strong></span>
+            <span>
+              Cashier: <strong className="text-white">Folake Adeyemi</strong>
+            </span>
           </div>
           <div className="flex items-center gap-2 border-l border-purple-800 pl-6">
             <Calendar className="w-4 h-4 text-purple-300" />
@@ -94,7 +105,9 @@ export default function CashierDashboard() {
       <div className="bg-[#5E35B1] text-white px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-xl border border-white/10 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">Pending Checkout</p>
+            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
+              Pending Checkout
+            </p>
             <p className="text-xl font-extrabold text-white">2 Patients</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center">
@@ -104,7 +117,9 @@ export default function CashierDashboard() {
 
         <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-xl border border-white/10 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">Completed Today</p>
+            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
+              Completed Today
+            </p>
             <p className="text-xl font-extrabold text-white">14 Invoices</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
@@ -114,7 +129,9 @@ export default function CashierDashboard() {
 
         <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-xl border border-white/10 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">Total Revenue (Shift)</p>
+            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
+              Total Revenue (Shift)
+            </p>
             <p className="text-xl font-extrabold text-white">₦685,000</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-purple-400/20 text-purple-200 flex items-center justify-center">
@@ -124,7 +141,9 @@ export default function CashierDashboard() {
 
         <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-xl border border-white/10 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">Active Register</p>
+            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
+              Active Register
+            </p>
             <p className="text-xl font-extrabold text-white">POS Terminal #02</p>
           </div>
           <div className="w-9 h-9 rounded-lg bg-purple-400/20 text-purple-200 flex items-center justify-center">
@@ -155,7 +174,9 @@ export default function CashierDashboard() {
                 <button
                   onClick={() => setStatusFilter("all")}
                   className={`px-3 py-1.5 rounded-lg transition ${
-                    statusFilter === "all" ? "bg-[#5E35B1] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    statusFilter === "all"
+                      ? "bg-[#5E35B1] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   All
@@ -163,7 +184,9 @@ export default function CashierDashboard() {
                 <button
                   onClick={() => setStatusFilter("pending")}
                   className={`px-3 py-1.5 rounded-lg transition ${
-                    statusFilter === "pending" ? "bg-[#5E35B1] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    statusFilter === "pending"
+                      ? "bg-[#5E35B1] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   Pending
@@ -171,7 +194,9 @@ export default function CashierDashboard() {
                 <button
                   onClick={() => setStatusFilter("paid")}
                   className={`px-3 py-1.5 rounded-lg transition ${
-                    statusFilter === "paid" ? "bg-[#5E35B1] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+                    statusFilter === "paid"
+                      ? "bg-[#5E35B1] text-white shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   Paid
