@@ -1,35 +1,25 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  Building2,
-  MapPin,
   Grid,
-  Upload,
-  Check,
-  AlertTriangle,
-  X,
   Plus,
+  Receipt,
   Clock,
   Key,
-  Receipt,
-  Save,
   Users,
+  X,
+  Save,
   Loader2,
+  AlertTriangle,
+  RotateCcw,
+  Building,
+  CheckCircle2,
+  UserCheck,
 } from "lucide-react";
 
-// --- TYPESCRIPT INTERFACES ---
-interface HospitalProfile {
-  name: string;
-  licenseId: string;
-  phone: string;
-  email: string;
-  address: string;
-  city: string;
-  state: string;
-}
-
-interface SystemModules {
+// --- TYPES ---
+export interface SystemModules {
   ehr: boolean;
   pharmacy: boolean;
   optical: boolean;
@@ -38,388 +28,247 @@ interface SystemModules {
   telemedicine: boolean;
 }
 
-interface BillingDefaults {
+export interface Department {
+  id: string;
+  name: string;
+  staffCount: number;
+  status: "Active" | "Inactive";
+}
+
+export interface BillingSettings {
   vatRate: string;
   invoiceDueDays: string;
 }
 
-interface Department {
-  id: number;
-  name: string;
-  status: "Active" | "Inactive";
-  staffCount: number;
-}
+// --- CONSTANTS ---
+const MODULE_ITEMS: { key: keyof SystemModules; title: string; desc: string }[] = [
+  { key: "ehr", title: "EHR Module", desc: "Electronic health records" },
+  { key: "pharmacy", title: "Pharmacy Portal", desc: "Medication dispensing" },
+  { key: "optical", title: "Optical & OCT Center", desc: "Eye diagnostics" },
+  { key: "billing", title: "Billing & Payments", desc: "Financial transactions" },
+  { key: "patientPortal", title: "Patient Self-Service", desc: "Patient portal access" },
+  { key: "telemedicine", title: "Telemedicine", desc: "Virtual consultations" },
+];
 
-export default function SystemSettingsPage() {
-  const [activeTab, setActiveTab] = useState("Hospital Profile");
+const TAB_OPTIONS = [
+  "General Setup",
+  "Departments & Wards",
+  "Billing & Tax Defaults",
+  "Operational Hours",
+  "Integrations & API",
+] as const;
 
-  // Loading & Async States
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+type TabType = (typeof TAB_OPTIONS)[number];
 
-  // Modals & Feedback State
-  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
-  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
-  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{
-    text: string;
-    type: "success" | "error";
-  } | null>(null);
+export default function AdminSettingsPage() {
+  // --- STATE MANAGEMENT ---
+  const [activeTab, setActiveTab] = useState<TabType>("General Setup");
 
-  // New Department Form State
-  const [newDeptName, setNewDeptName] = useState("");
-  const [newDeptStaff, setNewDeptStaff] = useState<number | "">("");
+  // Admin & Facility Info State
+  const [adminName, setAdminName] = useState("Dr. Alex Morgan");
+  const [hospitalName, setHospitalName] = useState("Sparkle Eye Specialist Hospital");
 
-  // --- FORM STATES ---
-  const [profile, setProfile] = useState<HospitalProfile>({
-    name: "",
-    licenseId: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    state: "",
-  });
-
-  const [initialProfile, setInitialProfile] = useState<HospitalProfile>(profile);
-
+  // System Modules State
   const [modules, setModules] = useState<SystemModules>({
-    ehr: false,
-    pharmacy: false,
-    optical: false,
-    billing: false,
+    ehr: true,
+    pharmacy: true,
+    optical: true,
+    billing: true,
     patientPortal: false,
     telemedicine: false,
   });
 
-  const [billing, setBilling] = useState<BillingDefaults>({
-    vatRate: "",
-    invoiceDueDays: "",
+  // Departments State
+  const [departments, setDepartments] = useState<Department[]>([
+    { id: "1", name: "Ophthalmology & Surgery", staffCount: 14, status: "Active" },
+    { id: "2", name: "Optometry & Refraction", staffCount: 8, status: "Active" },
+    { id: "3", name: "Pediatric Eye Care", staffCount: 5, status: "Active" },
+  ]);
+
+  // Billing State
+  const [billing, setBilling] = useState<BillingSettings>({
+    vatRate: "7.5%",
+    invoiceDueDays: "30 Days",
   });
 
-  const [departments, setDepartments] = useState<Department[]>([]);
+  // Modals & UI Feedback State
+  const [isAddDeptModalOpen, setIsAddDeptModalOpen] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
-  // Helper for Toast Feedback
-  const triggerToast = (text: string, type: "success" | "error" = "success") => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  // New Department Form Inputs
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newDeptStaff, setNewDeptStaff] = useState<number | "">("");
 
-  // --- FETCH SETTINGS FROM API ---
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        setIsLoading(true);
-        const res = await fetch("/api/admin/settings");
-        const json = await res.json();
-
-        if (json.success && json.data) {
-          setProfile(json.data.profile);
-          setInitialProfile(json.data.profile);
-          setModules(json.data.modules);
-          setBilling(json.data.billing);
-          setDepartments(json.data.departments || []);
-        } else {
-          triggerToast("Failed to load settings from server.", "error");
-        }
-      } catch (err) {
-        console.error("Failed to load system settings:", err);
-        triggerToast("Network error while fetching system settings.", "error");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadSettings();
-  }, []);
-
-  // --- HANDLER FUNCTIONS ---
-  const handleProfileChange = (field: keyof HospitalProfile, value: string) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleBillingChange = (field: keyof BillingDefaults, value: string) => {
-    setBilling((prev) => ({ ...prev, [field]: value }));
-  };
-
+  // --- HANDLERS ---
   const toggleModule = (key: keyof SystemModules) => {
     setModules((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // --- PERSIST TO SERVER (PUT) ---
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      const res = await fetch("/api/admin/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profile,
-          modules,
-          billing,
-          departments,
-        }),
-      });
-
-      const json = await res.json();
-
-      if (json.success) {
-        setInitialProfile(profile);
-        setIsSaveModalOpen(false);
-        triggerToast("System settings saved successfully!", "success");
-      } else {
-        triggerToast(json.error || "Failed to save settings.", "error");
-      }
-    } catch (err) {
-      console.error("Failed to update system settings:", err);
-      triggerToast("An error occurred while saving settings.", "error");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleDiscard = () => {
-    setProfile(initialProfile);
-    setIsDiscardModalOpen(false);
-    triggerToast("Changes discarded back to last saved state.", "success");
+  const handleBillingChange = (field: keyof BillingSettings, value: string) => {
+    setBilling((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleAddDepartment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName.trim()) return;
 
-    const newDepartment: Department = {
-      id: departments.length > 0 ? Math.max(...departments.map((d) => d.id)) + 1 : 1,
+    const newDept: Department = {
+      id: Date.now().toString(),
       name: newDeptName.trim(),
-      status: "Active",
       staffCount: typeof newDeptStaff === "number" ? newDeptStaff : 0,
+      status: "Active",
     };
 
-    setDepartments((prev) => [newDepartment, ...prev]);
+    setDepartments((prev) => [...prev, newDept]);
     setNewDeptName("");
     setNewDeptStaff("");
     setIsAddDeptModalOpen(false);
-    triggerToast(`Department "${newDepartment.name}" added locally. Click Save to persist.`, "success");
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center md:pl-64">
-        <div className="flex flex-col items-center gap-3 text-[#64748B]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#4F46E5]" />
-          <p className="text-sm font-medium">Loading hospital configuration...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleSave = async () => {
+    setIsSaving(true);
+    // Simulate backend API persistence delay
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    setIsSaving(false);
+    setIsSaveModalOpen(false);
+
+    // Show temporary success notification
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleDiscard = () => {
+    // Reset back to initial default values
+    setAdminName("Dr. Alex Morgan");
+    setHospitalName("Sparkle Eye Specialist Hospital");
+    setModules({
+      ehr: true,
+      pharmacy: true,
+      optical: true,
+      billing: true,
+      patientPortal: false,
+      telemedicine: false,
+    });
+    setBilling({
+      vatRate: "7.5%",
+      invoiceDueDays: "30 Days",
+    });
+    setIsDiscardModalOpen(false);
+  };
 
   return (
-    /* 
-      ADDED: 
-      - `md:pl-64` or `lg:pl-72` forces clear distance from a fixed left sidebar on desktop.
-      - `p-6 sm:p-8 lg:p-12` gives extra inner breathing room all around.
-    */
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] pb-12 md:pl-64 p-6 sm:p-8 lg:p-10 transition-all">
-      <div className="max-w-7xl mx-auto">
-        
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div
-            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-all animate-bounce text-white ${
-              toastMessage.type === "error" ? "bg-rose-600" : "bg-[#0F172A]"
-            }`}
-          >
-            {toastMessage.type === "error" ? (
-              <AlertTriangle className="w-5 h-5 text-amber-300" />
-            ) : (
-              <Check className="w-5 h-5 text-emerald-400" />
-            )}
-            <span className="text-sm font-medium">{toastMessage.text}</span>
-          </div>
-        )}
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 text-[#0F172A] relative">
+      {/* SUCCESS TOAST NOTIFICATION */}
+      {showToast && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg transition-all animate-bounce">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="text-sm font-medium">System settings updated successfully!</span>
+        </div>
+      )}
 
-        {/* PAGE HEADER & ACTIONS */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* TOP HEADER & GLOBAL ACTIONS */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-[#0F172A]">
-              System Settings & Facility Profile
-            </h2>
-            <p className="text-sm text-[#64748B] mt-1">
-              Manage global hospital configurations, department structures, and default billing settings.
+            <div className="flex items-center gap-2">
+              <Building className="w-6 h-6 text-[#4F46E5]" />
+              <h1 className="text-xl font-bold text-[#0F172A]">{hospitalName || "Hospital Facility"}</h1>
+            </div>
+            <p className="text-xs text-[#64748B] mt-1">
+              Logged in as: <span className="font-semibold text-[#0F172A]">{adminName || "Administrator"}</span>
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+
+          <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setIsDiscardModalOpen(true)}
-              className="px-5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#0F172A] bg-white hover:bg-[#F8FAFC] transition-all shadow-sm"
+              className="px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC] flex items-center gap-2 transition-colors"
             >
-              Discard
+              <RotateCcw className="w-4 h-4 text-[#64748B]" />
+              Discard Changes
             </button>
             <button
+              type="button"
               onClick={() => setIsSaveModalOpen(true)}
-              className="px-5 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium transition-all shadow-sm flex items-center gap-2"
+              className="px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium flex items-center gap-2 shadow-sm transition-all"
             >
-              <Check className="w-4 h-4" /> Save Changes
+              <Save className="w-4 h-4" />
+              Save Configuration
             </button>
           </div>
         </div>
 
-        {/* SUB NAVIGATION TABS */}
-        <div className="border-b border-[#E2E8F0] mb-8">
-          <div className="flex gap-8 overflow-x-auto">
-            {[
-              "Hospital Profile",
-              "Departments & Wards",
-              "Billing & Tax Defaults",
-              "Operational Hours",
-              "Integrations & API",
-            ].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`pb-3 text-sm font-medium whitespace-nowrap transition-colors relative ${
-                  activeTab === tab
-                    ? "text-[#4F46E5] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4F46E5] rounded-t-md" />
-                )}
-              </button>
-            ))}
-          </div>
+        {/* NAVIGATION TABS */}
+        <div className="flex items-center gap-2 border-b border-[#E2E8F0] overflow-x-auto pb-1">
+          {TAB_OPTIONS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-all ${
+                activeTab === tab
+                  ? "bg-white text-[#4F46E5] shadow-sm border border-[#E2E8F0]"
+                  : "text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100/60"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
 
-        {/* TAB 1: HOSPITAL PROFILE */}
-        {activeTab === "Hospital Profile" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <Building2 className="w-5 h-5 text-[#4F46E5]" />
-                  <h3 className="font-semibold text-base text-[#0F172A]">Facility Identity</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                  <div className="border-2 border-dashed border-[#818CF8] bg-[#EEF2FF]/40 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#EEF2FF]/70 transition-all">
-                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-[#4F46E5] shadow-sm mb-2">
-                      <Upload className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-semibold text-[#4F46E5]">Upload Logo</span>
-                    <span className="text-[10px] text-[#64748B] mt-1">PNG, JPG up to 2MB</span>
-                  </div>
-
-                  <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                        Legal Hospital Name
-                      </label>
-                      <input
-                        type="text"
-                        value={profile.name}
-                        onChange={(e) => handleProfileChange("name", e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                        Registration ID
-                      </label>
-                      <input
-                        type="text"
-                        value={profile.licenseId}
-                        onChange={(e) => handleProfileChange("licenseId", e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                        Official Phone
-                      </label>
-                      <input
-                        type="text"
-                        value={profile.phone}
-                        onChange={(e) => handleProfileChange("phone", e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                        Support Email
-                      </label>
-                      <input
-                        type="email"
-                        value={profile.email}
-                        onChange={(e) => handleProfileChange("email", e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                      />
-                    </div>
-                  </div>
-                </div>
+        {/* TAB 1: GENERAL SETUP */}
+        {activeTab === "General Setup" && (
+          <div className="space-y-6">
+            {/* ADMIN & FACILITY PROFILE EDITING PANEL */}
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 border-b border-[#E2E8F0] pb-4">
+                <UserCheck className="w-5 h-5 text-[#4F46E5]" />
+                <h3 className="font-semibold text-base text-[#0F172A]">Administrator & Hospital Profile</h3>
               </div>
 
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <MapPin className="w-5 h-5 text-[#4F46E5]" />
-                  <h3 className="font-semibold text-base text-[#0F172A]">Physical Address</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Admin Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={adminName}
+                    onChange={(e) => setAdminName(e.target.value)}
+                    placeholder="e.g. Dr. Alex Morgan"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                      Street Address
-                    </label>
-                    <input
-                      type="text"
-                      value={profile.address}
-                      onChange={(e) => handleProfileChange("address", e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      value={profile.city}
-                      onChange={(e) => handleProfileChange("city", e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      value={profile.state}
-                      onChange={(e) => handleProfileChange("state", e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Hospital / Facility Name
+                  </label>
+                  <input
+                    type="text"
+                    value={hospitalName}
+                    onChange={(e) => setHospitalName(e.target.value)}
+                    placeholder="e.g. Sparkle Eye Specialist Hospital"
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-6">
-                  <Grid className="w-5 h-5 text-[#4F46E5]" />
-                  <h3 className="font-semibold text-base text-[#0F172A]">Active Portals & Modules</h3>
-                </div>
+            {/* ACTIVE PORTALS & MODULES */}
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Grid className="w-5 h-5 text-[#4F46E5]" />
+                <h3 className="font-semibold text-base text-[#0F172A]">Active Portals & Modules</h3>
+              </div>
 
-                <div className="space-y-4">
-                  {[
-                    { key: "ehr", title: "EHR Module", desc: "Electronic health records" },
-                    { key: "pharmacy", title: "Pharmacy Portal", desc: "Medication dispensing" },
-                    { key: "optical", title: "Optical & OCT Center", desc: "Eye diagnostics" },
-                    { key: "billing", title: "Billing & Payments", desc: "Financial transactions" },
-                    { key: "patientPortal", title: "Patient Self-Service", desc: "Patient portal access" },
-                    { key: "telemedicine", title: "Telemedicine", desc: "Virtual consultations" },
-                  ].map((mod) => (
+              <div className="space-y-4">
+                {MODULE_ITEMS.map((mod) => {
+                  const isActive = modules[mod.key];
+                  return (
                     <div
                       key={mod.key}
                       className="flex items-center justify-between pt-3 first:pt-0 border-t border-[#F1F5F9] first:border-0"
@@ -430,20 +279,23 @@ export default function SystemSettingsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => toggleModule(mod.key as keyof SystemModules)}
+                        role="switch"
+                        aria-checked={isActive}
+                        aria-label={`Toggle ${mod.title}`}
+                        onClick={() => toggleModule(mod.key)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${
-                          modules[mod.key as keyof SystemModules] ? "bg-[#4F46E5]" : "bg-[#E2E8F0]"
+                          isActive ? "bg-[#4F46E5]" : "bg-[#E2E8F0]"
                         }`}
                       >
                         <div
                           className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                            modules[mod.key as keyof SystemModules] ? "translate-x-5" : "translate-x-0"
+                            isActive ? "translate-x-5" : "translate-x-0"
                           }`}
                         />
                       </button>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -536,158 +388,186 @@ export default function SystemSettingsPage() {
           </div>
         )}
 
-      </div>
-
-      {/* MODAL: ADD DEPARTMENT */}
-      {isAddDeptModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E2E8F0]">
-            <div className="flex justify-between items-center mb-4">
-              <div className="w-10 h-10 bg-[#EEF2FF] rounded-xl flex items-center justify-center text-[#4F46E5]">
-                <Users className="w-5 h-5" />
-              </div>
-              <button
-                onClick={() => setIsAddDeptModalOpen(false)}
-                className="text-[#64748B] hover:text-[#0F172A] transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mb-6">
-              <h3 className="text-lg font-bold text-[#0F172A]">Add Clinical Department</h3>
-              <p className="text-xs text-[#64748B] mt-1">
-                Create a new active department or ward unit for Sparkle Eye Hospital.
-              </p>
-            </div>
-
-            <form onSubmit={handleAddDepartment} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                  Department Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Corneal Specialist Unit"
-                  value={newDeptName}
-                  onChange={(e) => setNewDeptName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                  Initial Staff Count
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={newDeptStaff}
-                  onChange={(e) =>
-                    setNewDeptStaff(e.target.value === "" ? "" : parseInt(e.target.value, 10))
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
+        {/* MODAL: ADD DEPARTMENT */}
+        {isAddDeptModalOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsAddDeptModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E2E8F0]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <div className="w-10 h-10 bg-[#EEF2FF] rounded-xl flex items-center justify-center text-[#4F46E5]">
+                  <Users className="w-5 h-5" />
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsAddDeptModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A] hover:bg-[#F8FAFC]"
+                  className="text-[#64748B] hover:text-[#0F172A] transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-lg font-bold text-[#0F172A]">Add Clinical Department</h3>
+                <p className="text-xs text-[#64748B] mt-1">
+                  Create a new active department or ward unit for {hospitalName || "the facility"}.
+                </p>
+              </div>
+
+              <form onSubmit={handleAddDepartment} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Department Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Corneal Specialist Unit"
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Initial Staff Count
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={newDeptStaff}
+                    onChange={(e) =>
+                      setNewDeptStaff(e.target.value === "" ? "" : parseInt(e.target.value, 10))
+                    }
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddDeptModalOpen(false)}
+                    className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A] hover:bg-[#F8FAFC]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-lg text-sm bg-[#4F46E5] text-white hover:bg-[#4338CA] font-medium"
+                  >
+                    Add Department
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: SAVE CONFIRMATION */}
+        {isSaveModalOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsSaveModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-[#E2E8F0]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center">
+                <div className="w-10 h-10 bg-[#EEF2FF] rounded-xl flex items-center justify-center text-[#4F46E5]">
+                  <Save className="w-5 h-5" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSaveModalOpen(false)}
+                  className="text-[#64748B] hover:text-[#0F172A]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#0F172A]">Confirm Configuration Updates</h3>
+                <p className="text-xs text-[#64748B] mt-1">
+                  Are you sure you want to save these system changes for {hospitalName}?
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => setIsSaveModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A] disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg text-sm bg-[#4F46E5] text-white hover:bg-[#4338CA] font-medium"
+                  type="button"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                  className="px-4 py-2 rounded-lg text-sm bg-[#4F46E5] text-white hover:bg-[#4338CA] flex items-center gap-2 disabled:opacity-50 font-medium"
                 >
-                  Add Department
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isSaving ? "Saving..." : "Confirm & Save"}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* MODAL: SAVE CONFIRMATION */}
-      {isSaveModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-[#E2E8F0]">
-            <div className="flex justify-between items-center">
-              <div className="w-10 h-10 bg-[#EEF2FF] rounded-xl flex items-center justify-center text-[#4F46E5]">
-                <Save className="w-5 h-5" />
+        {/* MODAL: DISCARD CONFIRMATION */}
+        {isDiscardModalOpen && (
+          <div
+            className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsDiscardModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-[#E2E8F0]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center">
+                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDiscardModalOpen(false)}
+                  className="text-[#64748B] hover:text-[#0F172A]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button onClick={() => setIsSaveModalOpen(false)} className="text-[#64748B] hover:text-[#0F172A]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#0F172A]">Confirm Configuration Updates</h3>
-              <p className="text-xs text-[#64748B] mt-1">
-                Are you sure you want to save these system changes to Sparkle Eye Specialist Hospital?
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={() => setIsSaveModalOpen(false)}
-                className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A] disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isSaving}
-                onClick={handleSave}
-                className="px-4 py-2 rounded-lg text-sm bg-[#4F46E5] text-white hover:bg-[#4338CA] flex items-center gap-2 disabled:opacity-50"
-              >
-                {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSaving ? "Saving..." : "Confirm & Save"}
-              </button>
+              <div>
+                <h3 className="text-lg font-bold text-[#0F172A]">Discard Unsaved Changes?</h3>
+                <p className="text-xs text-[#64748B] mt-1">
+                  Any modifications made since your last save will be reset.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDiscardModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A]"
+                >
+                  Continue Editing
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDiscard}
+                  className="px-4 py-2 rounded-lg text-sm bg-rose-600 text-white hover:bg-rose-700 font-medium"
+                >
+                  Discard Changes
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* MODAL: DISCARD CONFIRMATION */}
-      {isDiscardModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-[#E2E8F0]">
-            <div className="flex justify-between items-center">
-              <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <button onClick={() => setIsDiscardModalOpen(false)} className="text-[#64748B] hover:text-[#0F172A]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#0F172A]">Discard Unsaved Changes?</h3>
-              <p className="text-xs text-[#64748B] mt-1">
-                Any modifications made since your last save will be reset.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setIsDiscardModalOpen(false)}
-                className="px-4 py-2 rounded-lg text-sm border border-[#E2E8F0] text-[#0F172A]"
-              >
-                Continue Editing
-              </button>
-              <button
-                onClick={handleDiscard}
-                className="px-4 py-2 rounded-lg text-sm bg-rose-600 text-white hover:bg-rose-700"
-              >
-                Discard Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

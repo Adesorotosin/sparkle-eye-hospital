@@ -2,9 +2,9 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Stethoscope,
   LogOut,
   Plus,
   Search,
@@ -15,7 +15,6 @@ import {
   User,
   ArrowRight,
   X,
-  Eye,
   FileText,
 } from "lucide-react";
 
@@ -146,12 +145,21 @@ export default function NurseDashboard() {
       {/* HEADER BAR */}
       <header className="bg-white border-b border-slate-200/80 px-6 md:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#6B21A8] text-white flex items-center justify-center font-bold shadow-xs">
-            <Stethoscope className="w-5 h-5" />
+          {/* BRAND LOGO FROM PUBLIC FOLDER */}
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[#6B21A8]/5 border border-[#6B21A8]/10 shadow-xs">
+            <Image
+              src="/logo.png" // Replace with your logo filename if different (e.g. /logo.svg)
+              alt="Sparkle Eye Specialist Hospital Logo"
+              width={36}
+              height={36}
+              className="object-contain p-1"
+              priority
+            />
           </div>
+
           <div>
             <h1 className="font-extrabold text-sm text-slate-900 leading-tight">
-              Nurse Triage & Vitals Dashboard
+              Nurse Triage &amp; Vitals Dashboard
             </h1>
             <span className="text-[10px] font-bold text-indigo-600 tracking-wider uppercase block">
               Sparkle Eye Portal • Live Patient Queue
