@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Users,
@@ -12,8 +13,6 @@ import {
   Calendar,
   Receipt,
   Filter,
-  Eye,
-  Sparkles,
 } from "lucide-react";
 import { usePatientFlow } from "@/context/PatientFlowContext";
 
@@ -71,10 +70,16 @@ export default function CashierDashboard() {
       {/* TOP HEADER */}
       <header className="w-full bg-[#3F1D85] text-white px-6 py-3.5 flex flex-col md:flex-row items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          {/* BRAND LOGO ICON */}
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-[#7E57C2] to-[#5E35B1] border border-purple-400/30 flex items-center justify-center shadow-xs group">
-            <Eye className="w-5 h-5 text-white stroke-[2.2]" />
-            <Sparkles className="w-3 h-3 text-amber-300 absolute -top-1 -right-1 animate-pulse" />
+          {/* BRAND LOGO FROM PUBLIC FOLDER */}
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-white/10 border border-white/20 shadow-xs">
+            <Image
+              src="/logo.png" // Replace with your exact logo filename in public/ (e.g., /logo.svg, /sparkle-logo.png)
+              alt="Sparkle Eye Specialist Hospital Logo"
+              width={36}
+              height={36}
+              className="object-contain p-1"
+              priority
+            />
           </div>
 
           <div>
