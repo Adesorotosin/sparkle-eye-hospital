@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db"; // Replace with your actual DB instance (Prisma, Drizzle, etc.)
+import { db } from "@/lib/db";
 
 // --- PATCH: Temporarily Suspend or Reactivate Staff ---
 export async function PATCH(
@@ -18,8 +18,16 @@ export async function PATCH(
       );
     }
 
+    const existing = await db.staff.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { error: `Staff member with id "${id}" not found` },
+        { status: 404 }
+      );
+    }
+
     // Update active status without setting deletedAt
-    const updatedStaff = await (db as any).staff.update({
+    const updatedStaff = await db.staff.update({
       where: { id },
       data: {
         isActive,
@@ -50,8 +58,16 @@ export async function DELETE(
   try {
     const { id } = await params; // ✅ Await params as a Promise
 
+    const existing = await db.staff.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { error: `Staff member with id "${id}" not found` },
+        { status: 404 }
+      );
+    }
+
     // Perform Soft Delete (Deactivate user without removing historical audit logs)
-    const updatedStaff = await (db as any).staff.update({
+    const updatedStaff = await db.staff.update({
       where: { id },
       data: {
         isActive: false,

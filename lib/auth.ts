@@ -6,7 +6,7 @@ export const ROLE_REDIRECT_MAP: Record<string, string> = {
   DOCTOR: "/doctor",
   PHARMACIST: "/pharmacy",
   NURSE: "/nurse",              // <-- MUST BE /nurse
-  CASHIER: "/billing",
+  CASHIER: "/cashier",
   RECEPTIONIST: "/reception",
 };
 

@@ -49,10 +49,8 @@ export default function NurseDashboard() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
   // Logout Handler
-  const handleLogout = () => {
-    document.cookie = "is_logged_in=; path=/; max-age=0;";
-    document.cookie = "user_role=; path=/; max-age=0;";
-    document.cookie = "staff_id=; path=/; max-age=0;";
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     localStorage.removeItem("sparkle_staff_token");
     window.location.href = "/";
   };

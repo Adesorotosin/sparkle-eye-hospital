@@ -21,15 +21,15 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     // 1. Clear tokens & client storage
     localStorage.removeItem("sparkle_staff_token");
     localStorage.clear();
     sessionStorage.clear();
 
-    // 2. Clear auth cookies read by middleware.ts
-    document.cookie = "is_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
-    document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT;";
+    // 2. Clear session cookies server-side (cookies are httpOnly, so this
+    // can no longer be done with document.cookie from the client)
+    await fetch("/api/auth/logout", { method: "POST" });
 
     // 3. Close dropdown
     setProfileDropdownOpen(false);

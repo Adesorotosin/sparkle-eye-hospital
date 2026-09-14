@@ -18,14 +18,25 @@ export interface UserSession {
 }
 
 // Define route access policies
+// NOTE: this is the ONLY place route permissions are defined. proxy.ts
+// imports this directly instead of keeping its own copy, to avoid the two
+// configs drifting out of sync (which is what caused most routes to end up
+// unprotected before).
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/admin": ["IT_ADMIN"],
   "/audit": ["IT_ADMIN"],
+  "/doctor": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "IT_ADMIN"],
   "/emr": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "IT_ADMIN"],
   "/consultation": ["OPHTHALMOLOGIST", "DOCTOR"],
-  "/pharmacy": ["PHARMACIST", "NURSE", "IT_ADMIN"],
+  "/pharmacy": ["PHARMACIST", "NURSE", "IT_ADMIN", "DOCTOR"],
   "/billing": ["CASHIER", "IT_ADMIN"],
+  "/cashier": ["CASHIER", "IT_ADMIN"],
+  "/nurse": ["NURSE", "IT_ADMIN", "DOCTOR"],
   "/reception": ["RECEPTIONIST", "CASHIER", "IT_ADMIN"],
+  "/triage": ["NURSE", "DOCTOR", "OPHTHALMOLOGIST", "IT_ADMIN"],
+  "/diagnostics": ["DOCTOR", "OPHTHALMOLOGIST", "NURSE", "IT_ADMIN"],
+  "/appointments": ["RECEPTIONIST", "NURSE", "DOCTOR", "OPHTHALMOLOGIST", "CASHIER", "IT_ADMIN"],
+  "/inventory": ["PHARMACIST", "IT_ADMIN", "NURSE"],
 };
 
 // Helper: Check if a path requires protection and if the user role matches

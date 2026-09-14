@@ -24,11 +24,11 @@ export default function CashierDashboard() {
 
   const queueList = [
     {
-      id: "PAT-2026-089",
-      fullName: patient.patientId === "PAT-2026-089" ? patient.fullName : "Amina Bello",
+      id: patient.patientId,
+      fullName: patient.fullName,
       coveragePlan: "HMO - AXA Mansard",
-      status: patient.patientId === "PAT-2026-089" ? patient.invoice.status : "pending",
-      grandTotal: patient.patientId === "PAT-2026-089" ? patient.invoice.grandTotal : 45000,
+      status: patient.invoice.status,
+      grandTotal: patient.invoice.grandTotal,
       timeInQueue: "10:45 AM",
       doctor: "Dr. Adebayo",
     },

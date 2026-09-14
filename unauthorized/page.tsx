@@ -8,7 +8,7 @@ export default function UnauthorizedPage() {
         You do not have permission to view this section or your session has expired.
       </p>
       <Link
-        href="/login"
+        href="/"
         className="px-4 py-2 bg-[#4F46E5] text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition-all"
       >
         Return to Login

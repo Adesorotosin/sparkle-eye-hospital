@@ -63,7 +63,7 @@ export default function RegisterPatientPage() {
       <header className="sticky top-0 z-30 w-full bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-8">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-3">
+          <Link href="/doctor" className="flex items-center gap-3">
             <div className="relative w-8 h-8 shrink-0">
               <Image
                 src="/logo.png"
@@ -86,10 +86,10 @@ export default function RegisterPatientPage() {
 
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600">
-            <Link href="/dashboard" className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition">
+            <Link href="/doctor" className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition">
               Dashboard
             </Link>
-            <Link href="/patients" className="px-3 py-1.5 rounded-lg bg-purple-50 text-[#6D4AFF] font-semibold">
+            <Link href="/doctor/patients" className="px-3 py-1.5 rounded-lg bg-purple-50 text-[#6D4AFF] font-semibold">
               Patients
             </Link>
             <Link href="/appointments" className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition">
