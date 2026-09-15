@@ -1,5 +1,5 @@
 "use client";
-
+import Image from "next/image";
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePatientFlow } from "@/context/PatientFlowContext";
@@ -237,32 +237,40 @@ function PharmacyContent() {
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
-      {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
-      <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
-        <div className="p-5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center font-bold text-white shadow-md">
-              <Pill className="w-4 h-4" />
-            </div>
-            <div>
-              <h1 className="font-extrabold text-sm tracking-tight text-white">
-                Sparkle-Eye
-              </h1>
-              <p className="text-[10px] text-slate-400 font-medium">
-                Dispensing Console
-              </p>
-            </div>
-          </div>
+     {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
+<aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+  <div className="p-5 border-b border-slate-800/80">
+    <div className="flex items-center gap-3">
+      {/* BRAND LOGO IMAGE */}
+      <div className="w-9 h-9 relative shrink-0 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 flex items-center justify-center">
+        <Image
+          src="/logo.png" // Replace with your exact filename (e.g., /logo.svg, /logo.png)
+          alt="Sparkle Eye Logo"
+          width={36}
+          height={36}
+          className="object-contain p-1"
+          priority
+        />
+      </div>
+      <div>
+        <h1 className="font-extrabold text-sm tracking-tight text-white">
+          Sparkle-Eye
+        </h1>
+        <p className="text-[10px] text-slate-400 font-medium">
+          Dispensing Console
+        </p>
+      </div>
+    </div>
 
-          <div className="mt-4 relative">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search prescriptions..."
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
-            />
-          </div>
-        </div>
+    <div className="mt-4 relative">
+      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <input
+        type="text"
+        placeholder="Search prescriptions..."
+        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+      />
+    </div>
+  </div>
 
         {/* Queue List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-5">
