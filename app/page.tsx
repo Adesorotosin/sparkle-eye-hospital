@@ -75,10 +75,7 @@ export default function LoginPage() {
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight mb-4 text-white">
             In-House Hospital <br /> Management System
           </h1>
-          <p className="text-zinc-400 text-sm leading-relaxed max-w-md">
-            Authorized Personnel Only. All activities are monitored, logged,
-            and subject to periodic clinical compliance audits.
-          </p>
+          
         </div>
 
         {/* Server Status Badge */}
