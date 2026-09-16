@@ -16,6 +16,8 @@ import {
   Syringe,
   Plus,
   X,
+  UserPlus,
+  Boxes,
 } from "lucide-react";
 
 export interface PrescriptionItem {
@@ -82,7 +84,6 @@ function PharmacyContent() {
     prescriptions: FALLBACK_PRESCRIPTIONS,
     vitals: { primaryComplaint: "Post-Operative Cataract Care — OD" },
   };
-  const setPatient = patientContext?.setPatient;
 
   const [isDispensing, setIsDispensing] = useState(false);
   const [dispenseSuccess, setDispenseSuccess] = useState(false);
@@ -101,6 +102,136 @@ function PharmacyContent() {
 
   const [fallbackDrugs, setFallbackDrugs] = useState<PrescriptionItem[]>(FALLBACK_PRESCRIPTIONS);
 
+  // Register Patient modal state
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isRegisteringPatient, setIsRegisteringPatient] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [newPatient, setNewPatient] = useState({
+    fullName: "",
+    coveragePlan: "Self-Pay",
+    age: "",
+    gender: "Female",
+    phone: "",
+    allergies: "",
+  });
+
+  // Drug Inventory modal state
+  const [isDrugInventoryOpen, setIsDrugInventoryOpen] = useState(false);
+  interface DrugStockItem {
+    id: string;
+    name: string;
+    category: string;
+    stock: number;
+    reorderLevel: number;
+    price: number;
+  }
+  const [drugInventory, setDrugInventory] = useState<DrugStockItem[]>([]);
+  const [isLoadingDrugInventory, setIsLoadingDrugInventory] = useState(false);
+  const [isAddDrugStockModalOpen, setIsAddDrugStockModalOpen] = useState(false);
+  const [isSubmittingDrugStock, setIsSubmittingDrugStock] = useState(false);
+  const [newDrugStock, setNewDrugStock] = useState({
+    name: "",
+    category: "Antibiotics",
+    stock: "",
+    reorderLevel: "",
+    price: "",
+  });
+
+  const loadDrugInventory = async () => {
+    setIsLoadingDrugInventory(true);
+    try {
+      const res = await fetch("/api/inventory?domain=pharmacy");
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("API Error Details:", data);
+        throw new Error(data.error || "Failed to load drug inventory");
+      }
+
+      setDrugInventory(data.items || []);
+    } catch (err: any) {
+      console.error("Inventory Fetch Error:", err.message);
+    } finally {
+      setIsLoadingDrugInventory(false);
+    }
+  };
+
+  const handleOpenDrugInventory = () => {
+    setIsDrugInventoryOpen(true);
+    loadDrugInventory();
+  };
+
+  const handleRegisterPatient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPatient.fullName) return;
+    setIsRegisteringPatient(true);
+    setRegisterError(null);
+
+    try {
+      const res = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: newPatient.fullName,
+          coveragePlan: newPatient.coveragePlan,
+          age: newPatient.age ? Number(newPatient.age) : undefined,
+          gender: newPatient.gender,
+          phone: newPatient.phone || undefined,
+          allergies: newPatient.allergies || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to register patient");
+      }
+      const { patient: created } = await res.json();
+
+      setIsRegisterModalOpen(false);
+      setNewPatient({ fullName: "", coveragePlan: "Self-Pay", age: "", gender: "Female", phone: "", allergies: "" });
+
+      // Jump straight to viewing the newly registered patient
+      handlePatientSelect(created.patientId, created.fullName);
+    } catch (err) {
+      setRegisterError(err instanceof Error ? err.message : "Failed to register patient");
+    } finally {
+      setIsRegisteringPatient(false);
+    }
+  };
+
+  const handleAddDrugStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDrugStock.name || !newDrugStock.stock || !newDrugStock.price) return;
+    setIsSubmittingDrugStock(true);
+
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newDrugStock.name,
+          category: newDrugStock.category,
+          stock: Number(newDrugStock.stock),
+          reorderLevel: newDrugStock.reorderLevel ? Number(newDrugStock.reorderLevel) : 5,
+          price: Number(newDrugStock.price),
+          domain: "pharmacy",
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to add drug");
+      }
+      const { item } = await res.json();
+      setDrugInventory((prev) => [item, ...prev]);
+      setNewDrugStock({ name: "", category: "Antibiotics", stock: "", reorderLevel: "", price: "" });
+      setIsAddDrugStockModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to add drug");
+    } finally {
+      setIsSubmittingDrugStock(false);
+    }
+  };
+
   const patientId = searchParams.get("patientId") || patient.patientId;
   const isContextPatient = patientId === patient.patientId;
 
@@ -108,15 +239,15 @@ function PharmacyContent() {
     ? {
         id: patient.patientId,
         name: patient.fullName || "Mrs. Chidinma Okafor",
-        age: 42,
-        gender: "Female",
-        phone: "+234 803 123 4567",
+        age: patient.age ?? 42,
+        gender: patient.gender || "Female",
+        phone: patient.phone || "+234 803 123 4567",
         hmo: {
           name: patient.coveragePlan || "Private Cash",
           type: (patient.coveragePlan || "").includes("HMO") ? "HMO Private" : "Self-Pay",
           status: "Verified",
         },
-        allergies: ["None"],
+        allergies: patient.allergies ? patient.allergies.split(",").map((a: string) => a.trim()) : ["None"],
         currentStage: "pharmacy",
         assignedDoctor: "Dr. James Okoro",
         visitDate: "27 Aug 2026",
@@ -169,26 +300,28 @@ function PharmacyContent() {
     }));
   };
 
-  const handleAddDrug = (e: React.FormEvent) => {
+  const handleAddDrug = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDrug.drugName || !newDrug.dosage || !newDrug.quantity) return;
 
-    const newItem: PrescriptionItem = {
-      id: `rx-${Date.now()}`,
-      drugName: newDrug.drugName,
-      dosage: newDrug.dosage,
-      quantity: newDrug.quantity,
-      unitPrice: Number(newDrug.unitPrice),
-      totalPrice: Number(newDrug.unitPrice),
-      status: "pending",
-    };
-
-    if (isContextPatient && typeof setPatient === "function") {
-      setPatient((prev: any) => ({
-        ...prev,
-        prescriptions: [...(prev.prescriptions || []), newItem],
-      }));
+    if (isContextPatient && typeof patientContext?.addPrescription === "function") {
+      await patientContext.addPrescription({
+        drugName: newDrug.drugName,
+        dosage: newDrug.dosage,
+        quantity: Number(newDrug.quantity) || 1,
+        pricePerUnit: Number(newDrug.unitPrice),
+        totalPrice: Number(newDrug.unitPrice) * (Number(newDrug.quantity) || 1),
+      });
     } else {
+      const newItem: PrescriptionItem = {
+        id: `rx-${Date.now()}`,
+        drugName: newDrug.drugName,
+        dosage: newDrug.dosage,
+        quantity: newDrug.quantity,
+        unitPrice: Number(newDrug.unitPrice),
+        totalPrice: Number(newDrug.unitPrice),
+        status: "pending",
+      };
       setFallbackDrugs((prev: any) => [...prev, newItem]);
     }
 
@@ -196,24 +329,14 @@ function PharmacyContent() {
     setIsAddModalOpen(false);
   };
 
-  const handleDispenseAndSend = () => {
+  const handleDispenseAndSend = async () => {
     setIsDispensing(true);
 
-    if (isContextPatient && typeof setPatient === "function") {
-      setPatient((prev: any) => ({
-        ...prev,
-        stage: "billing",
-        invoice: {
-          ...prev.invoice,
-          status: "pending_payment",
-          amountDue: coPayDue,
-          totalAmount: totalPrescriptionPrice,
-        },
-        prescriptions: (prev.prescriptions || []).map((rx: any) => ({
-          ...rx,
-          status: "dispensed",
-        })),
-      }));
+    if (isContextPatient && typeof patientContext?.dispensePrescription === "function") {
+      const toDispense = (patient.prescriptions || []).filter(
+        (rx: any) => rx.status === "ready_for_dispensing"
+      );
+      await Promise.all(toDispense.map((rx: any) => patientContext.dispensePrescription(rx.id)));
     }
 
     setTimeout(() => {
@@ -237,40 +360,58 @@ function PharmacyContent() {
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
-     {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
-<aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
-  <div className="p-5 border-b border-slate-800/80">
-    <div className="flex items-center gap-3">
-      {/* BRAND LOGO IMAGE */}
-      <div className="w-9 h-9 relative shrink-0 overflow-hidden rounded-xl border border-slate-700/50 bg-slate-800/50 flex items-center justify-center">
-        <Image
-          src="/logo.png" // Replace with your exact filename (e.g., /logo.svg, /logo.png)
-          alt="Sparkle Eye Logo"
-          width={36}
-          height={36}
-          className="object-contain p-1"
-          priority
-        />
-      </div>
-      <div>
-        <h1 className="font-extrabold text-sm tracking-tight text-white">
-          Sparkle-Eye
-        </h1>
-        <p className="text-[10px] text-slate-400 font-medium">
-          Dispensing Console
-        </p>
-      </div>
-    </div>
-
-    <div className="mt-4 relative">
-      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-      <input
-        type="text"
-        placeholder="Search prescriptions..."
-        className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+      {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
+      <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+        <div className="p-5 border-b border-slate-800/80">
+  <div className="flex items-center gap-3">
+    <div className="w-8 h-8 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-center p-1 shadow-md overflow-hidden relative">
+      <Image
+        src="/logo.png"
+        alt="Sparkle-Eye Logo"
+        width={32}
+        height={32}
+        className="object-contain"
+        priority
       />
     </div>
+    <div>
+      <h1 className="font-extrabold text-sm tracking-tight text-white">
+        Sparkle-Eye
+      </h1>
+      <p className="text-[10px] text-slate-400 font-medium">
+        Dispensing Console
+      </p>
+    </div>
   </div>
+
+  <div className="mt-4 relative">
+    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+    <input
+      type="text"
+      placeholder="Search prescriptions..."
+      className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
+    />
+  </div>
+
+  <div className="mt-3 grid grid-cols-2 gap-2">
+    <button
+      type="button"
+      onClick={() => setIsRegisterModalOpen(true)}
+      className="px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+    >
+      <UserPlus className="w-3.5 h-3.5" />
+      Register Patient
+    </button>
+    <button
+      type="button"
+      onClick={handleOpenDrugInventory}
+      className="px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+    >
+      <Boxes className="w-3.5 h-3.5" />
+      Drug Stock
+    </button>
+  </div>
+</div>
 
         {/* Queue List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-5">
@@ -707,6 +848,295 @@ function PharmacyContent() {
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition shadow-md"
                 >
                   Add to Prescription
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REGISTER PATIENT MODAL */}
+      {isRegisterModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-purple-600" />
+                Register New Patient
+              </h3>
+              <button
+                onClick={() => setIsRegisterModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRegisterPatient} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ngozi Umeh"
+                  value={newPatient.fullName}
+                  onChange={(e) => setNewPatient({ ...newPatient, fullName: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Age</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 35"
+                    value={newPatient.age}
+                    onChange={(e) => setNewPatient({ ...newPatient, age: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Gender</label>
+                  <select
+                    value={newPatient.gender}
+                    onChange={(e) => setNewPatient({ ...newPatient, gender: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                  >
+                    <option>Female</option>
+                    <option>Male</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="e.g. +234 803 000 0000"
+                  value={newPatient.phone}
+                  onChange={(e) => setNewPatient({ ...newPatient, phone: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Coverage Plan</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Self-Pay or HMO - AXA Mansard"
+                  value={newPatient.coveragePlan}
+                  onChange={(e) => setNewPatient({ ...newPatient, coveragePlan: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Known Allergies</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Penicillin, Sulfa drugs (or leave blank)"
+                  value={newPatient.allergies}
+                  onChange={(e) => setNewPatient({ ...newPatient, allergies: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              {registerError && <p className="text-red-600 font-bold">{registerError}</p>}
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isRegisteringPatient}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl font-bold transition shadow-md"
+                >
+                  {isRegisteringPatient ? "Registering…" : "Register Patient"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DRUG INVENTORY MODAL */}
+      {isDrugInventoryOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl border border-slate-100 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <Boxes className="w-4 h-4 text-purple-600" />
+                Drug Stock & Inventory
+              </h3>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDrugStockModalOpen(true)}
+                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Drug
+                </button>
+                <button
+                  onClick={() => setIsDrugInventoryOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {isLoadingDrugInventory ? (
+              <p className="text-xs text-slate-400 py-6 text-center">Loading drug stock…</p>
+            ) : drugInventory.length === 0 ? (
+              <p className="text-xs text-slate-400 py-6 text-center">No drugs in stock yet.</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-slate-400 uppercase text-[10px] tracking-wide border-b border-slate-100">
+                    <th className="py-2 font-bold">Drug</th>
+                    <th className="py-2 font-bold">Category</th>
+                    <th className="py-2 font-bold">Stock</th>
+                    <th className="py-2 font-bold">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drugInventory.map((drug) => (
+                    <tr key={drug.id} className="border-b border-slate-50">
+                      <td className="py-2.5 font-bold text-slate-900">
+                        {drug.name}
+                        <span className="block text-[10px] font-medium text-slate-400">{drug.id}</span>
+                      </td>
+                      <td className="py-2.5 text-slate-600 font-medium">{drug.category}</td>
+                      <td className="py-2.5">
+                        <span
+                          className={`font-bold ${
+                            drug.stock <= drug.reorderLevel ? "text-rose-600" : "text-slate-800"
+                          }`}
+                        >
+                          {drug.stock}
+                        </span>
+                        {drug.stock <= drug.reorderLevel && (
+                          <span className="ml-1.5 text-[9px] font-bold uppercase text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                            Low
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 font-bold text-slate-900">₦{drug.price.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ADD DRUG TO STOCK MODAL */}
+      {isAddDrugStockModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <Plus className="w-4 h-4 text-purple-600" />
+                Add New Drug to Stock
+              </h3>
+              <button
+                onClick={() => setIsAddDrugStockModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddDrugStock} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Drug Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Ciprofloxacin 500mg"
+                  value={newDrugStock.name}
+                  onChange={(e) => setNewDrugStock({ ...newDrugStock, name: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Category</label>
+                <select
+                  value={newDrugStock.category}
+                  onChange={(e) => setNewDrugStock({ ...newDrugStock, category: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                >
+                  <option>Antibiotics</option>
+                  <option>Analgesics</option>
+                  <option>Ophthalmic Drops</option>
+                  <option>Antihistamines</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Stock Qty</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="e.g. 50"
+                    value={newDrugStock.stock}
+                    onChange={(e) => setNewDrugStock({ ...newDrugStock, stock: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Reorder At</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 15"
+                    value={newDrugStock.reorderLevel}
+                    onChange={(e) => setNewDrugStock({ ...newDrugStock, reorderLevel: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 font-bold mb-1">Price (₦)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    placeholder="e.g. 3500"
+                    value={newDrugStock.price}
+                    onChange={(e) => setNewDrugStock({ ...newDrugStock, price: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDrugStockModalOpen(false)}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDrugStock}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl font-bold transition shadow-md"
+                >
+                  {isSubmittingDrugStock ? "Saving…" : "Add to Stock"}
                 </button>
               </div>
             </form>

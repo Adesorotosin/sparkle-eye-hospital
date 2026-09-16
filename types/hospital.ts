@@ -84,6 +84,10 @@ export interface PatientRecord {
   patientId: string;
   fullName: string;
   coveragePlan: string;
+  age?: number;
+  gender?: string;
+  phone?: string;
+  allergies?: string;
   vitals?: TriageVitals;
   diagnostics: DiagnosticOrder[];
   prescriptions: Prescription[];
