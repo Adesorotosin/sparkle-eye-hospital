@@ -80,6 +80,17 @@ export type ActivityLog = {
   performedBy: string;
 };
 
+export type Encounter = {
+  id: string;
+  slitLampOD?: string;
+  slitLampOS?: string;
+  refractionOD?: { sphere: string; cylinder: string; axis: string };
+  refractionOS?: { sphere: string; cylinder: string; axis: string };
+  diagnosis?: string;
+  status: "draft" | "completed";
+  createdAt: string;
+};
+
 export interface PatientRecord {
   patientId: string;
   fullName: string;
@@ -93,4 +104,5 @@ export interface PatientRecord {
   prescriptions: Prescription[];
   invoice: PatientInvoice;
   activityLogs?: ActivityLog[];
+  encounters?: Encounter[];
 }

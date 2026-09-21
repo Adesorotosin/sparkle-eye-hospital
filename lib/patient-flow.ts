@@ -16,6 +16,7 @@ import {
   PatientInvoice,
   LineItem,
   ActivityLog,
+  Encounter,
 } from "@/types/hospital";
 
 export async function getOrCreatePatientByCode(patientCode: string) {
@@ -107,7 +108,7 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
   if (patientError) throw patientError;
   if (!patient) return null;
 
-  const [vitalsRes, diagnosticsRes, prescriptionsRes, invoiceRes, logsRes] = await Promise.all([
+  const [vitalsRes, diagnosticsRes, prescriptionsRes, invoiceRes, logsRes, encountersRes] = await Promise.all([
     supabase
       .from("vitals")
       .select("*")
@@ -138,6 +139,11 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
       .select("*")
       .eq("patient_id", patient.id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("encounters")
+      .select("*")
+      .eq("patient_id", patient.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   if (vitalsRes.error) throw vitalsRes.error;
@@ -145,6 +151,7 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
   if (prescriptionsRes.error) throw prescriptionsRes.error;
   if (invoiceRes.error) throw invoiceRes.error;
   if (logsRes.error) throw logsRes.error;
+  if (encountersRes.error) throw encountersRes.error;
 
   const vitals: TriageVitals | undefined = vitalsRes.data
     ? {
@@ -206,6 +213,17 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
     performedBy: l.performed_by,
   }));
 
+  const encounters: Encounter[] = (encountersRes.data ?? []).map((e) => ({
+    id: e.id,
+    slitLampOD: e.slit_lamp_od ?? undefined,
+    slitLampOS: e.slit_lamp_os ?? undefined,
+    refractionOD: e.refraction_od ?? undefined,
+    refractionOS: e.refraction_os ?? undefined,
+    diagnosis: e.diagnosis ?? undefined,
+    status: e.status,
+    createdAt: e.created_at,
+  }));
+
   return {
     patientId: patient.patient_code,
     fullName: patient.full_name,
@@ -214,6 +232,7 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
     gender: patient.gender ?? undefined,
     phone: patient.phone ?? undefined,
     allergies: patient.allergies ?? undefined,
+    encounters,
     vitals,
     diagnostics,
     prescriptions,

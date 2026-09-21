@@ -1,138 +1,166 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
+import React, { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
-  Clock,
   ChevronLeft,
-  ChevronRight,
   Activity,
-  CheckSquare,
-  Search,
   Eye,
+  Pill,
+  Receipt,
+  FlaskConical,
+  Stethoscope,
+  User,
 } from "lucide-react";
+import { PatientRecord } from "@/types/hospital";
+
+const tabs = [
+  "Patient Info",
+  "History",
+  "Diagnosis",
+  "Investigations",
+  "Pharmacy",
+  "Payments",
+  "Treatment",
+  "Surgery",
+  "Reports",
+];
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export default function PatientEHRPage() {
-  const [activeTab, setActiveTab] = useState("Eye Examination");
-  const [selectedVisit, setSelectedVisit] = useState("24 Aug 2026");
+  const params = useParams();
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  // Eye Exam Form State
-  const [affectedEye, setAffectedEye] = useState("OU");
-  const [chiefComplaint, setChiefComplaint] = useState(
-    "Gradual blurring of vision, both eyes, worse in the right"
-  );
-  const [duration, setDuration] = useState("3 months");
-  const [currentDrops, setCurrentDrops] = useState("Timolol 0.5% BD");
-  const [pastSurgeries, setPastSurgeries] = useState("Cataract surgery OS — 2024");
+  const [activeTab, setActiveTab] = useState("Patient Info");
+  const [patient, setPatient] = useState<PatientRecord | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null);
 
-  // Systemic Conditions State
-  const [systemic, setSystemic] = useState({
-    diabetes: true,
-    hypertension: true,
-    asthma: false,
-    sickleCell: false,
-  });
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
 
-  // Anatomic Segment Findings State
-  const [anatomicFindings, setAnatomicFindings] = useState({
-    odLids: "Normal",
-    osLids: "Normal",
-    odConjunctiva: "Clear",
-    osConjunctiva: "Clear",
-    odCornea: "Clear",
-    osCornea: "Clear",
-    odAC: "Quiet, Deep",
-    osAC: "Quiet, Deep",
-    odIris: "Normal",
-    osIris: "Normal",
-    odLens: "Nuclear Sclerosis 2+",
-    osLens: "PCIOL in situ (Clear)",
-    odOpticDisc: "C/D 0.6, Rim thin temporally",
-    osOpticDisc: "C/D 0.4, Healthy rim",
-    odMacula: "Normal reflex",
-    osMacula: "Normal reflex",
-  });
+    async function loadPatient() {
+      try {
+        const res = await fetch(`/api/patients/${id}`);
+        if (!res.ok) throw new Error("Failed to load patient");
+        const { patient: fetched } = await res.json();
+        if (cancelled) return;
+        setPatient(fetched);
+        if (fetched.encounters && fetched.encounters.length > 0) {
+          setSelectedEncounterId(fetched.encounters[0].id);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
 
-  const tabs = [
-    "Patient Info",
-    "History",
-    "Eye Examination",
-    "Diagnosis",
-    "Treatment",
-    "Investigations",
-    "Surgery",
-    "Pharmacy",
-    "Payments",
-    "Reports",
-  ];
+    loadPatient();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
-  const visitHistory = [
-    { date: "24 Aug 2026", type: "Follow-up Review", isToday: true },
-    { date: "10 Jul 2026", type: "Glaucoma Check", isToday: false },
-    { date: "15 May 2026", type: "Initial Examination", isToday: false },
-    { date: "02 Mar 2026", type: "Refraction Test", isToday: false },
-    { date: "18 Jan 2026", type: "Emergency Consult", isToday: false },
-  ];
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F5F8]">
+        <p className="text-sm text-slate-500">Loading patient chart…</p>
+      </div>
+    );
+  }
+
+  if (!patient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F3F5F8]">
+        <p className="text-sm text-red-600">Patient not found.</p>
+      </div>
+    );
+  }
+
+  const selectedEncounter =
+    patient.encounters?.find((e) => e.id === selectedEncounterId) || patient.encounters?.[0];
+
+  const allergyList = patient.allergies
+    ? patient.allergies.split(",").map((a) => a.trim()).filter((a) => a && a.toLowerCase() !== "none")
+    : [];
 
   return (
     <div className="min-h-screen w-full bg-[#F3F5F8] font-sans antialiased text-slate-800">
-      {/* 1. TOP PATIENT HEADER BANNER */}
+      {/* TOP PATIENT HEADER BANNER */}
       <header className="sticky top-0 z-30 w-full bg-white border-b border-slate-200 shadow-sm px-6 py-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          
-          {/* Left: Patient Avatar & Key Info */}
           <div className="flex items-center gap-4">
             <div className="w-11 h-11 rounded-full bg-[#EFEBFF] text-[#6D4AFF] font-bold text-sm flex items-center justify-center shrink-0 border border-purple-100">
-              AO
+              {initials(patient.fullName)}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold text-slate-900 leading-none">
-                  Mrs. Adaeze Okonkwo
+                  {patient.fullName}
                 </h1>
                 <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  SESH-2026-089
+                  {patient.patientId}
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium mt-1">
-                54 / Female
+                {patient.age ? `${patient.age} / ` : ""}
+                {patient.gender || "—"} · {patient.coveragePlan}
               </p>
             </div>
           </div>
 
-          {/* Center: Vitals Badge */}
+          {/* Center: Real Vitals (from Triage), when available */}
           <div className="flex items-center gap-6 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 text-xs font-semibold text-slate-600">
             <div>
               <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                BLOOD PRESSURE
+                VISUAL ACUITY (OD / OS)
               </span>
-              <span className="text-slate-900 font-bold">130/85 mmHg</span>
+              <span className="text-slate-900 font-bold">
+                {patient.vitals ? `${patient.vitals.visualAcuityOD} / ${patient.vitals.visualAcuityOS}` : "Not recorded"}
+              </span>
             </div>
             <div className="h-6 w-px bg-slate-200"></div>
             <div>
               <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-bold">
-                PULSE RATE
+                IOP
               </span>
-              <span className="text-slate-900 font-bold">78 bpm</span>
+              <span className="text-slate-900 font-bold">
+                {patient.vitals ? `${patient.vitals.iop} mmHg` : "Not recorded"}
+              </span>
             </div>
           </div>
 
-          {/* Right: Clinical Alert Badges */}
+          {/* Right: Real allergy badges */}
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-              <span>Drug Allergy: Sulfonamides</span>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-              <span>Diabetic</span>
-            </div>
+            {allergyList.length > 0 ? (
+              allergyList.map((a) => (
+                <div
+                  key={a}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Allergy: {a}</span>
+                </div>
+              ))
+            ) : (
+              <span className="text-xs text-slate-400 font-medium">No known allergies on file</span>
+            )}
           </div>
         </div>
 
-        {/* 2. EHR MODULE TAB NAVIGATION */}
+        {/* EHR MODULE TAB NAVIGATION */}
         <div className="mt-4 border-t border-slate-100 pt-2 flex items-center gap-1 overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
             <button
@@ -152,8 +180,7 @@ export default function PatientEHRPage() {
 
       {/* MAIN CONTENT AREA */}
       <div className="flex min-h-[calc(100vh-120px)]">
-        
-        {/* LEFT PANEL: VISIT HISTORY */}
+        {/* LEFT PANEL: VISIT HISTORY — real encounters */}
         <aside className="w-64 border-r border-slate-200/80 bg-white p-4 shrink-0 hidden md:block">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -162,539 +189,252 @@ export default function PatientEHRPage() {
             <ChevronLeft className="w-4 h-4 text-slate-400 cursor-pointer" />
           </div>
 
-          <div className="space-y-2">
-            {visitHistory.map((visit) => (
-              <button
-                key={visit.date}
-                onClick={() => setSelectedVisit(visit.date)}
-                className={`w-full text-left p-3 rounded-xl border text-xs transition ${
-                  selectedVisit === visit.date
-                    ? "bg-purple-50/80 border-[#6D4AFF] ring-1 ring-[#6D4AFF]/20"
-                    : "bg-slate-50/60 border-slate-200/80 hover:bg-slate-100"
-                }`}
-              >
-                <div className="flex items-center justify-between font-bold text-slate-900">
-                  <span>
-                    {visit.date} {visit.isToday && "(Today)"}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  {visit.type}
-                </p>
-              </button>
-            ))}
-          </div>
+          {!patient.encounters || patient.encounters.length === 0 ? (
+            <p className="text-xs text-slate-400">No consultations recorded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {patient.encounters.map((visit, idx) => (
+                <button
+                  key={visit.id}
+                  onClick={() => setSelectedEncounterId(visit.id)}
+                  className={`w-full text-left p-3 rounded-xl border text-xs transition ${
+                    selectedEncounterId === visit.id
+                      ? "bg-purple-50/80 border-[#6D4AFF] ring-1 ring-[#6D4AFF]/20"
+                      : "bg-slate-50/60 border-slate-200/80 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold text-slate-900">
+                    <span>
+                      {new Date(visit.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "2-digit",
+                        year: "numeric",
+                      })}
+                      {idx === 0 && " (Latest)"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    {visit.diagnosis || (visit.status === "draft" ? "Draft consultation" : "Consultation")}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <Link
+            href={`/doctor/patients/${patient.patientId}/encounter`}
+            className="mt-4 block text-center px-3 py-2 bg-[#6D4AFF] hover:bg-[#5B3CE1] text-white rounded-xl font-bold text-xs transition"
+          >
+            + Start New Consultation
+          </Link>
         </aside>
 
         {/* RIGHT CANVAS: ACTIVE TAB CONTENT */}
         <main className="flex-1 p-6 space-y-6 max-w-6xl">
-          {activeTab === "Eye Examination" && (
-            <>
-              {/* SECTION HEADER */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Eye Examination Overview
-                </h2>
+          {activeTab === "Patient Info" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <User className="w-5 h-5 text-[#6D4AFF]" /> Patient Information
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <Field label="Full Name" value={patient.fullName} />
+                <Field label="Patient ID" value={patient.patientId} />
+                <Field label="Age" value={patient.age ? `${patient.age} years` : "Not recorded"} />
+                <Field label="Gender" value={patient.gender || "Not recorded"} />
+                <Field label="Phone" value={patient.phone || "Not recorded"} />
+                <Field label="Coverage Plan" value={patient.coveragePlan} />
+                <Field label="Known Allergies" value={patient.allergies || "None recorded"} />
               </div>
-
-              {/* CARD 1: CHIEF COMPLAINT & MEDICAL HISTORY */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Chief Complaint & Medical History
-                </h3>
-
-                {/* Complaint & Duration */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="md:col-span-3">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Chief Complaint
-                    </label>
-                    <input
-                      type="text"
-                      value={chiefComplaint}
-                      onChange={(e) => setChiefComplaint(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6D4AFF]/20 focus:border-[#6D4AFF]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Duration
-                    </label>
-                    <input
-                      type="text"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6D4AFF]/20 focus:border-[#6D4AFF]"
-                    />
-                  </div>
-                </div>
-
-                {/* Affected Eye, Eye Drops, Past Surgeries */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Affected Eye
-                    </label>
-                    <div className="flex items-center gap-2 pt-0.5">
-                      {["OD", "OS", "OU"].map((eye) => (
-                        <button
-                          key={eye}
-                          type="button"
-                          onClick={() => setAffectedEye(eye)}
-                          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg border transition ${
-                            affectedEye === eye
-                              ? "bg-purple-50 border-[#6D4AFF] text-[#6D4AFF]"
-                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          {eye}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Current Eye Drops
-                    </label>
-                    <input
-                      type="text"
-                      value={currentDrops}
-                      onChange={(e) => setCurrentDrops(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6D4AFF]/20 focus:border-[#6D4AFF]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Past Ocular Surgeries
-                    </label>
-                    <input
-                      type="text"
-                      value={pastSurgeries}
-                      onChange={(e) => setPastSurgeries(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#6D4AFF]/20 focus:border-[#6D4AFF]"
-                    />
-                  </div>
-                </div>
-
-                {/* Systemic Conditions */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-2">
-                    Systemic Conditions
-                  </label>
-                  <div className="flex items-center gap-6 text-xs font-semibold text-slate-700">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={systemic.diabetes}
-                        onChange={(e) =>
-                          setSystemic({ ...systemic, diabetes: e.target.checked })
-                        }
-                        className="w-4 h-4 rounded text-[#6D4AFF] accent-[#6D4AFF]"
-                      />
-                      Diabetes
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={systemic.hypertension}
-                        onChange={(e) =>
-                          setSystemic({ ...systemic, hypertension: e.target.checked })
-                        }
-                        className="w-4 h-4 rounded text-[#6D4AFF] accent-[#6D4AFF]"
-                      />
-                      Hypertension
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={systemic.asthma}
-                        onChange={(e) =>
-                          setSystemic({ ...systemic, asthma: e.target.checked })
-                        }
-                        className="w-4 h-4 rounded text-[#6D4AFF] accent-[#6D4AFF]"
-                      />
-                      Asthma
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={systemic.sickleCell}
-                        onChange={(e) =>
-                          setSystemic({ ...systemic, sickleCell: e.target.checked })
-                        }
-                        className="w-4 h-4 rounded text-[#6D4AFF] accent-[#6D4AFF]"
-                      />
-                      Sickle Cell
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD 2: VISUAL ACUITY & INTRAOCULAR PRESSURE */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Visual Acuity Table (2 Cols Wide) */}
-                <div className="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Visual Acuity (VA) Split
-                  </h3>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                          <th className="pb-3">Parameter</th>
-                          <th className="pb-3">OD (Right Eye)</th>
-                          <th className="pb-3">OS (Left Eye)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                        <tr>
-                          <td className="py-3 font-semibold text-slate-900">Unaided Vision</td>
-                          <td className="py-2 pr-3">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/36</option>
-                              <option>6/60</option>
-                              <option>6/18</option>
-                            </select>
-                          </td>
-                          <td className="py-2">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/18</option>
-                              <option>6/12</option>
-                              <option>6/9</option>
-                            </select>
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td className="py-3 font-semibold text-slate-900">Current Glasses</td>
-                          <td className="py-2 pr-3">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/24</option>
-                              <option>6/18</option>
-                            </select>
-                          </td>
-                          <td className="py-2">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/12</option>
-                              <option>6/9</option>
-                            </select>
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td className="py-3 font-semibold text-slate-900">Best Corrected</td>
-                          <td className="py-2 pr-3">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/12</option>
-                              <option>6/9</option>
-                            </select>
-                          </td>
-                          <td className="py-2">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/9</option>
-                              <option>6/6</option>
-                            </select>
-                          </td>
-                        </tr>
-
-                        <tr>
-                          <td className="py-3 font-semibold text-slate-900">Pinhole</td>
-                          <td className="py-2 pr-3">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/12</option>
-                              <option>6/9</option>
-                            </select>
-                          </td>
-                          <td className="py-2">
-                            <select className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF]">
-                              <option>6/9</option>
-                              <option>6/6</option>
-                            </select>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Intraocular Pressure Box (1 Col Wide) */}
-                <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 mb-4">
-                      Intraocular Pressure (IOP)
-                    </h3>
-
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                          OD (Right Eye)
-                        </label>
-                        <div className="p-2.5 rounded-xl border-2 border-amber-400 bg-amber-50/50 text-amber-900 font-bold text-center text-sm">
-                          22 mmHg
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                          OS (Left Eye)
-                        </label>
-                        <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-bold text-center text-sm">
-                          16 mmHg
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Measurement Method
-                      </label>
-                      <select className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium focus:outline-none focus:border-[#6D4AFF]">
-                        <option>NCT (Non-Contact Tonometry)</option>
-                        <option>Goldmann Applanation Tonometry</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Measured on 24 Aug 2026, 10:32 AM</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* CARD 3: ANATOMIC EYE EXAMINATION (ANTERIOR & POSTERIOR SEGMENTS) */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-[#6D4AFF]" />
-                    <h3 className="text-sm font-bold text-slate-900">
-                      Anatomic Segment Examination
-                    </h3>
-                  </div>
-                  <span className="text-[11px] font-medium text-slate-400">
-                    Slit Lamp & Ophthalmoscopy
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold">
-                        <th className="pb-3 w-1/4">Anatomic Structure</th>
-                        <th className="pb-3 w-3/8">OD (Right Eye)</th>
-                        <th className="pb-3 w-3/8">OS (Left Eye)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
-                      {/* Anterior Segment Header */}
-                      <tr className="bg-slate-50/70">
-                        <td colSpan={3} className="py-2 px-1 font-bold text-slate-500 text-[11px] tracking-wider uppercase">
-                          Anterior Segment
-                        </td>
-                      </tr>
-
-                      {/* Lids & Adnexa */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Lids & Adnexa</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odLids}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odLids: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osLids}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osLids: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Conjunctiva / Sclera */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Conjunctiva / Sclera</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odConjunctiva}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odConjunctiva: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osConjunctiva}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osConjunctiva: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Cornea */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Cornea</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odCornea}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odCornea: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osCornea}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osCornea: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Anterior Chamber */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Anterior Chamber</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odAC}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odAC: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osAC}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osAC: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Iris / Pupil */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Iris & Pupil</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odIris}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odIris: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osIris}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osIris: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Crystalline Lens */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Crystalline Lens</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odLens}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odLens: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osLens}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osLens: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Posterior Segment Header */}
-                      <tr className="bg-slate-50/70">
-                        <td colSpan={3} className="py-2 px-1 font-bold text-slate-500 text-[11px] tracking-wider uppercase">
-                          Posterior Segment (Fundus)
-                        </td>
-                      </tr>
-
-                      {/* Optic Disc */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Optic Disc / Cup-to-Disc</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odOpticDisc}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odOpticDisc: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osOpticDisc}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osOpticDisc: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-
-                      {/* Macula */}
-                      <tr>
-                        <td className="py-2.5 font-semibold text-slate-900">Macula & Retina</td>
-                        <td className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={anatomicFindings.odMacula}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, odMacula: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2">
-                          <input
-                            type="text"
-                            value={anatomicFindings.osMacula}
-                            onChange={(e) => setAnatomicFindings({ ...anatomicFindings, osMacula: e.target.value })}
-                            className="w-full p-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#6D4AFF] focus:bg-white"
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
+            </div>
           )}
 
-          {/* PLACEHOLDER STATES FOR OTHER TABS */}
-          {activeTab !== "Eye Examination" && (
+          {activeTab === "History" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-5">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#6D4AFF]" /> Consultation History
+              </h2>
+              {selectedEncounter ? (
+                <div className="space-y-4 text-sm">
+                  <p className="text-xs text-slate-400 font-semibold">
+                    {new Date(selectedEncounter.createdAt).toLocaleString()}
+                  </p>
+                  <Field label="Slit Lamp — OD" value={selectedEncounter.slitLampOD || "Not recorded"} />
+                  <Field label="Slit Lamp — OS" value={selectedEncounter.slitLampOS || "Not recorded"} />
+                  <Field
+                    label="Refraction — OD"
+                    value={
+                      selectedEncounter.refractionOD
+                        ? `${selectedEncounter.refractionOD.sphere} / ${selectedEncounter.refractionOD.cylinder} x ${selectedEncounter.refractionOD.axis}`
+                        : "Not recorded"
+                    }
+                  />
+                  <Field
+                    label="Refraction — OS"
+                    value={
+                      selectedEncounter.refractionOS
+                        ? `${selectedEncounter.refractionOS.sphere} / ${selectedEncounter.refractionOS.cylinder} x ${selectedEncounter.refractionOS.axis}`
+                        : "Not recorded"
+                    }
+                  />
+                  <Field label="Diagnosis" value={selectedEncounter.diagnosis || "Not recorded"} />
+                  <Field label="Status" value={selectedEncounter.status === "completed" ? "Completed" : "Draft"} />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">No consultations recorded yet for this patient.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Diagnosis" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-[#6D4AFF]" /> Diagnosis
+              </h2>
+              {selectedEncounter?.diagnosis ? (
+                <p className="text-sm text-slate-700 leading-relaxed">{selectedEncounter.diagnosis}</p>
+              ) : (
+                <p className="text-sm text-slate-400">No diagnosis recorded yet. Start a consultation to add one.</p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Investigations" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <FlaskConical className="w-5 h-5 text-[#6D4AFF]" /> Investigations / Diagnostic Orders
+              </h2>
+              {patient.diagnostics.length === 0 ? (
+                <p className="text-sm text-slate-400">No diagnostic tests ordered yet.</p>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold">
+                      <th className="py-2">Test</th>
+                      <th className="py-2">Price</th>
+                      <th className="py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {patient.diagnostics.map((d) => (
+                      <tr key={d.id}>
+                        <td className="py-2.5">{d.name}</td>
+                        <td className="py-2.5">₦{d.price.toLocaleString()}</td>
+                        <td className="py-2.5 capitalize">{d.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Pharmacy" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Pill className="w-5 h-5 text-[#6D4AFF]" /> Prescriptions
+              </h2>
+              {patient.prescriptions.length === 0 ? (
+                <p className="text-sm text-slate-400">No prescriptions on file yet.</p>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold">
+                      <th className="py-2">Drug</th>
+                      <th className="py-2">Dosage</th>
+                      <th className="py-2">Qty</th>
+                      <th className="py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {patient.prescriptions.map((rx) => (
+                      <tr key={rx.id}>
+                        <td className="py-2.5">{rx.drugName}</td>
+                        <td className="py-2.5">{rx.dosage}</td>
+                        <td className="py-2.5">{rx.quantity}</td>
+                        <td className="py-2.5 capitalize">{rx.status.replace(/_/g, " ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === "Payments" && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-[#6D4AFF]" /> Billing & Payments
+              </h2>
+              {patient.invoice.items.length === 0 ? (
+                <p className="text-sm text-slate-400">No invoice items yet.</p>
+              ) : (
+                <>
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-400 uppercase tracking-wider font-bold">
+                        <th className="py-2">Item</th>
+                        <th className="py-2">Category</th>
+                        <th className="py-2">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                      {patient.invoice.items.map((item) => (
+                        <tr key={item.id}>
+                          <td className="py-2.5">{item.name}</td>
+                          <td className="py-2.5 capitalize">{item.category}</td>
+                          <td className="py-2.5">₦{item.totalPrice.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="pt-3 border-t border-slate-100 space-y-1 text-sm">
+                    <div className="flex justify-between text-slate-500">
+                      <span>Subtotal</span>
+                      <span>₦{patient.invoice.subtotal.toLocaleString()}</span>
+                    </div>
+                    {patient.invoice.discountAmount > 0 && (
+                      <div className="flex justify-between text-slate-500">
+                        <span>Discount</span>
+                        <span>-₦{patient.invoice.discountAmount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-bold text-slate-900">
+                      <span>Grand Total</span>
+                      <span>₦{patient.invoice.grandTotal.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Status</span>
+                      <span className="capitalize">{patient.invoice.status}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {["Treatment", "Surgery", "Reports"].includes(activeTab) && (
             <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm space-y-3">
-              <div className="w-12 h-12 rounded-full bg-purple-50 text-[#6D4AFF] flex items-center justify-center mx-auto">
-                <Activity className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+                <Stethoscope className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-slate-900">
-                {activeTab} Module
-              </h3>
+              <h3 className="text-base font-bold text-slate-900">{activeTab} — Demo data</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Viewing {activeTab} history for Mrs. Adaeze Okonkwo. Active encounter records update automatically.
+                There's no {activeTab.toLowerCase()} data model in the system yet, so this tab isn't
+                connected to real records. Let your developer know if this is a module worth building out.
               </p>
             </div>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span className="block text-xs font-semibold text-slate-500 mb-1">{label}</span>
+      <span className="block text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
