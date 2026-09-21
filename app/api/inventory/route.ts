@@ -1,5 +1,7 @@
+// app/api/inventory/route.ts
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity-log";
 
 function nextSku(existingCount: number, prefix: string) {
   return `${prefix}-${String(existingCount + 1).padStart(3, "0")}`;
@@ -11,15 +13,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get("domain");
 
-    // Order by 'sku' to prevent failures if 'created_at' does not exist in schema
-    let query = supabase.from("inventory_items").select("*").order("sku", { ascending: true });
+    let query = supabase.from("inventory_items").select("*").order("created_at", { ascending: true });
     if (domain) query = query.eq("domain", domain);
 
     const { data, error } = await query;
-    if (error) {
-      console.error("Supabase GET Query Error:", error);
-      throw error;
-    }
+    if (error) throw error;
 
     const items = (data ?? []).map((row) => ({
       id: row.sku,
@@ -32,9 +30,9 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json({ items });
-  } catch (error: any) {
-    console.error("Inventory list error detail:", error);
-    return NextResponse.json({ error: error.message || "Failed to load inventory" }, { status: 500 });
+  } catch (error) {
+    console.error("Inventory list error:", error);
+    return NextResponse.json({ error: "Failed to load inventory" }, { status: 500 });
   }
 }
 
@@ -54,12 +52,10 @@ export async function POST(request: Request) {
     const itemDomain = domain === "pharmacy" ? "pharmacy" : "optical";
     const prefix = itemDomain === "pharmacy" ? "RX" : "INV";
 
-    const { count, error: countError } = await supabase
+    const { count } = await supabase
       .from("inventory_items")
       .select("*", { count: "exact", head: true })
       .eq("domain", itemDomain);
-
-    if (countError) throw countError;
 
     const sku = nextSku(count ?? 0, prefix);
 
@@ -76,8 +72,15 @@ export async function POST(request: Request) {
       })
       .select("*")
       .single();
-
     if (error) throw error;
+
+    await logActivity({
+      module: "Admin",
+      category: "ADMIN",
+      action: `${itemDomain === "pharmacy" ? "Drug" : "Inventory item"} added: ${name} (stock: ${stock})`,
+      performedBy: itemDomain === "pharmacy" ? "Pharmacy" : "Inventory Staff",
+      financialAmount: price * stock,
+    });
 
     return NextResponse.json(
       {
@@ -94,10 +97,10 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: any) {
-    console.error("Inventory create error detail:", error);
+    console.error("Inventory create error:", error);
     if (error?.code === "23505") {
       return NextResponse.json({ error: "An item with that SKU already exists." }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message || "Failed to add inventory item" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to add inventory item" }, { status: 500 });
   }
 }

@@ -75,7 +75,7 @@ export interface PatientInvoice {
 export type ActivityLog = {
   id: string;
   timestamp: string;
-  module: "Billing" | "Pharmacy" | "Diagnostics" | "Triage";
+  module: "Billing" | "Pharmacy" | "Diagnostics" | "Triage" | "Admin" | "Scheduling" | "Consultation";
   action: string;
   performedBy: string;
 };

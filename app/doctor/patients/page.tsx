@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -30,9 +30,11 @@ interface Patient {
 
 export default function PatientDirectoryPage() {
   // --- STATES ---
-  const [globalSearch, setGlobalSearch] = useState("Sarah");
+  const [globalSearch, setGlobalSearch] = useState("");
   const [tableSearch, setTableSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+  const [isSavingPatient, setIsSavingPatient] = useState(false);
 
   // Modals & Drawers State
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -40,86 +42,92 @@ export default function PatientDirectoryPage() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  // Sample Notifications State
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "New Walk-in Patient Arrived",
-      desc: "Tunde Ayodele registered at reception desk.",
-      time: "2 mins ago",
-      unread: true,
-    },
-    {
-      id: 2,
-      title: "Vitals Updated",
-      desc: "Sarah Adams triage vitals uploaded by Nurse Grace.",
-      time: "10 mins ago",
-      unread: true,
-    },
-    {
-      id: 3,
-      title: "Lab Results Ready",
-      desc: "Optical coherence tomography report for SESH-2026-045 is ready.",
-      time: "25 mins ago",
-      unread: false,
-    },
-  ]);
+  // Notifications derived from real activity — populated in the fetch effect below
+  const [notifications, setNotifications] = useState<
+    { id: string; title: string; desc: string; time: string; unread: boolean }[]
+  >([]);
 
   // Active Selected Patient for Modals
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
-  // Initial Patient Data State
-  const [patients, setPatients] = useState<Patient[]>([
-    {
-      id: "SESH-2026-089",
-      name: "Sarah Adams",
-      ageSex: "34 Y / F",
-      phone: "+234 803 123 4567",
-      lastVisit: "May 14, 2026",
-      status: "Waiting for Triage",
-    },
-    {
-      id: "SESH-2026-074",
-      name: "Tunde Ayodele",
-      isWalkIn: true,
-      ageSex: "42 Y / M",
-      phone: "+234 815 333 4444",
-      lastVisit: "June 12, 2026",
-      status: "In Consultation",
-    },
-    {
-      id: "SESH-2026-045",
-      name: "Chinedu Okafor",
-      ageSex: "61 Y / M",
-      phone: "+234 902 444 5555",
-      lastVisit: "June 10, 2026",
-      status: "Completed Today",
-    },
-    {
-      id: "SESH-2026-023",
-      name: "Fatima Yusuf",
-      ageSex: "19 Y / F",
-      phone: "+234 809 555 7777",
-      lastVisit: "May 01, 2026",
-      status: "Waiting for Triage",
-    },
-    {
-      id: "SESH-2025-998",
-      name: "Chioma Nze",
-      ageSex: "55 Y / F",
-      phone: "+234 803 999 1111",
-      lastVisit: "Dec 18, 2025",
-      status: "Completed Today",
-    },
-    {
-      id: "SESH-2026-004",
-      name: "Abubakar Garba",
-      ageSex: "67 Y / M",
-      phone: "+234 806 888 2222",
-      lastVisit: "April 15, 2026",
-      status: "In Consultation",
-    },
-  ]);
+  // Real Patient Data — fetched from /api/patients (previously a hardcoded
+  // array of "SESH-2026-xxx" ids disconnected from every other page)
+  const [patients, setPatients] = useState<Patient[]>([]);
+
+  const STATUS_TO_DISPLAY: Record<string, Patient["status"]> = {
+    waiting_triage: "Waiting for Triage",
+    in_consultation: "In Consultation",
+    completed_today: "Completed Today",
+  };
+  const STATUS_TO_DB: Record<Patient["status"], string> = {
+    "Waiting for Triage": "waiting_triage",
+    "In Consultation": "in_consultation",
+    "Completed Today": "completed_today",
+  };
+
+  function mapApiPatient(p: any): Patient {
+    return {
+      id: p.patientId,
+      name: p.fullName,
+      isWalkIn: p.isWalkIn,
+      ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
+      phone: p.phone || "—",
+      lastVisit: p.lastVisitAt
+        ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+          })
+        : "—",
+      status: STATUS_TO_DISPLAY[p.status] || "Waiting for Triage",
+    };
+  }
+
+  const loadPatients = async () => {
+    setIsLoadingPatients(true);
+    try {
+      const res = await fetch("/api/patients");
+      if (!res.ok) throw new Error("Failed to load patients");
+      const { patients: fetched } = await res.json();
+      setPatients(fetched.map(mapApiPatient));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  };
+
+  const loadActivity = async () => {
+    try {
+      const res = await fetch("/api/activity-logs?limit=10");
+      if (!res.ok) throw new Error("Failed to load activity");
+      const { logs } = await res.json();
+
+      setActivityLogs(
+        logs.map((log: any) => ({
+          text: log.action,
+          time: new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        }))
+      );
+
+      setNotifications(
+        logs.slice(0, 6).map((log: any, idx: number) => ({
+          id: log.id,
+          title: log.action,
+          desc: log.details || `Logged by ${log.user}`,
+          time: new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          unread: idx < 2,
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    loadPatients();
+    loadActivity();
+  }, []);
 
   // Form State for Adding / Editing Patient
   const [patientForm, setPatientForm] = useState({
@@ -131,24 +139,7 @@ export default function PatientDirectoryPage() {
     status: "Waiting for Triage" as Patient["status"],
   });
 
-  const activityLogs = [
-    {
-      text: "Dr. James Okoro started consultation with Patient SESH-2026-089",
-      time: "3 min ago",
-    },
-    {
-      text: "SESH-2026-045 (Sarah Adams) triage vitals uploaded",
-      time: "12 min ago",
-    },
-    {
-      text: "Walk-in check-in completed for Patient SESH-2026-112",
-      time: "25 min ago",
-    },
-    {
-      text: "Dr. Adams completed consultation for SESH-2026-012",
-      time: "45 min ago",
-    },
-  ];
+  const [activityLogs, setActivityLogs] = useState<{ text: string; time: string }[]>([]);
 
   // --- FILTERED DATA COMPUTATION ---
   const filteredPatients = useMemo(() => {
@@ -207,29 +198,37 @@ export default function PatientDirectoryPage() {
     setIsRegisterOpen(true);
   };
 
-  const handleSaveNewPatient = (e: React.FormEvent) => {
+  const handleSaveNewPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!patientForm.name || !patientForm.phone) return;
 
-    const newId = `SESH-2026-${Math.floor(100 + Math.random() * 900)}`;
-    const today = new Date().toLocaleDateString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-    });
-
-    const newPatient: Patient = {
-      id: newId,
-      name: patientForm.name,
-      ageSex: `${patientForm.age || "30"} Y / ${patientForm.gender}`,
-      phone: patientForm.phone,
-      lastVisit: today,
-      isWalkIn: patientForm.isWalkIn,
-      status: patientForm.status,
-    };
-
-    setPatients([newPatient, ...patients]);
-    setIsRegisterOpen(false);
+    setIsSavingPatient(true);
+    try {
+      const res = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: patientForm.name,
+          age: patientForm.age ? Number(patientForm.age) : undefined,
+          gender: patientForm.gender,
+          phone: patientForm.phone,
+          isWalkIn: patientForm.isWalkIn,
+          status: STATUS_TO_DB[patientForm.status],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to register patient");
+      }
+      const { patient: created } = await res.json();
+      setPatients((prev) => [mapApiPatient(created), ...prev]);
+      setIsRegisterOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to register patient");
+    } finally {
+      setIsSavingPatient(false);
+    }
   };
 
   const handleOpenEditModal = (patient: Patient) => {
@@ -246,26 +245,56 @@ export default function PatientDirectoryPage() {
     setIsEditOpen(true);
   };
 
-  const handleSaveEditPatient = (e: React.FormEvent) => {
+  const handleSaveEditPatient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPatient) return;
 
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === editingPatient.id
-          ? {
-              ...p,
-              name: patientForm.name,
-              ageSex: `${patientForm.age} Y / ${patientForm.gender}`,
-              phone: patientForm.phone,
-              isWalkIn: patientForm.isWalkIn,
-              status: patientForm.status,
-            }
-          : p
-      )
-    );
-    setIsEditOpen(false);
+    setIsSavingPatient(true);
+    try {
+      const res = await fetch(`/api/patients/${editingPatient.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: patientForm.name,
+          age: patientForm.age ? Number(patientForm.age) : undefined,
+          gender: patientForm.gender,
+          phone: patientForm.phone,
+          isWalkIn: patientForm.isWalkIn,
+          status: STATUS_TO_DB[patientForm.status],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to update patient");
+      }
+      const { patient: updated } = await res.json();
+      setPatients((prev) =>
+        prev.map((p) => (p.id === editingPatient.id ? mapApiPatient(updated) : p))
+      );
+      setIsEditOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to update patient");
+    } finally {
+      setIsSavingPatient(false);
+    }
   };
+
+  if (isLoadingPatients) {
+    return (
+      <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center">
+        <p className="text-sm text-slate-500">Loading patients…</p>
+      </div>
+    );
+  }
+
+  if (patients.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center">
+        <p className="text-sm text-slate-500">No patients registered yet.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800 font-sans antialiased">
@@ -861,9 +890,10 @@ export default function PatientDirectoryPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#0B7285] hover:bg-[#085a69] text-white rounded-xl font-bold"
+                  disabled={isSavingPatient}
+                  className="px-4 py-2 bg-[#0B7285] hover:bg-[#085a69] disabled:opacity-60 text-white rounded-xl font-bold"
                 >
-                  Save & Register
+                  {isSavingPatient ? "Saving…" : "Save & Register"}
                 </button>
               </div>
             </form>
@@ -986,9 +1016,10 @@ export default function PatientDirectoryPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold"
+                  disabled={isSavingPatient}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl font-bold"
                 >
-                  Update Record
+                  {isSavingPatient ? "Saving…" : "Update Record"}
                 </button>
               </div>
             </form>

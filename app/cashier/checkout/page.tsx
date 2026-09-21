@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image"; // Added Image import
 import { useRouter } from "next/navigation";
 import {
   Lock,
@@ -79,12 +80,21 @@ export default function BillingCheckoutView() {
       {/* TOP HEADER */}
       <header className="w-full bg-[#3F1D85] text-white px-6 py-3.5 flex flex-col md:flex-row items-center justify-between shadow-sm print:hidden">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#7E57C2] flex items-center justify-center font-bold text-white">
-            ✦
+          {/* BRAND LOGO FROM PUBLIC FOLDER */}
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-white/10 border border-white/20 shadow-xs">
+            <Image
+              src="/logo.png"
+              alt="Sparkle Eye Specialist Hospital Logo"
+              width={36}
+              height={36}
+              className="object-contain p-1"
+              priority
+            />
           </div>
+
           <div>
             <h1 className="text-sm font-bold tracking-wide">Sparkle Eye Specialist Hospital</h1>
-            <p className="text-[11px] text-purple-200/80 font-medium">Hospital Billing & Cashier Console</p>
+            <p className="text-[11px] text-purple-200/80 font-medium">Hospital Billing &amp; Cashier Console</p>
           </div>
         </div>
 

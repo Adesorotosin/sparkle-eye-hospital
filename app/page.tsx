@@ -24,20 +24,20 @@ export default function LoginPage() {
       const user = await authenticateStaff(username, password);
 
       // 2. Set client cookies (enforce uppercase role & SameSite safety)
-      const formattedRole = String(user.role).toUpperCase();
-      document.cookie = "is_logged_in=true; path=/; max-age=86400; SameSite=Lax";
-      document.cookie = `user_role=${formattedRole}; path=/; max-age=86400; SameSite=Lax`;
+const formattedRole = String(user.role).toUpperCase();
+document.cookie = "is_logged_in=true; path=/; max-age=86400; SameSite=Lax";
+document.cookie = `user_role=${formattedRole}; path=/; max-age=86400; SameSite=Lax`;
 
-      // 3. Save token client-side if requested
-      if (rememberWorkstation) {
-        localStorage.setItem("sparkle_staff_token", user.token);
-      }
+// 3. Save token client-side if requested
+if (rememberWorkstation) {
+  localStorage.setItem("sparkle_staff_token", user.token);
+}
 
-      // 4. Determine target route based on role (fallback to existing /doctor route)
-      const targetRoute = ROLE_REDIRECT_MAP[user.role] || "/doctor";
+// 4. Determine target route using the formatted uppercase role
+const targetRoute = ROLE_REDIRECT_MAP[formattedRole] || "/admin";
 
-      // 5. Hard refresh to send new cookies directly to middleware
-      window.location.href = targetRoute;
+// 5. Hard refresh to send new cookies directly to middleware
+window.location.href = targetRoute;
     } catch (err: any) {
       setErrorMsg(err.message || "Invalid username or password. Please check your credentials.");
       setIsLoading(false);

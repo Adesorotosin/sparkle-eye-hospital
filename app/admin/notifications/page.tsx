@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Siren,
   Plus,
@@ -17,55 +17,39 @@ import {
 
 export default function NotificationsAlertCenterPage() {
   const [activeTab, setActiveTab] = useState("All");
+  const [error, setError] = useState<string | null>(null);
 
   // Modal State Controls
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
 
-  // Active Feed Items State
-  const [notifications, setNotifications] = useState([
-    {
-      id: "1",
-      type: "Emergency",
-      title: "Code Blue — Surgical Theater 2",
-      message:
-        "Resuscitation team required immediately. Patient requires cardiac arrest intervention. All nearby anesthesiologists report to Theater 2 post-haste.",
-      timestamp: "2 minutes ago",
-      triggeredBy: "Dr. Adeyemi",
-      target: "All Surgical Staff",
-      category: "Security", // Emergency/Security
-    },
-    {
-      id: "2",
-      type: "Announcement",
-      title: "Scheduled Maintenance — Server Downtime",
-      message:
-        "System maintenance scheduled for Sep 5, 2026 from 2:00 AM — 4:00 AM. All services, including scheduling and clinical uploads, will be briefly unavailable.",
-      timestamp: "1 hour ago",
-      target: "All Staff",
-      category: "Announcements",
-    },
-    {
-      id: "3",
-      type: "Clinical",
-      title: "Updated Glaucoma Screening Protocol",
-      message:
-        "New screening protocol effective Sep 10, 2026. All ophthalmology staff and clinical associates must review updated tonometry guidelines to ensure audit compliance.",
-      timestamp: "3 hours ago",
-      target: "Ophthalmology Unit",
-      category: "Clinical Escalations",
-    },
-    {
-      id: "4",
-      type: "Finance",
-      title: "POS Cash Reconciliation Deadline",
-      message:
-        "All frontline POS terminals must complete daily cash reconciliation by 6:00 PM today. Non-compliance will be auto-flagged in the executive compliance audit trail.",
-      timestamp: "5 hours ago",
-      target: "Billing & Cashier Dept",
-      category: "Security",
-    },
-  ]);
+  // Active Feed Items State — persisted broadcasts + live-derived system
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+
+  const loadNotifications = async () => {
+    try {
+      setIsLoadingNotifications(true);
+      const res = await fetch("/api/notifications");
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Request failed with status ${res.status}`);
+      }
+
+      const { notifications: fetched } = await res.json();
+      setNotifications(fetched || []);
+    } catch (err: any) {
+      console.error("Failed to load notifications:", err.message);
+      setError(err.message);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
 
   // Filter helper logic to route items to tabs accurately
   const isCategoryMatch = (itemCategory: string, tabName: string) => {
@@ -127,22 +111,31 @@ export default function NotificationsAlertCenterPage() {
   };
 
   // Handle Dispatch Emergency Alert
-  const handleTriggerEmergency = (e: React.FormEvent) => {
+  const handleTriggerEmergency = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newEmergency = {
-      id: Date.now().toString(),
-      type: "Emergency",
-      title: `${emergencyData.codeType} — ${emergencyData.location}`,
-      message:
-        emergencyData.instructions ||
-        "Immediate response required. Please follow standard emergency response protocols.",
-      timestamp: "Just now",
-      triggeredBy: "Dr. Sarah Jenkins",
-      target: emergencyData.targetRoles,
-      category: "Security",
-    };
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Emergency",
+          title: `${emergencyData.codeType} — ${emergencyData.location}`,
+          message:
+            emergencyData.instructions ||
+            "Immediate response required. Please follow standard emergency response protocols.",
+          target: emergencyData.targetRoles,
+          category: "Security",
+          triggeredBy: "Dr. Sarah Jenkins",
+        }),
+      });
+      if (res.ok) {
+        const { notification } = await res.json();
+        setNotifications([notification, ...notifications]);
+      }
+    } catch (err) {
+      console.error("Failed to broadcast emergency alert:", err);
+    }
 
-    setNotifications([newEmergency, ...notifications]);
     setIsEmergencyModalOpen(false);
     setEmergencyData({
       codeType: "Code Blue (Cardiac Arrest)",
@@ -153,26 +146,37 @@ export default function NotificationsAlertCenterPage() {
   };
 
   // Handle Dispatch Announcement
-  const handleCreateAnnouncement = (e: React.FormEvent) => {
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!announcementData.title || !announcementData.message) return;
 
-    const newAnnouncement = {
-      id: Date.now().toString(),
-      type: announcementData.category,
-      title: announcementData.title,
-      message: announcementData.message,
-      timestamp: "Just now",
-      target: announcementData.targetDept,
-      category:
-        announcementData.category === "Clinical"
-          ? "Clinical Escalations"
-          : announcementData.category === "Finance"
-          ? "Security"
-          : "Announcements",
-    };
+    const category =
+      announcementData.category === "Clinical"
+        ? "Clinical Escalations"
+        : announcementData.category === "Finance"
+        ? "Security"
+        : "Announcements";
 
-    setNotifications([newAnnouncement, ...notifications]);
+    try {
+      const res = await fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: announcementData.category,
+          title: announcementData.title,
+          message: announcementData.message,
+          target: announcementData.targetDept,
+          category,
+        }),
+      });
+      if (res.ok) {
+        const { notification } = await res.json();
+        setNotifications([notification, ...notifications]);
+      }
+    } catch (err) {
+      console.error("Failed to broadcast announcement:", err);
+    }
+
     setIsAnnouncementModalOpen(false);
     setAnnouncementData({
       title: "",
@@ -227,6 +231,12 @@ export default function NotificationsAlertCenterPage() {
 
       {/* MAIN CONTAINER */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
+        {error && (
+          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+            {error}
+          </div>
+        )}
+
         {/* PAGE HEADER & ACTIONS */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
@@ -320,7 +330,11 @@ export default function NotificationsAlertCenterPage() {
             </div>
 
             {/* DYNAMIC NOTIFICATIONS FEED */}
-            {filteredNotifications.length === 0 ? (
+            {isLoadingNotifications ? (
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
+                <p className="text-sm text-[#64748B]">Loading notifications…</p>
+              </div>
+            ) : filteredNotifications.length === 0 ? (
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <p className="text-sm font-semibold text-[#0F172A]">No notifications found</p>
                 <p className="text-xs text-[#64748B] mt-1">There are no items currently listed under {activeTab}.</p>
@@ -598,7 +612,7 @@ export default function NotificationsAlertCenterPage() {
 
             <form onSubmit={handleTriggerEmergency} className="p-6 space-y-4">
               <div className="bg-[#FEF2F2] border border-[#FCA5A5] rounded-lg p-3 text-xs text-[#991B1B]">
-                <strong>Warning:</strong> Triggering an emergency alert will instantly send push notifications and sticky banners across all active staff interfaces.
+                <strong>Note:</strong> This alert is saved and appears here in Admin. It does not yet push live to other staff members' screens — that requires a separate real-time delivery feature.
               </div>
 
               <div>

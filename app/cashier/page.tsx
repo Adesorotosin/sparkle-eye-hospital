@@ -13,6 +13,7 @@ import {
   Calendar,
   Receipt,
   Filter,
+  LogOut,
 } from "lucide-react";
 import { usePatientFlow } from "@/context/PatientFlowContext";
 
@@ -22,6 +23,48 @@ export default function CashierDashboard() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">("all");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    setIsLoggingOut(true);
+
+    try {
+      // 1. Call the backend API logout route
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      console.error("API Logout Error:", error);
+    } finally {
+      // 2. Clear client-side cookies
+      const cookiesToClear = [
+        "is_logged_in",
+        "user_role",
+        "staff_id",
+        "auth_token",
+        "token",
+        "session",
+        "next-auth.session-token",
+      ];
+
+      cookiesToClear.forEach((name) => {
+        document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;`;
+      });
+
+      // 3. Clear browser storage
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (err) {
+        console.error("Storage clear error:", err);
+      }
+
+      // 4. Force hard redirect to the root login page (app/page.tsx)
+      window.location.href = "/";
+    }
+  };
 
   const queueList = [
     {
@@ -68,15 +111,14 @@ export default function CashierDashboard() {
   return (
     <div className="min-h-screen w-full bg-[#F3F0F7] text-slate-800 font-sans antialiased">
       {/* TOP HEADER */}
-      <header className="w-full bg-[#3F1D85] text-white px-6 py-3.5 flex flex-col md:flex-row items-center justify-between shadow-sm">
+      <header className="w-full bg-[#3F1D85] text-white px-6 py-3.5 flex flex-col md:flex-row items-center justify-between shadow-sm gap-4 md:gap-0">
         <div className="flex items-center gap-3">
-          {/* BRAND LOGO FROM PUBLIC FOLDER */}
-          <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-white/10 border border-white/20 shadow-xs">
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-white/10 border border-white/20 shadow-xs">
             <Image
-              src="/logo.png" // Replace with your exact logo filename in public/ (e.g., /logo.svg, /sparkle-logo.png)
+              src="/logo.png"
               alt="Sparkle Eye Specialist Hospital Logo"
-              width={36}
-              height={36}
+              width={40}
+              height={40}
               className="object-contain p-1"
               priority
             />
@@ -99,14 +141,24 @@ export default function CashierDashboard() {
               Cashier: <strong className="text-white">Folake Adeyemi</strong>
             </span>
           </div>
-          <div className="flex items-center gap-2 border-l border-purple-800 pl-6">
+          <div className="hidden sm:flex items-center gap-2 border-l border-purple-800 pl-6">
             <Calendar className="w-4 h-4 text-purple-300" />
-            <span>Sep 4, 2026</span>
+            <span>Sep 21, 2026</span>
           </div>
+
+          <button
+            type="button"
+            disabled={isLoggingOut}
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-500/30 font-semibold text-xs transition cursor-pointer disabled:opacity-50"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>{isLoggingOut ? "Signing out..." : "Sign Out"}</span>
+          </button>
         </div>
       </header>
 
-      {/* SUB-NAV / METRICS BAR */}
+      {/* METRICS BAR */}
       <div className="bg-[#5E35B1] text-white px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-xl border border-white/10 flex items-center justify-between">
           <div>
@@ -157,7 +209,7 @@ export default function CashierDashboard() {
         </div>
       </div>
 
-      {/* MAIN QUEUE CONTENT */}
+      {/* QUEUE TABLE */}
       <main className="max-w-7xl mx-auto p-6 space-y-6">
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-purple-100 shadow-sm space-y-5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">

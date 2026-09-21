@@ -345,18 +345,29 @@ function PharmacyContent() {
     }, 800);
   };
 
-  const handleLogout = async () => {
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      router.push("/");
-      router.refresh();
-    } catch (error) {
-      console.error("Logout error:", error);
+ const handleLogout = async () => {
+  try {
+    // 1. Call the backend API route to clear httpOnly cookies
+    const res = await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+
+    // 2. Clear client storage
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+      sessionStorage.clear();
     }
-  };
+
+    // 3. Force a full window redirect to clear router cache & run middleware check
+    if (res.ok) {
+      window.location.href = "/";
+    } else {
+      console.error("Logout API failed with status:", res.status);
+    }
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">

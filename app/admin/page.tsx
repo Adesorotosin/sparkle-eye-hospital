@@ -1,19 +1,39 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  TrendingUp,
-  TrendingDown,
   Calendar,
   Filter,
   Download,
   ArrowUpRight,
 } from "lucide-react";
 
+interface AdminStats {
+  totalRevenue: number;
+  activePatientEncounters: number;
+  totalStaff: number;
+  lowStockCount: number;
+  todaysAppointments: number;
+}
+
 export default function ExecutiveOverviewDashboard() {
   const [timeRange, setTimeRange] = useState("Last 30 Days");
   const [department, setDepartment] = useState("All Departments");
+  const [stats, setStats] = useState<AdminStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/stats")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setStats(data);
+      })
+      .catch((err) => console.error("Failed to load dashboard stats:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="p-6 md:p-8 text-slate-800 font-sans antialiased max-w-7xl mx-auto space-y-8">
@@ -85,15 +105,14 @@ export default function ExecutiveOverviewDashboard() {
             <ArrowUpRight className="w-4 h-4 text-slate-400 group-hover:text-[#6D4AFF] transition-colors" />
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
-            &#8358;42.5M
+            {stats?.totalRevenue != null ? `₦${stats.totalRevenue.toLocaleString()}` : "…"}
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
-            <TrendingUp className="w-3 h-3" />
-            +12.4% <span className="text-slate-400 font-normal">vs last period</span>
+          <div className="mt-2 text-[11px] font-medium text-slate-400">
+            From all paid invoices
           </div>
         </Link>
 
-        {/* Card 2: Active Patient Encounters (Static Card) */}
+        {/* Card 2: Active Patient Encounters */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-sky-500">
           <div className="flex justify-between items-start">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
@@ -101,42 +120,47 @@ export default function ExecutiveOverviewDashboard() {
             </span>
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
-            1,240
+            {stats?.activePatientEncounters != null ? stats.activePatientEncounters.toLocaleString() : "…"}
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
-            <TrendingUp className="w-3 h-3" />
-            +4.1% <span className="text-slate-400 font-normal">vs last period</span>
+          <div className="mt-2 text-[11px] font-medium text-slate-400">
+            Patients with an unpaid invoice in progress
           </div>
         </div>
 
-        {/* Card 3: Average Wait Time (Static Card) */}
+        {/* Card 3: Average Wait Time (Illustrative — not tracked yet) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-amber-500">
           <div className="flex justify-between items-start">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               Average Wait Time
             </span>
+            <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+              Demo data
+            </span>
           </div>
           <div className="text-2xl font-black text-slate-900 tracking-tight">
             18 mins
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
-            <TrendingDown className="w-3 h-3 text-emerald-600" />
-            -2.5% <span className="text-slate-400 font-normal">vs last period</span>
+          <div className="mt-2 text-[11px] text-slate-400">
+            Not yet tracked — needs queue timestamps
           </div>
         </div>
 
-        {/* Card 4: OR Occupancy Rate (Static Card) */}
+        {/* Card 4: OR Occupancy Rate (Illustrative — not tracked yet) */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs relative overflow-hidden border-l-4 border-l-emerald-500 flex items-center justify-between">
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              OR Occupancy Rate
-            </span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                OR Occupancy Rate
+              </span>
+              <span className="text-[9px] font-bold uppercase text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                Demo data
+              </span>
+            </div>
             <div className="text-2xl font-black text-slate-900 tracking-tight">
               84%
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
-              <TrendingUp className="w-3 h-3" />
-              +8.0% <span className="text-slate-400 font-normal">vs last period</span>
+            <div className="mt-2 text-[11px] text-slate-400">
+              Not yet tracked — needs OR scheduling data
             </div>
           </div>
           {/* Donut Gauge Badge */}

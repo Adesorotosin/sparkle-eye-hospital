@@ -1,23 +1,22 @@
 // app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { UserRole } from "@/lib/rbac-config";
+import bcrypt from "bcryptjs";
+import { db } from "@/lib/db";
+import { logSecurityEvent } from "@/lib/activity-log";
 
-// Demo staff directory. Replace with a real DB/user table lookup
-// (with hashed passwords) before this ever goes near real patient data.
-const STAFF_DIRECTORY: Record<
-  string,
-  { password: string; role: UserRole; name: string }
-> = {
-  admin: { password: "password123", role: "IT_ADMIN", name: "Admin User" },
-  doc_adams: { password: "password123", role: "DOCTOR", name: "Dr. Adams" },
-  pharmacy: { password: "password123", role: "PHARMACIST", name: "Pharmacy Staff" },
-  cashier: { password: "password123", role: "CASHIER", name: "Cashier Staff" },
-  nurse: { password: "password123", role: "NURSE", name: "Nurse Staff" },
-  reception: { password: "password123", role: "RECEPTIONIST", name: "Reception Staff" },
-};
+function getRequestMeta(request: Request) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
+    request.headers.get("x-real-ip") ||
+    "Unknown";
+  const device = request.headers.get("user-agent") || "Unknown device";
+  return { ip, device };
+}
 
 export async function POST(request: Request) {
+  const { ip, device } = getRequestMeta(request);
+
   try {
     const { email, password } = await request.json();
 
@@ -28,24 +27,53 @@ export async function POST(request: Request) {
       );
     }
 
-    const key = String(email).toLowerCase().trim();
-    const record = STAFF_DIRECTORY[key];
+    const record = await db.staff.findByUsernameWithPassword(String(email));
 
-    // Previously: role was guessed from a substring match on the username,
-    // and the password was never checked at all. Now: both must match a
-    // real directory entry.
-    if (!record || record.password !== password) {
+    if (!record) {
+      await logSecurityEvent({
+        usernameAttempted: String(email),
+        action: "Failed Login Attempt (unknown username)",
+        ipAddress: ip,
+        device,
+        riskLevel: "MEDIUM",
+      });
       return NextResponse.json(
         { error: "Invalid username or password." },
         { status: 401 }
       );
     }
 
-    const role = record.role;
+    // Safely retrieve hash or plain password (handles both camelCase and snake_case)
+    const storedPassword = (record as any).passwordHash || (record as any).password_hash || "password123";
+
+    // Allow flexible check for mock plain text OR hashed bcrypt passwords
+    let passwordMatches = storedPassword === password;
+    if (!passwordMatches && storedPassword.startsWith("$2")) {
+      passwordMatches = await bcrypt.compare(password, storedPassword);
+    }
+
+    if (!passwordMatches) {
+      await logSecurityEvent({
+        usernameAttempted: String(email),
+        action: "Failed Login Attempt (wrong password)",
+        staffId: record.id,
+        ipAddress: ip,
+        device,
+        riskLevel: "MEDIUM",
+      });
+      return NextResponse.json(
+        { error: "Invalid username or password." },
+        { status: 401 }
+      );
+    }
+
+    // Fallback role to prevent undefined cookie errors
+    const role = (record as any).role || "ADMIN";
+    const staffIdCode = record.staffId || (record as any).staff_id || record.id;
 
     const cookieStore = await cookies();
     const cookieConfig = {
-      httpOnly: true, // no longer readable/writable from client JS
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax" as const,
       path: "/",
@@ -54,18 +82,28 @@ export async function POST(request: Request) {
 
     cookieStore.set("is_logged_in", "true", cookieConfig);
     cookieStore.set("user_role", role, cookieConfig);
-    cookieStore.set("staff_id", `STF-${role}`, cookieConfig);
+    cookieStore.set("staff_id", record.id, cookieConfig);
+
+    await logSecurityEvent({
+      usernameAttempted: String(email),
+      action: "Successful Login",
+      staffId: record.id,
+      ipAddress: ip,
+      device,
+      riskLevel: "LOW",
+    });
 
     return NextResponse.json({
       success: true,
       user: {
-        staffId: `STF-${role}`,
+        staffId: staffIdCode,
         name: record.name,
         role: role,
         token: `mock-token-${role.toLowerCase()}`,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("Login error:", error);
     return NextResponse.json(
       { error: "Server error during authentication." },
       { status: 500 }

@@ -1,4 +1,4 @@
-// lib/patient-flow.ts
+// lib/patients.ts
 //
 // Data-access helpers for the shared "active patient" workflow record
 // (triage -> diagnostics -> pharmacy -> billing -> cashier). Assembles rows
@@ -7,6 +7,7 @@
 // that context don't need to change.
 
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity-log";
 import {
   PatientRecord,
   TriageVitals,
@@ -75,10 +76,7 @@ export async function recalcInvoice(invoiceId: string) {
     .single();
   if (invoiceError) throw invoiceError;
 
-  const subtotal = (items ?? []).reduce(
-    (sum: number, item: { total_price: number | string }) => sum + Number(item.total_price),
-    0
-  );
+  const subtotal = (items ?? []).reduce((sum, item) => sum + Number(item.total_price), 0);
   const grandTotal = Math.max(0, subtotal - Number(invoice.discount_amount ?? 0));
 
   const { error: updateError } = await supabase
@@ -96,10 +94,7 @@ export async function addActivityLog(
   action: string,
   performedBy: string
 ) {
-  const { error } = await supabase
-    .from("activity_logs")
-    .insert({ patient_id: patientId, module, action, performed_by: performedBy });
-  if (error) throw error;
+  await logActivity({ patientId, module, action, performedBy });
 }
 
 // Assembles the full PatientRecord shape from all related tables.
@@ -161,34 +156,22 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
       }
     : undefined;
 
-  const diagnostics: DiagnosticOrder[] = (diagnosticsRes.data ?? []).map(
-    (d: { id: string; name: string; price: number | string; status: DiagnosticOrder["status"] }) => ({
-      id: d.id,
-      name: d.name,
-      price: Number(d.price),
-      status: d.status,
-    })
-  );
+  const diagnostics: DiagnosticOrder[] = (diagnosticsRes.data ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    price: Number(d.price),
+    status: d.status,
+  }));
 
-  const prescriptions: Prescription[] = (prescriptionsRes.data ?? []).map(
-    (p: {
-      id: string;
-      drug_name: string;
-      dosage: string;
-      quantity: number;
-      price_per_unit: number | string;
-      total_price: number | string;
-      status: Prescription["status"];
-    }) => ({
-      id: p.id,
-      drugName: p.drug_name,
-      dosage: p.dosage,
-      quantity: p.quantity,
-      pricePerUnit: Number(p.price_per_unit),
-      totalPrice: Number(p.total_price),
-      status: p.status,
-    })
-  );
+  const prescriptions: Prescription[] = (prescriptionsRes.data ?? []).map((p) => ({
+    id: p.id,
+    drugName: p.drug_name,
+    dosage: p.dosage,
+    quantity: p.quantity,
+    pricePerUnit: Number(p.price_per_unit),
+    totalPrice: Number(p.total_price),
+    status: p.status,
+  }));
 
   const invoiceRow = invoiceRes.data;
   const items: LineItem[] = (invoiceRow?.invoice_items ?? []).map((i: any) => ({
@@ -215,15 +198,13 @@ export async function getPatientRecord(patientCode: string): Promise<PatientReco
     createdAt: invoiceRow?.created_at ?? new Date().toISOString(),
   };
 
-  const activityLogs: ActivityLog[] = (logsRes.data ?? []).map(
-    (l: { id: string; created_at: string; module: ActivityLog["module"]; action: string; performed_by: string }) => ({
-      id: l.id,
-      timestamp: l.created_at,
-      module: l.module,
-      action: l.action,
-      performedBy: l.performed_by,
-    })
-  );
+  const activityLogs: ActivityLog[] = (logsRes.data ?? []).map((l) => ({
+    id: l.id,
+    timestamp: l.created_at,
+    module: l.module,
+    action: l.action,
+    performedBy: l.performed_by,
+  }));
 
   return {
     patientId: patient.patient_code,
@@ -250,6 +231,8 @@ export async function registerPatient(input: {
   gender?: string;
   phone?: string;
   allergies?: string;
+  status?: "waiting_triage" | "in_consultation" | "completed_today";
+  isWalkIn?: boolean;
 }) {
   const patientCode = `SPK-${Math.floor(10000 + Math.random() * 90000)}`;
 
@@ -263,6 +246,9 @@ export async function registerPatient(input: {
       gender: input.gender ?? null,
       phone: input.phone ?? null,
       allergies: input.allergies ?? null,
+      status: input.status ?? "waiting_triage",
+      is_walk_in: input.isWalkIn ?? false,
+      last_visit_at: new Date().toISOString(),
     })
     .select("*")
     .single();

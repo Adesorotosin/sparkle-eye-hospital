@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Download,
@@ -56,103 +56,6 @@ interface SecurityAlert {
   type: "critical" | "warning";
 }
 
-// --- Mock Data ---
-const OPERATIONAL_LOGS: OperationalLog[] = [
-  {
-    id: "op-1",
-    timestamp: "2026-08-30 10:41:15",
-    user: "Dr. Ananya Mehta",
-    staffId: "DOC-2201",
-    role: "Ophthalmologist",
-    roleColor: "bg-purple-100 text-purple-700 border-purple-200",
-    category: "CLINICAL",
-    action: "Viewed Medical Record",
-    details: "Accessed file #SPK-30892 for consultation review.",
-    metadata: { RecordID: "SPK-30892", Patient: "Kemi Balogun", AccessType: "Read-Only" },
-  },
-  {
-    id: "op-2",
-    timestamp: "2026-08-30 10:38:44",
-    user: "Folake Adeyemi",
-    staffId: "NRS-0445",
-    role: "Cashier",
-    roleColor: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    category: "BILLING",
-    action: "Attempted Billing Override",
-    details: "Requested 15% discount override on Invoice INV-2026-4920.",
-    financialAmount: "₦64,700",
-    metadata: { InvoiceID: "INV-2026-4920", OverrideAmount: "₦9,705", Status: "Pending Supervisor" },
-  },
-  {
-    id: "op-3",
-    timestamp: "2026-08-30 10:35:20",
-    user: "Nurse Amaka Eze",
-    staffId: "NRS-0312",
-    role: "Nurse",
-    roleColor: "bg-blue-100 text-blue-700 border-blue-200",
-    category: "CLINICAL",
-    action: "Dispensed Medication",
-    details: "Dispensed Timolol Maleate 0.5% Rx #7845.",
-    metadata: { RxNumber: "7845", Dosage: "1 drop twice daily", BatchNo: "BN-9921" },
-  },
-];
-
-const SECURITY_LOGS: SecurityLog[] = [
-  {
-    id: "sec-1",
-    timestamp: "2026-08-30 10:42:33",
-    user: "unknown",
-    staffId: "—",
-    role: "—",
-    roleColor: "bg-slate-100 text-slate-600 border-slate-200",
-    action: "Failed Password Attempt (12th try)",
-    ipAddress: "192.168.1.45",
-    device: "Chrome Win11",
-    riskLevel: "CRITICAL",
-  },
-  {
-    id: "sec-2",
-    timestamp: "2026-08-30 10:33:08",
-    user: "Sys. Admin Chidi",
-    staffId: "ADM-0100",
-    role: "IT Admin",
-    roleColor: "bg-rose-100 text-rose-700 border-rose-200",
-    action: "System Override: Modified Drug Price Table",
-    ipAddress: "192.168.1.10",
-    device: "Admin Console",
-    riskLevel: "CRITICAL",
-  },
-  {
-    id: "sec-3",
-    timestamp: "2026-08-30 02:15:03",
-    user: "Dr. Emeka Obi",
-    staffId: "DOC-2208",
-    role: "Ophthalmologist",
-    roleColor: "bg-purple-100 text-purple-700 border-purple-200",
-    action: "After-Hours Record Access — SPK-29444",
-    ipAddress: "41.58.120.77",
-    device: "Unknown Mobile",
-    riskLevel: "CRITICAL",
-  },
-];
-
-const SECURITY_ALERTS: SecurityAlert[] = [
-  {
-    id: "a1",
-    title: "Multiple Failed Logins from IP 192.168.1.45 — 12 attempts in 5 min",
-    timestamp: "10:42 AM",
-    actionText: "Revoke Session",
-    type: "critical",
-  },
-  {
-    id: "a2",
-    title: "Unusual Billing Override Pattern — Staff ID NRS-0445",
-    timestamp: "10:38 AM",
-    actionText: "Investigate",
-    type: "warning",
-  },
-];
-
 export default function UnifiedAuditDashboard() {
   // Shared Workspace State
   const [activeTab, setActiveTab] = useState<TabType>("OPERATIONS");
@@ -161,9 +64,47 @@ export default function UnifiedAuditDashboard() {
   const [severityFilter, setSeverityFilter] = useState("ALL");
   const [selectedOperationalLog, setSelectedOperationalLog] = useState<OperationalLog | null>(null);
 
+  const [operationalLogs, setOperationalLogs] = useState<OperationalLog[]>([]);
+  const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
+  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAuditData() {
+      try {
+        const [opRes, secRes] = await Promise.all([
+          fetch("/api/activity-logs"),
+          fetch("/api/security-logs"),
+        ]);
+        if (opRes.ok) {
+          const { logs } = await opRes.json();
+          if (!cancelled) setOperationalLogs(logs);
+        }
+        if (secRes.ok) {
+          const { logs, alerts } = await secRes.json();
+          if (!cancelled) {
+            setSecurityLogs(logs);
+            setSecurityAlerts(alerts);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load audit data:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    loadAuditData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Filter Logic
   const filteredOperationalLogs = useMemo(() => {
-    return OPERATIONAL_LOGS.filter((log) => {
+    return operationalLogs.filter((log) => {
       const matchesSearch =
         log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.staffId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -171,10 +112,10 @@ export default function UnifiedAuditDashboard() {
       const matchesCategory = categoryFilter === "ALL" || log.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, categoryFilter]);
+  }, [operationalLogs, searchQuery, categoryFilter]);
 
   const filteredSecurityLogs = useMemo(() => {
-    return SECURITY_LOGS.filter((log) => {
+    return securityLogs.filter((log) => {
       const matchesSearch =
         log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.staffId.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -183,7 +124,15 @@ export default function UnifiedAuditDashboard() {
       const matchesSeverity = severityFilter === "ALL" || log.riskLevel === severityFilter;
       return matchesSearch && matchesSeverity;
     });
-  }, [searchQuery, severityFilter]);
+  }, [securityLogs, searchQuery, severityFilter]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-sm text-slate-500">Loading audit data…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col">
@@ -238,7 +187,7 @@ export default function UnifiedAuditDashboard() {
               <Activity className="h-4 w-4" />
               Clinical & Operational Logs
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-700">
-                {OPERATIONAL_LOGS.length}
+                {operationalLogs.length}
               </span>
             </button>
 
@@ -253,7 +202,7 @@ export default function UnifiedAuditDashboard() {
               <Shield className="h-4 w-4" />
               Security Threats & Auth Logs
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-rose-50 text-rose-700">
-                {SECURITY_LOGS.length}
+                {securityLogs.length}
               </span>
             </button>
           </div>
@@ -341,21 +290,27 @@ export default function UnifiedAuditDashboard() {
             <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-200 shadow-xs flex justify-between items-center">
               <div>
                 <div className="text-xs font-bold text-rose-700 uppercase">CRITICAL THREATS</div>
-                <div className="text-2xl font-black text-rose-600 mt-1">3 Active</div>
+                <div className="text-2xl font-black text-rose-600 mt-1">
+                  {securityAlerts.filter((a) => a.type === "critical").length} Active
+                </div>
               </div>
               <AlertTriangle className="h-8 w-8 text-rose-400" />
             </div>
 
             <div className="md:col-span-2 bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2">
               <div className="text-xs font-bold text-slate-500 uppercase">ACTIVE THREAT FEED</div>
-              <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="font-semibold text-slate-800">
-                  {SECURITY_ALERTS[0].title}
-                </span>
-                <button className="text-[11px] font-bold px-2 py-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors cursor-pointer">
-                  {SECURITY_ALERTS[0].actionText}
-                </button>
-              </div>
+              {securityAlerts.length === 0 ? (
+                <p className="text-xs text-slate-400 py-1">No active alerts in the last 24 hours.</p>
+              ) : (
+                <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="font-semibold text-slate-800">
+                    {securityAlerts[0].title}
+                  </span>
+                  <button className="text-[11px] font-bold px-2 py-1 rounded bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors cursor-pointer">
+                    {securityAlerts[0].actionText}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

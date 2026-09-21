@@ -1,13 +1,20 @@
 // lib/auth.ts
 
 export const ROLE_REDIRECT_MAP: Record<string, string> = {
-  IT_ADMIN: "/admin",
-  OPHTHALMOLOGIST: "/doctor",
+  ADMIN: "/admin",
+  SUPER_ADMIN: "/admin",
   DOCTOR: "/doctor",
+  NURSE: "/nurse",
+  // Pharmacy roles
+  PHARMACY: "/pharmacy",
   PHARMACIST: "/pharmacy",
-  NURSE: "/nurse",              // <-- MUST BE /nurse
+  // Cashier & Billing roles
   CASHIER: "/cashier",
-  RECEPTIONIST: "/reception",
+  BILLING: "/billing",
+  // Additional hospital departments
+  RECEPTIONIST: "/receptionist",
+  LAB: "/laboratory",
+  LABORATORY: "/laboratory",
 };
 
 export async function authenticateStaff(username: string, password: string) {

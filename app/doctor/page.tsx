@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -15,40 +15,36 @@ import {
   X,
 } from "lucide-react";
 
+interface QueuePatient {
+  id: string;
+  fullName: string;
+  age: number | null;
+  gender: string | null;
+  triageNote: string;
+  priority: "Normal" | "Priority";
+  status: "waiting" | "in-consultation" | "completed";
+  timeInQueue: string;
+}
+
+const STATUS_TO_QUEUE: Record<string, QueuePatient["status"]> = {
+  waiting_triage: "waiting",
+  in_consultation: "in-consultation",
+  completed_today: "completed",
+};
+
 export default function DoctorDashboard() {
   const router = useRouter();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "in-consultation" | "completed">("all");
+  const [isLoadingQueue, setIsLoadingQueue] = useState(true);
+  const [doctorQueue, setDoctorQueue] = useState<QueuePatient[]>([]);
 
-  // Notification State
+  // Notification State — derived from real activity logs
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Urgent Triage Alert",
-      message: "Chukwudi Okeke added to high-priority cataract queue.",
-      time: "10 mins ago",
-      read: false,
-      type: "urgent",
-    },
-    {
-      id: 2,
-      title: "Lab Results Ready",
-      message: "Margaret Chen's OCT Optical Scan reports uploaded.",
-      time: "25 mins ago",
-      read: false,
-      type: "info",
-    },
-    {
-      id: 3,
-      title: "Appointment Rescheduled",
-      message: "Zainab Ahmed updated appointment time to 2:00 PM.",
-      time: "1 hour ago",
-      read: true,
-      type: "info",
-    },
-  ]);
+  const [notifications, setNotifications] = useState<
+    { id: string; title: string; message: string; time: string; read: boolean; type: "urgent" | "info" }[]
+  >([]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -56,38 +52,67 @@ export default function DoctorDashboard() {
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
   };
 
-  const doctorQueue = [
-    {
-      id: "PAT-2026-089",
-      fullName: "Amina Bello",
-      age: 34,
-      gender: "Female",
-      triageNote: "Complains of blurred vision and eye strain for 2 weeks.",
-      priority: "Normal",
-      status: "waiting",
-      timeInQueue: "10:45 AM",
-    },
-    {
-      id: "PAT-2026-090",
-      fullName: "Chukwudi Okeke",
-      age: 45,
-      gender: "Male",
-      triageNote: "Post-op cataract follow-up check. Mild itching reported.",
-      priority: "Priority",
-      status: "waiting",
-      timeInQueue: "11:00 AM",
-    },
-    {
-      id: "PAT-2026-092",
-      fullName: "Zainab Ahmed",
-      age: 28,
-      gender: "Female",
-      triageNote: "Routine comprehensive eye exam. Requesting anti-glare lenses.",
-      priority: "Normal",
-      status: "completed",
-      timeInQueue: "09:15 AM",
-    },
-  ];
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadQueue() {
+      try {
+        const res = await fetch("/api/patients");
+        if (!res.ok) throw new Error("Failed to load patients");
+        const { patients } = await res.json();
+        if (cancelled) return;
+
+        setDoctorQueue(
+          patients.map((p: any) => ({
+            id: p.patientId,
+            fullName: p.fullName,
+            age: p.age,
+            gender: p.gender,
+            triageNote: p.primaryComplaint || "No triage notes recorded yet.",
+            // No real priority tracking exists yet — defaulting to Normal
+            // rather than fabricating urgency that isn't there.
+            priority: "Normal",
+            status: STATUS_TO_QUEUE[p.status] || "waiting",
+            timeInQueue: p.lastVisitAt
+              ? new Date(p.lastVisitAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "—",
+          }))
+        );
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!cancelled) setIsLoadingQueue(false);
+      }
+    }
+
+    async function loadNotifications() {
+      try {
+        const res = await fetch("/api/activity-logs?limit=6");
+        if (!res.ok) throw new Error("Failed to load activity");
+        const { logs } = await res.json();
+        if (cancelled) return;
+
+        setNotifications(
+          logs.map((log: any, idx: number) => ({
+            id: log.id,
+            title: log.action,
+            message: log.details || `Logged by ${log.user}`,
+            time: new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            read: idx >= 2,
+            type: log.category === "CLINICAL" ? "urgent" : "info",
+          }))
+        );
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    loadQueue();
+    loadNotifications();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredQueue = doctorQueue.filter((item) => {
     const matchesSearch =
@@ -96,6 +121,9 @@ export default function DoctorDashboard() {
     const matchesStatus = statusFilter === "all" || item.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const waitingCount = doctorQueue.filter((p) => p.status === "waiting").length;
+  const completedCount = doctorQueue.filter((p) => p.status === "completed").length;
 
   const handleStartConsultation = (patientId: string) => {
     router.push(`/doctor/patients/${patientId}/encounter`);
@@ -208,7 +236,9 @@ export default function DoctorDashboard() {
             <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
               Waiting for Exam
             </p>
-            <p className="text-2xl font-extrabold text-white">2 Patients</p>
+            <p className="text-2xl font-extrabold text-white">
+              {isLoadingQueue ? "…" : `${waitingCount} Patient${waitingCount === 1 ? "" : "s"}`}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center">
             <Clock className="w-5 h-5" />
@@ -220,7 +250,9 @@ export default function DoctorDashboard() {
             <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
               Consultations Done
             </p>
-            <p className="text-2xl font-extrabold text-white">8 Patients</p>
+            <p className="text-2xl font-extrabold text-white">
+              {isLoadingQueue ? "…" : `${completedCount} Patient${completedCount === 1 ? "" : "s"}`}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
             <CheckCircle2 className="w-5 h-5" />
@@ -229,9 +261,14 @@ export default function DoctorDashboard() {
 
         <div className="bg-white/10 backdrop-blur-sm p-4 rounded-2xl border border-white/10 flex items-center justify-between">
           <div>
-            <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
-              Clinic Room
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] text-purple-100 uppercase tracking-wider font-semibold">
+                Clinic Room
+              </p>
+              <span className="text-[8px] font-bold uppercase text-amber-200 bg-amber-500/20 px-1.5 py-0.5 rounded">
+                Demo data
+              </span>
+            </div>
             <p className="text-2xl font-extrabold text-white">Optometry Room 03</p>
           </div>
           <div className="w-10 h-10 rounded-xl bg-purple-400/20 text-purple-200 flex items-center justify-center">
@@ -297,12 +334,27 @@ export default function DoctorDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {filteredQueue.map((item) => (
+                {isLoadingQueue ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      Loading patient queue…
+                    </td>
+                  </tr>
+                ) : filteredQueue.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No patients match this filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredQueue.map((item) => (
                   <tr key={item.id} className="hover:bg-purple-50/40 transition">
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-slate-900">{item.fullName}</div>
                       <div className="text-[11px] text-slate-400">
-                        {item.id} • {item.age} yrs, {item.gender}
+                        {item.id}
+                        {item.age ? ` • ${item.age} yrs` : ""}
+                        {item.gender ? `, ${item.gender}` : ""}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600 max-w-xs truncate">
@@ -343,7 +395,8 @@ export default function DoctorDashboard() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

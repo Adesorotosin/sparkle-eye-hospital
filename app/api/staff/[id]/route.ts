@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logActivity } from "@/lib/activity-log";
 
-// --- PATCH: Temporarily Suspend or Reactivate Staff ---
+// --- PATCH: Suspend/Reactivate Staff, and/or update their permissions ---
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -9,11 +10,23 @@ export async function PATCH(
   try {
     const { id } = await params; // ✅ Await params as a Promise
     const body = await request.json();
-    const { isActive } = body;
+    const { isActive, permissions } = body;
 
-    if (typeof isActive !== "boolean") {
+    if (isActive === undefined && permissions === undefined) {
       return NextResponse.json(
-        { error: "Invalid payload: 'isActive' boolean is required." },
+        { error: "Provide 'isActive' (boolean) and/or 'permissions' (object) to update." },
+        { status: 400 }
+      );
+    }
+    if (isActive !== undefined && typeof isActive !== "boolean") {
+      return NextResponse.json(
+        { error: "'isActive' must be a boolean." },
+        { status: 400 }
+      );
+    }
+    if (permissions !== undefined && (typeof permissions !== "object" || permissions === null)) {
+      return NextResponse.json(
+        { error: "'permissions' must be an object." },
         { status: 400 }
       );
     }
@@ -26,17 +39,29 @@ export async function PATCH(
       );
     }
 
-    // Update active status without setting deletedAt
     const updatedStaff = await db.staff.update({
       where: { id },
       data: {
-        isActive,
+        ...(isActive !== undefined ? { isActive } : {}),
+        ...(permissions !== undefined ? { permissions } : {}),
       },
+    });
+
+    const messageParts: string[] = [];
+    if (isActive !== undefined) messageParts.push(isActive ? "reactivated" : "suspended");
+    if (permissions !== undefined) messageParts.push("permissions updated");
+
+    await logActivity({
+      module: "Admin",
+      category: "ADMIN",
+      action: `Staff ${messageParts.join(", ")}: ${existing.name}`,
+      performedBy: "Admin",
+      staffId: id,
     });
 
     return NextResponse.json(
       {
-        message: `Staff member ${isActive ? "reactivated" : "suspended"} successfully`,
+        message: `Staff member ${messageParts.join(", ")} successfully`,
         staff: updatedStaff,
       },
       { status: 200 }
@@ -44,7 +69,7 @@ export async function PATCH(
   } catch (error) {
     console.error("Status update error:", error);
     return NextResponse.json(
-      { error: "Failed to update staff status in database" },
+      { error: "Failed to update staff record in database" },
       { status: 500 }
     );
   }
@@ -71,8 +96,16 @@ export async function DELETE(
       where: { id },
       data: {
         isActive: false,
-        deletedAt: new Date(),
+        deletedAt: new Date().toISOString(),
       },
+    });
+
+    await logActivity({
+      module: "Admin",
+      category: "ADMIN",
+      action: `Staff soft-deleted: ${existing.name}`,
+      performedBy: "Admin",
+      staffId: id,
     });
 
     return NextResponse.json(

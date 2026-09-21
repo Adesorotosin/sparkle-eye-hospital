@@ -24,14 +24,14 @@ values
 on conflict (username) do nothing;
 
 -- Demo patient (matches the previous hardcoded mock so existing screenshots/flows still make sense)
-insert into patients (patient_code, full_name, coverage_plan, age, gender, phone, allergies)
-values ('SPK-30892', 'Mrs. Chidinma Okafor', 'Self-Pay', 42, 'Female', '+234 803 123 4567', 'None')
+insert into patients (patient_code, full_name, coverage_plan, age, gender, phone, allergies, status, last_visit_at)
+values ('SPK-30892', 'Mrs. Chidinma Okafor', 'Self-Pay', 42, 'Female', '+234 803 123 4567', 'None', 'in_consultation', now())
 on conflict (patient_code) do nothing;
 
-insert into patients (patient_code, full_name, coverage_plan)
+insert into patients (patient_code, full_name, coverage_plan, status, last_visit_at)
 values
-  ('PAT-2026-090', 'Chukwudi Okeke', 'Private / Out-of-Pocket'),
-  ('PAT-2026-091', 'Folashade Adekunle', 'HMO - Hygeia')
+  ('PAT-2026-090', 'Chukwudi Okeke', 'Private / Out-of-Pocket', 'waiting_triage', now() - interval '2 days'),
+  ('PAT-2026-091', 'Folashade Adekunle', 'HMO - Hygeia', 'completed_today', now() - interval '1 day')
 on conflict (patient_code) do nothing;
 
 -- Vitals, diagnostics, prescriptions, and invoice for the demo patient

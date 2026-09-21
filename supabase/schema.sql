@@ -37,6 +37,10 @@ create table patients (
   gender text,
   phone text,
   allergies text,                             -- free-text, comma-separated
+  status text not null default 'waiting_triage'
+    check (status in ('waiting_triage','in_consultation','completed_today')),
+  is_walk_in boolean not null default false,
+  last_visit_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -123,9 +127,25 @@ create table invoice_items (
 create table activity_logs (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid references patients(id) on delete cascade,
-  module text not null check (module in ('Billing','Pharmacy','Diagnostics','Triage')),
+  staff_id uuid references staff(id) on delete set null,
+  module text not null,                       -- 'Billing' | 'Pharmacy' | 'Diagnostics' | 'Triage' | 'Admin' | 'Scheduling' | 'Consultation'
+  category text not null default 'CLINICAL' check (category in ('CLINICAL','BILLING','ADMIN')),
   action text not null,
+  details text,
+  financial_amount numeric,
   performed_by text not null,                 -- free-text name/label, matches existing UI
+  created_at timestamptz not null default now()
+);
+
+-- Login/security events, tracked separately from clinical/admin activity
+create table security_logs (
+  id uuid primary key default gen_random_uuid(),
+  staff_id uuid references staff(id) on delete set null,
+  username_attempted text not null,
+  action text not null,                       -- e.g. 'Successful Login', 'Failed Login Attempt'
+  ip_address text,
+  device text,
+  risk_level text not null default 'LOW' check (risk_level in ('LOW','MEDIUM','CRITICAL')),
   created_at timestamptz not null default now()
 );
 
@@ -160,6 +180,21 @@ create table appointments (
   created_at timestamptz not null default now()
 );
 
+-- Manually broadcast alerts/announcements from Admin > Notifications.
+-- NOTE: these persist and are visible in this Admin view, but are not yet
+-- pushed live to other roles' dashboards — that would need each role's
+-- page to poll or subscribe for updates, which is a separate feature.
+create table notifications (
+  id uuid primary key default gen_random_uuid(),
+  type text not null,                         -- 'Emergency' | 'Announcement' | 'Clinical' | 'Finance'
+  title text not null,
+  message text not null,
+  category text not null,                     -- 'Security' | 'Announcements' | 'Clinical Escalations'
+  target text,
+  triggered_by text,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================
 -- Helpful indexes
 -- ============================================================
@@ -170,7 +205,9 @@ create index idx_encounters_patient on encounters(patient_id);
 create index idx_invoices_patient on invoices(patient_id);
 create index idx_invoice_items_invoice on invoice_items(invoice_id);
 create index idx_activity_logs_patient on activity_logs(patient_id);
+create index idx_security_logs_created on security_logs(created_at);
 create index idx_appointments_time on appointments(start_time);
+create index idx_notifications_created on notifications(created_at);
 
 -- ============================================================
 -- Row Level Security
@@ -188,8 +225,10 @@ alter table encounters enable row level security;
 alter table invoices enable row level security;
 alter table invoice_items enable row level security;
 alter table activity_logs enable row level security;
+alter table security_logs enable row level security;
 alter table inventory_items enable row level security;
 alter table appointments enable row level security;
+alter table notifications enable row level security;
 
 -- No policies are created, which means: with RLS enabled and the anon key,
 -- ALL access is denied by default. Only the service role key (used only

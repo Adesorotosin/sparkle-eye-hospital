@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,7 +14,10 @@ import {
 } from "lucide-react";
 
 export default function RegisterPatientPage() {
+  const router = useRouter();
   const [activeStep, setActiveStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Form State
   const [firstName, setFirstName] = useState("");
@@ -34,7 +38,42 @@ export default function RegisterPatientPage() {
 
   const [referralSource, setReferralSource] = useState("Optician");
 
-  // Auto-Calculate Age based on Date of Birth
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firstName || !lastName) return;
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+
+    try {
+      const res = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName,
+          age: age ? Number(age) : undefined,
+          gender: sex,
+          phone: primaryPhone || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to register patient");
+      }
+
+      const { patient: created } = await res.json();
+      // Note: /doctor/patients/[id] (the main EHR chart) is still fully
+      // static and doesn't read the id param yet — redirecting to the
+      // encounter page instead, which does load real patient data.
+      router.push(`/doctor/patients/${created.patientId}/encounter`);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to register patient");
+      setIsSaving(false);
+    }
+  };
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDob(value);
@@ -164,7 +203,7 @@ export default function RegisterPatientPage() {
         </div>
 
         {/* 3. FORM CARDS */}
-        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* CARD 1: ID GENERATOR & PHOTO UPLOAD */}
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -481,21 +520,27 @@ export default function RegisterPatientPage() {
           <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <button
               type="button"
+              onClick={() => router.push("/doctor")}
               className="w-full sm:w-auto px-6 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-xl transition"
             >
               Cancel
             </button>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <Lock className="w-3.5 h-3.5 text-emerald-600" />
-              <span>All patient data is encrypted and stored securely (HIPAA compliant).</span>
-            </div>
+            {saveError ? (
+              <p className="text-xs font-semibold text-red-600">{saveError}</p>
+            ) : (
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span>Fields marked with an occupation, address, or next-of-kin are not saved yet.</span>
+              </div>
+            )}
 
             <button
               type="submit"
-              className="w-full sm:w-auto px-6 py-2.5 bg-[#6D4AFF] hover:bg-[#5B3CE1] text-white text-sm font-semibold rounded-xl shadow-md shadow-[#6D4AFF]/20 transition"
+              disabled={isSaving}
+              className="w-full sm:w-auto px-6 py-2.5 bg-[#6D4AFF] hover:bg-[#5B3CE1] disabled:opacity-60 text-white text-sm font-semibold rounded-xl shadow-md shadow-[#6D4AFF]/20 transition"
             >
-              Save & Open Patient File
+              {isSaving ? "Saving…" : "Save & Open Patient File"}
             </button>
           </div>
         </form>
