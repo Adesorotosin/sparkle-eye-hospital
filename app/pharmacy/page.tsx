@@ -387,31 +387,30 @@ function PharmacyContent() {
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
-      {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
-     <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
-  <div className="p-5 border-b border-slate-800/80">
-    <div className="flex items-center gap-3">
-      {/* Logo Container replacing the static Pill icon box */}
-      <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
-        <Image
-          src="/logo.png"
-          alt="Sparkle Eye Specialist Hospital Logo"
-          width={36}
-          height={36}
-          className="object-contain"
-          priority
-        />
-      </div>
-      <div>
-        <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">
-          Sparkle Eye
-        </h1>
-        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-          Dispensing Console
-        </p>
-      </div>
-    </div>
-  </div>
+ {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
+      <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+        <div className="p-5 border-b border-slate-800/80">
+          <div className="flex items-center gap-3">
+            {/* Logo Container */}
+            <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
+              <Image
+                src="/logo.png"
+                alt="Sparkle Eye Specialist Hospital Logo"
+                width={36}
+                height={36}
+                className="object-contain"
+                priority
+              />
+            </div>
+            <div>
+              <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">
+                Sparkle Eye
+              </h1>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                Dispensing Console
+              </p>
+            </div>
+          </div>
 
           <div className="mt-4 relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -506,26 +505,6 @@ function PharmacyContent() {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* SIDEBAR FOOTER WITH LOGOUT */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-900/50 text-xs space-y-3">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="flex items-center gap-2 font-medium">
-              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-              COMPLETED
-            </span>
-            <span className="font-bold text-slate-300">12 today</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl font-bold transition cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Logout</span>
-          </button>
         </div>
       </aside>
 
