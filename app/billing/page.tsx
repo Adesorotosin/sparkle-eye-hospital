@@ -29,11 +29,17 @@ export default function BillingCheckoutView() {
   const { invoice } = patient;
 
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("cash");
+  const [selectedPayment, setSelectedPayment] =
+    useState<PaymentMethod>("cash");
 
-  const [discountType, setDiscountType] = useState<"fixed" | "percentage">("fixed");
-  const [discountInput, setDiscountInput] = useState(invoice.discountAmount.toString());
-  const [reasonInput, setReasonInput] = useState("Staff discount / management approval");
+  const [discountType, setDiscountType] =
+    useState<"fixed" | "percentage">("fixed");
+  const [discountInput, setDiscountInput] = useState(
+    invoice.discountAmount.toString()
+  );
+  const [reasonInput, setReasonInput] = useState(
+    "Staff discount / management approval"
+  );
   const [adminPinInput, setAdminPinInput] = useState("");
   const [discountError, setDiscountError] = useState("");
 
@@ -47,14 +53,23 @@ export default function BillingCheckoutView() {
 
   const handleApplyDiscount = () => {
     setDiscountError("");
+
     const numericValue = parseFloat(discountInput) || 0;
 
-    const success = applyDiscount(discountType, numericValue, reasonInput, adminPinInput);
+    const success = applyDiscount(
+      discountType,
+      numericValue,
+      reasonInput,
+      adminPinInput
+    );
+
     if (success) {
       setDiscountModalOpen(false);
       setAdminPinInput("");
     } else {
-      setDiscountError("Invalid Admin PIN. Authorized PIN required (e.g. 1234).");
+      setDiscountError(
+        "Invalid Admin PIN. Authorized PIN required."
+      );
     }
   };
 
@@ -63,7 +78,11 @@ export default function BillingCheckoutView() {
   };
 
   const handleProcessPayment = () => {
-    const result = processPayment(selectedPayment, amountRendered);
+    const result = processPayment(
+      selectedPayment,
+      amountRendered
+    );
+
     if (result.success) {
       setPaymentSuccess(true);
       setLastChangeDue(result.changeDue);
@@ -77,7 +96,12 @@ export default function BillingCheckoutView() {
   };
 
   const handleLogout = () => {
-    const cookiesToClear = ["is_logged_in", "user_role", "auth_token", "next-auth.session-token"];
+    const cookiesToClear = [
+      "is_logged_in",
+      "user_role",
+      "auth_token",
+      "next-auth.session-token",
+    ];
 
     cookiesToClear.forEach((name) => {
       document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;`;
@@ -87,6 +111,7 @@ export default function BillingCheckoutView() {
 
     localStorage.clear();
     sessionStorage.clear();
+
     window.location.replace("/");
   };
 
@@ -105,11 +130,14 @@ export default function BillingCheckoutView() {
               priority
             />
           </div>
+
           <div>
             <h1 className="text-sm font-extrabold tracking-wide text-white leading-tight">
               Sparkle Eye Specialist Hospital
             </h1>
-            <p className="text-[11px] text-purple-200/80 font-medium">Hospital Billing &amp; Cashier Console</p>
+            <p className="text-[11px] text-purple-200/80 font-medium">
+              Hospital Billing &amp; Cashier Console
+            </p>
           </div>
         </div>
 
@@ -117,13 +145,18 @@ export default function BillingCheckoutView() {
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-purple-300" />
             <span>
-              Cashier: <strong className="text-white">Folake Adeyemi</strong>
+              Cashier:{" "}
+              <strong className="text-white">
+                Folake Adeyemi
+              </strong>
             </span>
           </div>
+
           <div className="hidden sm:flex items-center gap-2 border-l border-purple-800 pl-6">
             <Calendar className="w-4 h-4 text-purple-300" />
             <span>Sep 21, 2026</span>
           </div>
+
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 hover:text-white border border-rose-500/30 font-semibold text-xs transition cursor-pointer"
@@ -137,24 +170,39 @@ export default function BillingCheckoutView() {
       {/* PATIENT BAR */}
       <div className="w-full bg-[#5E35B1] text-white px-6 py-2.5 text-xs font-semibold flex items-center gap-2 print:hidden shadow-inner">
         <span>Patient:</span>
-        <span className="text-purple-200 font-bold">{patient.fullName}</span>
+        <span className="text-purple-200 font-bold">
+          {patient.fullName}
+        </span>
+
         <span className="text-purple-400">|</span>
+
         <span>ID:</span>
-        <span className="text-purple-200 font-bold">{patient.patientId}</span>
+        <span className="text-purple-200 font-bold">
+          {patient.patientId}
+        </span>
+
         <span className="text-purple-400">|</span>
+
         <span>Coverage Plan:</span>
-        <span className="text-purple-200 font-bold">{patient.coveragePlan}</span>
+        <span className="text-purple-200 font-bold">
+          {patient.coveragePlan}
+        </span>
       </div>
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT */}
       <main className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT COLUMN: Dynamic Itemized Bill */}
+        {/* LEFT COLUMN */}
         <section className="lg:col-span-7 bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-purple-100 shadow-sm space-y-6 print:w-full print:shadow-none print:border-none">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Itemized Bill</h2>
-              <p className="text-xs text-slate-500 font-medium">Invoice No: #{invoice.invoiceNo}</p>
+              <h2 className="text-base font-bold text-slate-900">
+                Itemized Bill
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                Invoice No: #{invoice.invoiceNo}
+              </p>
             </div>
+
             <span
               className={`px-3 py-1 text-[11px] font-bold rounded-md uppercase tracking-wider ${
                 invoice.status === "paid"
@@ -170,14 +218,25 @@ export default function BillingCheckoutView() {
             <div className="grid grid-cols-12 font-bold text-slate-400 border-b border-slate-200 pb-2">
               <span className="col-span-7">ITEM NAME</span>
               <span className="col-span-2 text-center">QTY</span>
-              <span className="col-span-3 text-right">AMOUNT</span>
+              <span className="col-span-3 text-right">
+                AMOUNT
+              </span>
             </div>
 
             <div className="space-y-2.5 font-medium text-slate-700">
               {invoice.items.map((item) => (
-                <div key={item.id} className="grid grid-cols-12 items-center">
-                  <span className="col-span-7 text-slate-800 font-semibold">{item.name}</span>
-                  <span className="col-span-2 text-center text-slate-500">{item.quantity}</span>
+                <div
+                  key={item.id}
+                  className="grid grid-cols-12 items-center"
+                >
+                  <span className="col-span-7 text-slate-800 font-semibold">
+                    {item.name}
+                  </span>
+
+                  <span className="col-span-2 text-center text-slate-500">
+                    {item.quantity}
+                  </span>
+
                   <span className="col-span-3 text-right text-slate-900 font-bold">
                     ₦{item.totalPrice.toLocaleString()}
                   </span>
@@ -186,20 +245,28 @@ export default function BillingCheckoutView() {
             </div>
           </div>
 
-          {/* DYNAMIC TOTALS */}
+          {/* TOTALS */}
           <div className="border-t border-slate-200 pt-4 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
-              <span className="font-semibold">₦{invoice.subtotal.toLocaleString()}</span>
+              <span className="font-semibold">
+                ₦{invoice.subtotal.toLocaleString()}
+              </span>
             </div>
+
             {invoice.discountAmount > 0 && (
               <div className="flex justify-between text-emerald-600 font-semibold items-center">
                 <span className="flex items-center gap-1">
-                  Discount Approved <Lock className="w-3 h-3" />
+                  Discount Approved
+                  <Lock className="w-3 h-3" />
                 </span>
-                <span>-₦{invoice.discountAmount.toLocaleString()}</span>
+
+                <span>
+                  -₦{invoice.discountAmount.toLocaleString()}
+                </span>
               </div>
             )}
+
             <div className="flex justify-between text-slate-600">
               <span>VAT (0%)</span>
               <span>₦0.00</span>
@@ -208,15 +275,18 @@ export default function BillingCheckoutView() {
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm font-bold text-slate-900">
               <div className="flex items-center gap-1.5">
                 <span>Grand Total</span>
+
                 {invoice.status !== "paid" && (
                   <button
                     onClick={() => setDiscountModalOpen(true)}
                     className="text-xs font-semibold text-[#5E35B1] hover:underline flex items-center gap-1 print:hidden cursor-pointer"
                   >
-                    <Lock className="w-3 h-3" /> Apply Discount
+                    <Lock className="w-3 h-3" />
+                    Apply Discount
                   </button>
                 )}
               </div>
+
               <span className="text-base text-[#5E35B1] font-extrabold">
                 ₦{invoice.grandTotal.toLocaleString()}
               </span>
@@ -225,16 +295,22 @@ export default function BillingCheckoutView() {
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-500 print:hidden">
             <Info className="w-4 h-4 text-slate-400 shrink-0" />
-            <span>All transactions are logged permanently and cannot be deleted or modified after processing.</span>
+            <span>
+              All transactions are logged permanently and cannot
+              be deleted or modified after processing.
+            </span>
           </div>
         </section>
 
-        {/* RIGHT COLUMN: Interactive Payment Console / Post-Payment Actions */}
+        {/* RIGHT COLUMN */}
         <section className="lg:col-span-5 bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-purple-100 shadow-sm space-y-6 print:hidden">
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              {paymentSuccess || invoice.status === "paid" ? "Post-Payment Actions" : "Payment Method"}
+              {paymentSuccess || invoice.status === "paid"
+                ? "Post-Payment Actions"
+                : "Payment Method"}
             </h2>
+
             <p className="text-xs text-slate-500 font-medium">
               {paymentSuccess || invoice.status === "paid"
                 ? "Transaction complete. Proceed with post-payment workflow."
@@ -249,10 +325,17 @@ export default function BillingCheckoutView() {
                   <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
+
                   <div>
-                    <h3 className="text-sm font-bold text-emerald-950">Payment Completed</h3>
+                    <h3 className="text-sm font-bold text-emerald-950">
+                      Payment Completed
+                    </h3>
+
                     <p className="text-xs text-emerald-800 font-medium">
-                      Invoice #{invoice.invoiceNo} marked as <span className="font-bold uppercase text-emerald-900">PAID</span>
+                      Invoice #{invoice.invoiceNo} marked as{" "}
+                      <span className="font-bold uppercase text-emerald-900">
+                        PAID
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -260,7 +343,9 @@ export default function BillingCheckoutView() {
                 {lastChangeDue > 0 && (
                   <div className="mt-3 p-2.5 bg-emerald-100/60 border border-emerald-300/50 rounded-xl flex items-center justify-between text-xs font-bold text-emerald-900">
                     <span>Change Returned:</span>
-                    <span className="text-sm">₦{lastChangeDue.toLocaleString()}</span>
+                    <span className="text-sm">
+                      ₦{lastChangeDue.toLocaleString()}
+                    </span>
                   </div>
                 )}
               </div>
@@ -274,11 +359,17 @@ export default function BillingCheckoutView() {
                     <div className="w-8 h-8 rounded-lg bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5E35B1]">
                       <Printer className="w-4 h-4" />
                     </div>
+
                     <div className="text-left">
-                      <p className="font-bold text-slate-900">Print Patient Receipt</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Generate physical or PDF receipt copy</p>
+                      <p className="font-bold text-slate-900">
+                        Print Patient Receipt
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-normal">
+                        Generate physical or PDF receipt copy
+                      </p>
                     </div>
                   </div>
+
                   <Receipt className="w-4 h-4 text-slate-400 group-hover:text-[#5E35B1] transition" />
                 </button>
 
@@ -290,37 +381,63 @@ export default function BillingCheckoutView() {
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
                       <LayoutDashboard className="w-4 h-4" />
                     </div>
+
                     <div className="text-left">
-                      <p className="font-bold text-white">Return to Cashier Dashboard</p>
-                      <p className="text-[11px] text-purple-100/80 font-normal">Back to queue overview and shift summary</p>
+                      <p className="font-bold text-white">
+                        Return to Cashier Dashboard
+                      </p>
+                      <p className="text-[11px] text-purple-100/80 font-normal">
+                        Back to queue overview and shift summary
+                      </p>
                     </div>
                   </div>
+
                   <ArrowRight className="w-4 h-4 text-purple-200 group-hover:translate-x-1 transition" />
                 </button>
               </div>
 
-              {patient.activityLogs && patient.activityLogs.length > 0 && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <span className="flex items-center gap-1.5">
-                      <History className="w-3.5 h-3.5 text-slate-400" /> Recent Audit Entries
-                    </span>
-                    <span>{patient.activityLogs.length} Total</span>
+              {patient.activityLogs &&
+                patient.activityLogs.length > 0 && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5">
+                        <History className="w-3.5 h-3.5 text-slate-400" />
+                        Recent Audit Entries
+                      </span>
+
+                      <span>
+                        {patient.activityLogs.length} Total
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 pt-1">
+                      {patient.activityLogs
+                        .slice(0, 2)
+                        .map((log) => (
+                          <div
+                            key={log.id}
+                            className="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-slate-100 flex items-start justify-between"
+                          >
+                            <div>
+                              <span className="font-bold text-slate-800">
+                                [{log.module}]
+                              </span>{" "}
+                              {log.action}
+                            </div>
+
+                            <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                              {new Date(
+                                log.timestamp
+                              ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                  <div className="space-y-1.5 pt-1">
-                    {patient.activityLogs.slice(0, 2).map((log) => (
-                      <div key={log.id} className="text-[11px] text-slate-600 bg-white p-2 rounded-lg border border-slate-100 flex items-start justify-between">
-                        <div>
-                          <span className="font-bold text-slate-800">[{log.module}]</span> {log.action}
-                        </div>
-                        <span className="text-[10px] text-slate-400 shrink-0 ml-2">
-                          {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                )}
             </div>
           ) : (
             <>
@@ -345,9 +462,14 @@ export default function BillingCheckoutView() {
                         type="radio"
                         name="payment"
                         checked={selectedPayment === method.id}
-                        onChange={() => setSelectedPayment(method.id as PaymentMethod)}
+                        onChange={() =>
+                          setSelectedPayment(
+                            method.id as PaymentMethod
+                          )
+                        }
                         className="accent-[#5E35B1]"
                       />
+
                       <span>{method.name}</span>
                     </div>
                   </label>
@@ -357,24 +479,42 @@ export default function BillingCheckoutView() {
               <div className="space-y-3 border-t border-slate-200 pt-4">
                 <div className="flex justify-between text-xs font-bold text-slate-900">
                   <span>Amount Due:</span>
+
                   <span className="text-base font-extrabold text-[#5E35B1]">
                     ₦{invoice.grandTotal.toLocaleString()}
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-slate-500 block">Quick Cash Tender</label>
+                  <label className="text-[11px] font-semibold text-slate-500 block">
+                    Quick Cash Tender
+                  </label>
+
                   <div className="grid grid-cols-4 gap-2">
                     {[
-                      { label: "Exact", value: invoice.grandTotal },
-                      { label: "₦50,000", value: 50000 },
-                      { label: "₦70,000", value: 70000 },
-                      { label: "₦100,000", value: 100000 },
-                    ].map((tender, index) => (
+                      {
+                        label: "Exact",
+                        value: invoice.grandTotal,
+                      },
+                      {
+                        label: "₦50,000",
+                        value: 50000,
+                      },
+                      {
+                        label: "₦70,000",
+                        value: 70000,
+                      },
+                      {
+                        label: "₦100,000",
+                        value: 100000,
+                      },
+                    ].map((tender) => (
                       <button
-                        key={index}
+                        key={tender.label}
                         type="button"
-                        onClick={() => handleQuickCash(tender.value)}
+                        onClick={() =>
+                          handleQuickCash(tender.value)
+                        }
                         className="py-1.5 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200 transition cursor-pointer"
                       >
                         {tender.label}
@@ -384,28 +524,55 @@ export default function BillingCheckoutView() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-slate-500 block">Amount Rendered (₦)</label>
+                  <label className="text-[11px] font-semibold text-slate-500 block">
+                    Amount Rendered (₦)
+                  </label>
+
                   <input
                     type="number"
+                    min="0"
                     value={amountRenderedInput}
-                    onChange={(e) => setAmountRenderedInput(e.target.value)}
+                    onChange={(e) =>
+                      setAmountRenderedInput(e.target.value)
+                    }
                     className={`w-full p-2.5 bg-white border rounded-xl font-bold text-sm text-slate-900 focus:outline-none ${
-                      isUnderpaid ? "border-amber-400 focus:border-amber-500" : "border-slate-300 focus:border-[#5E35B1]"
+                      isUnderpaid
+                        ? "border-amber-400 focus:border-amber-500"
+                        : "border-slate-300 focus:border-[#5E35B1]"
                     }`}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-3 bg-emerald-50 border border-emerald-200/60 rounded-xl">
-                    <span className="text-[10px] font-bold text-emerald-700 block">Change Due</span>
+                    <span className="text-[10px] font-bold text-emerald-700 block">
+                      Change Due
+                    </span>
+
                     <span className="text-sm font-bold text-emerald-800">
                       ₦{changeDue.toLocaleString()}
                     </span>
                   </div>
+
                   <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-500 block">Outstanding Balance</span>
-                    <span className={`text-sm font-bold ${isUnderpaid ? "text-amber-700" : "text-slate-800"}`}>
-                      ₦{isUnderpaid ? (invoice.grandTotal - amountRendered).toLocaleString() : "0.00"}
+                    <span className="text-[10px] font-bold text-slate-500 block">
+                      Outstanding Balance
+                    </span>
+
+                    <span
+                      className={`text-sm font-bold ${
+                        isUnderpaid
+                          ? "text-amber-700"
+                          : "text-slate-800"
+                      }`}
+                    >
+                      ₦
+                      {isUnderpaid
+                        ? (
+                            invoice.grandTotal -
+                            amountRendered
+                          ).toLocaleString()
+                        : "0.00"}
                     </span>
                   </div>
                 </div>
@@ -419,7 +586,9 @@ export default function BillingCheckoutView() {
                       : "bg-[#5E35B1] hover:bg-[#4527A0] text-white cursor-pointer"
                   }`}
                 >
-                  {isUnderpaid ? "Insufficient Amount Rendered" : "Process Payment & Issue Receipt"}
+                  {isUnderpaid
+                    ? "Insufficient Amount Rendered"
+                    : "Process Payment & Issue Receipt"}
                 </button>
               </div>
             </>
@@ -436,9 +605,16 @@ export default function BillingCheckoutView() {
                 <div className="w-8 h-8 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-[#5E35B1]">
                   <Lock className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Discount Authorization</h3>
+
+                <h3 className="text-sm font-bold text-slate-900">
+                  Discount Authorization
+                </h3>
               </div>
-              <button onClick={() => setDiscountModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+
+              <button
+                onClick={() => setDiscountModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -451,7 +627,10 @@ export default function BillingCheckoutView() {
               )}
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 block">Discount Type</label>
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Discount Type
+                </label>
+
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -462,68 +641,100 @@ export default function BillingCheckoutView() {
                         : "bg-slate-50 border-slate-200 text-slate-600"
                     }`}
                   >
-                    <Banknote className="w-3.5 h-3.5" /> Flat Amount (₦)
+                    <Banknote className="w-3.5 h-3.5" />
+                    Flat Amount (₦)
                   </button>
+
                   <button
                     type="button"
-                    onClick={() => setDiscountType("percentage")}
+                    onClick={() =>
+                      setDiscountType("percentage")
+                    }
                     className={`py-2 px-3 text-xs font-bold rounded-xl border flex items-center justify-center gap-1.5 transition cursor-pointer ${
                       discountType === "percentage"
                         ? "bg-purple-50 border-[#5E35B1] text-[#5E35B1]"
                         : "bg-slate-50 border-slate-200 text-slate-600"
                     }`}
                   >
-                    <Percent className="w-3.5 h-3.5" /> Percentage (%)
+                    <Percent className="w-3.5 h-3.5" />
+                    Percentage (%)
                   </button>
                 </div>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-slate-700 block">
-                  {discountType === "fixed" ? "Discount Amount (₦)" : "Discount Percentage (%)"}
+                  {discountType === "fixed"
+                    ? "Discount Amount (₦)"
+                    : "Discount Percentage (%)"}
                 </label>
+
                 <input
                   type="number"
+                  min="0"
                   value={discountInput}
-                  onChange={(e) => setDiscountInput(e.target.value)}
-                  placeholder={discountType === "fixed" ? "e.g. 5000" : "e.g. 10"}
+                  onChange={(e) =>
+                    setDiscountInput(e.target.value)
+                  }
+                  placeholder={
+                    discountType === "fixed"
+                      ? "e.g. 5000"
+                      : "e.g. 10"
+                  }
                   className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#5E35B1]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 block">Reason for Discount</label>
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Reason for Discount
+                </label>
+
                 <textarea
                   rows={2}
                   value={reasonInput}
-                  onChange={(e) => setReasonInput(e.target.value)}
+                  onChange={(e) =>
+                    setReasonInput(e.target.value)
+                  }
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none resize-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700 block">Admin Approval PIN (Try 1234)</label>
+                <label className="text-[11px] font-bold text-slate-700 block">
+                  Admin Approval PIN
+                </label>
+
                 <input
                   type="password"
                   value={adminPinInput}
-                  onChange={(e) => setAdminPinInput(e.target.value)}
-                  placeholder="Enter 1234"
+                  onChange={(e) =>
+                    setAdminPinInput(e.target.value)
+                  }
+                  placeholder="Enter admin PIN"
                   className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs tracking-widest text-slate-900 focus:outline-none focus:border-[#5E35B1]"
                 />
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center gap-2 text-[11px] font-medium text-amber-800">
                 <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>This action will be logged with timestamp and approver identity.</span>
+
+                <span>
+                  This action will be logged with timestamp and
+                  approver identity.
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
-                  onClick={() => setDiscountModalOpen(false)}
+                  onClick={() =>
+                    setDiscountModalOpen(false)
+                  }
                   className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl border border-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
+
                 <button
                   onClick={handleApplyDiscount}
                   className="px-5 py-2.5 text-xs font-bold text-white bg-[#5E35B1] hover:bg-[#4527A0] rounded-xl shadow-sm cursor-pointer"
