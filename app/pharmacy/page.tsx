@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { usePatientFlow } from "@/context/PatientFlowContext";
@@ -387,21 +388,30 @@ function PharmacyContent() {
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
       {/* LEFT SIDEBAR: PRESCRIPTION QUEUE */}
-      <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
-        <div className="p-5 border-b border-slate-800/80">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-purple-600 flex items-center justify-center font-bold text-white shadow-md">
-              <Pill className="w-4 h-4" />
-            </div>
-            <div>
-              <h1 className="font-extrabold text-sm tracking-tight text-white">
-                Sparkle-Eye
-              </h1>
-              <p className="text-[10px] text-slate-400 font-medium">
-                Dispensing Console
-              </p>
-            </div>
-          </div>
+     <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+  <div className="p-5 border-b border-slate-800/80">
+    <div className="flex items-center gap-3">
+      {/* Logo Container replacing the static Pill icon box */}
+      <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
+        <Image
+          src="/logo.png"
+          alt="Sparkle Eye Specialist Hospital Logo"
+          width={36}
+          height={36}
+          className="object-contain"
+          priority
+        />
+      </div>
+      <div>
+        <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">
+          Sparkle Eye
+        </h1>
+        <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+          Dispensing Console
+        </p>
+      </div>
+    </div>
+  </div>
 
           <div className="mt-4 relative">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
