@@ -4,7 +4,10 @@ import React, { useEffect, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { getPatientById, PatientRecord } from "@/lib/patients";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
-import { usePatientFlow } from "@/context/PatientFlowContext";
+import {
+  createDiagnosticOrder,
+  createPrescription,
+} from "@/app/actions/clinical-orders";
 import {
   Calendar,
   Check,
@@ -54,14 +57,210 @@ const SURGERY_OPTIONS = [
   "Intravitreal Injection",
 ];
 
+function TriageSummary({
+  vitals,
+}: {
+  vitals?: PatientRecord["vitals"];
+}) {
+  if (!vitals) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Nurse Triage
+            </p>
+
+            <p className="text-sm font-semibold text-slate-700 mt-1">
+              No triage record available
+            </p>
+          </div>
+
+          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
+            NOT RECORDED
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  const symptoms = vitals.symptoms ?? [];
+
+  const vitalItems = [
+    {
+      label: "Visual Acuity",
+      value: `OD ${vitals.visualAcuityOD || "—"} • OS ${
+        vitals.visualAcuityOS || "—"
+      }`,
+    },
+    {
+      label: "IOP",
+      value:
+        vitals.iopOD !== undefined || vitals.iopOS !== undefined
+          ? `OD ${vitals.iopOD ?? "—"} • OS ${
+              vitals.iopOS ?? "—"
+            } mmHg`
+          : "—",
+    },
+    {
+      label: "Blood Pressure",
+      value:
+        vitals.bpSystolic !== undefined ||
+        vitals.bpDiastolic !== undefined
+          ? `${vitals.bpSystolic ?? "—"} / ${
+              vitals.bpDiastolic ?? "—"
+            } mmHg`
+          : "—",
+    },
+    {
+      label: "Pulse",
+      value:
+        vitals.pulse !== undefined ? `${vitals.pulse} bpm` : "—",
+    },
+    {
+      label: "Temperature",
+      value:
+        vitals.temperature !== undefined
+          ? `${vitals.temperature} °C`
+          : "—",
+    },
+    {
+      label: "SpO₂",
+      value:
+        vitals.spo2 !== undefined ? `${vitals.spo2}%` : "—",
+    },
+  ];
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600">
+            Nurse Triage
+          </p>
+
+          <h3 className="text-sm font-bold text-slate-900 mt-1">
+            Initial Assessment
+          </h3>
+
+          <p className="text-[10px] text-slate-400 mt-1">
+            Recorded{" "}
+            {vitals.recordedAt
+              ? new Date(vitals.recordedAt).toLocaleString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "—"}
+          </p>
+        </div>
+
+        {vitals.severity && (
+          <span
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+              vitals.severity === "Severe"
+                ? "bg-rose-100 text-rose-700"
+                : vitals.severity === "Moderate"
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            {vitals.severity.toUpperCase()}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        {vitalItems.map((item) => (
+          <div
+            key={item.label}
+            className="rounded-xl bg-slate-50 border border-slate-100 p-3"
+          >
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+              {item.label}
+            </p>
+
+            <p className="text-xs font-bold text-slate-800 mt-1">
+              {item.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+            Chief Complaint
+          </p>
+
+          <p className="text-xs font-semibold text-slate-800 mt-1">
+            {vitals.primaryComplaint || "Not recorded"}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+            Duration
+          </p>
+
+          <p className="text-xs font-semibold text-slate-800 mt-1">
+            {vitals.durationText || "Not recorded"}
+          </p>
+        </div>
+      </div>
+
+      {symptoms.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400 mb-2">
+            Reported Symptoms
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {symptoms.map((symptom) => (
+              <span
+                key={symptom}
+                className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100"
+              >
+                {symptom}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mt-3 pt-3 border-t border-slate-100">
+        <p className="text-[10px] text-slate-500">
+          Correction:{" "}
+          <span className="font-bold text-slate-700">
+            {vitals.withCorrection === undefined
+              ? "Not specified"
+              : vitals.withCorrection
+                ? "With correction"
+                : "Without correction"}
+          </span>
+        </p>
+
+        {vitals.iopInstrument && (
+          <p className="text-[10px] text-slate-500">
+            IOP Instrument:{" "}
+            <span className="font-bold text-slate-700">
+              {vitals.iopInstrument}
+            </span>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function OphthalmologyConsultation() {
   const params = useParams();
-  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
-  const {
-    addDiagnosticOrder,
-    addPrescription,
-  } = usePatientFlow();
+  const id = Array.isArray(params?.id)
+    ? params.id[0]
+    : params?.id;
 
   const [patient, setPatient] = useState<PatientRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,7 +313,10 @@ export default function OphthalmologyConsultation() {
 
   const [isPending, startTransition] = useTransition();
 
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(
+    null
+  );
+
   const [feedbackType, setFeedbackType] = useState<
     "success" | "error" | "info"
   >("success");
@@ -132,6 +334,8 @@ export default function OphthalmologyConsultation() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadPatientData() {
       if (!id) {
         setLoading(false);
@@ -140,6 +344,10 @@ export default function OphthalmologyConsultation() {
 
       try {
         const data = await getPatientById(id);
+
+        if (cancelled) {
+          return;
+        }
 
         if (data) {
           setPatient(data);
@@ -163,16 +371,25 @@ export default function OphthalmologyConsultation() {
         }
       } catch (error) {
         console.error("Failed to load patient record:", error);
-        showFeedback(
-          "Unable to load this patient record. Please try again.",
-          "error"
-        );
+
+        if (!cancelled) {
+          showFeedback(
+            "Unable to load this patient record. Please try again.",
+            "error"
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadPatientData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const snapToQuarter = (value: string): string => {
@@ -197,8 +414,13 @@ export default function OphthalmologyConsultation() {
 
     let num = Number.parseInt(cleaned, 10);
 
-    if (num < 0) num = 0;
-    if (num > 180) num = 180;
+    if (num < 0) {
+      num = 0;
+    }
+
+    if (num > 180) {
+      num = 180;
+    }
 
     return num.toString();
   };
@@ -239,6 +461,7 @@ export default function OphthalmologyConsultation() {
         "Please enter a diagnosis before completing the encounter.",
         "error"
       );
+
       setActiveTab("diagnosis");
       return;
     }
@@ -270,7 +493,10 @@ export default function OphthalmologyConsultation() {
     });
   };
 
-  const toggleDiagnostic = (testName: string, checked: boolean) => {
+  const toggleDiagnostic = (
+    testName: string,
+    checked: boolean
+  ) => {
     setSelectedDiagnostics((previous) => {
       if (checked) {
         return previous.includes(testName)
@@ -283,6 +509,11 @@ export default function OphthalmologyConsultation() {
   };
 
   const handleSubmitDiagnostics = () => {
+    if (!id) {
+      showFeedback("Patient ID is missing.", "error");
+      return;
+    }
+
     if (selectedDiagnostics.length === 0) {
       showFeedback(
         "Select at least one diagnostic test before submitting.",
@@ -291,19 +522,23 @@ export default function OphthalmologyConsultation() {
       return;
     }
 
-    startTransition(() => {
+    startTransition(async () => {
       try {
         const selectedTests = DIAGNOSTIC_TESTS.filter((test) =>
           selectedDiagnostics.includes(test.name)
         );
 
-        selectedTests.forEach((test) => {
-          addDiagnosticOrder({
+        for (const test of selectedTests) {
+          const result = await createDiagnosticOrder({
+            patientCode: id,
             name: test.name,
             price: test.price,
-            status: "ordered",
           });
-        });
+
+          if (!result.success) {
+            throw new Error(result.message);
+          }
+        }
 
         showFeedback(
           `${selectedTests.length} diagnostic ${
@@ -318,7 +553,9 @@ export default function OphthalmologyConsultation() {
         console.error("Failed to add diagnostic orders:", error);
 
         showFeedback(
-          "Unable to add the diagnostic orders. Please try again.",
+          error instanceof Error
+            ? error.message
+            : "Unable to add the diagnostic orders. Please try again.",
           "error"
         );
       }
@@ -326,13 +563,20 @@ export default function OphthalmologyConsultation() {
   };
 
   const handleSavePrescription = () => {
+    if (!id) {
+      showFeedback("Patient ID is missing.", "error");
+      return;
+    }
+
     const medication = prescriptionDetails.medication.trim();
     const dosage = prescriptionDetails.dosage.trim();
     const frequency = prescriptionDetails.frequency.trim();
     const duration = prescriptionDetails.duration.trim();
 
     const quantity = Number(prescriptionDetails.quantity);
-    const pricePerUnit = Number(prescriptionDetails.pricePerUnit);
+    const pricePerUnit = Number(
+      prescriptionDetails.pricePerUnit
+    );
 
     if (!medication) {
       showFeedback("Enter the medication name.", "error");
@@ -350,16 +594,25 @@ export default function OphthalmologyConsultation() {
     }
 
     if (!duration) {
-      showFeedback("Enter the duration of treatment.", "error");
+      showFeedback(
+        "Enter the duration of treatment.",
+        "error"
+      );
       return;
     }
 
     if (!Number.isInteger(quantity) || quantity <= 0) {
-      showFeedback("Quantity must be a whole number greater than zero.", "error");
+      showFeedback(
+        "Quantity must be a whole number greater than zero.",
+        "error"
+      );
       return;
     }
 
-    if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
+    if (
+      !Number.isFinite(pricePerUnit) ||
+      pricePerUnit < 0
+    ) {
       showFeedback(
         "Enter a valid price per unit.",
         "error"
@@ -367,7 +620,7 @@ export default function OphthalmologyConsultation() {
       return;
     }
 
-    startTransition(() => {
+    startTransition(async () => {
       try {
         const fullDosage = [
           dosage,
@@ -377,13 +630,17 @@ export default function OphthalmologyConsultation() {
           .filter(Boolean)
           .join(", ");
 
-        addPrescription({
+        const result = await createPrescription({
+          patientCode: id,
           drugName: medication,
           dosage: fullDosage,
           quantity,
           pricePerUnit,
-          totalPrice: quantity * pricePerUnit,
         });
+
+        if (!result.success) {
+          throw new Error(result.message);
+        }
 
         showFeedback(
           `${medication} has been added to the patient's prescription and bill.`,
@@ -404,7 +661,9 @@ export default function OphthalmologyConsultation() {
         console.error("Failed to save prescription:", error);
 
         showFeedback(
-          "Unable to save the prescription. Please try again.",
+          error instanceof Error
+            ? error.message
+            : "Unable to save the prescription. Please try again.",
           "error"
         );
       }
@@ -463,7 +722,10 @@ export default function OphthalmologyConsultation() {
 
               <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
                 {patient.history.map((hist, idx) => (
-                  <div key={idx} className="relative pl-6">
+                  <div
+                    key={idx}
+                    className="relative pl-6"
+                  >
                     <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-purple-50 border-2 border-[#6B21A8] flex items-center justify-center">
                       <div className="w-1.5 h-1.5 rounded-full bg-[#6B21A8]" />
                     </div>
@@ -544,7 +806,9 @@ export default function OphthalmologyConsultation() {
               <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
                 <div className="flex items-center gap-8">
                   <button
-                    onClick={() => setActiveTab("slit-lamp")}
+                    onClick={() =>
+                      setActiveTab("slit-lamp")
+                    }
                     className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
                       activeTab === "slit-lamp"
                         ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
@@ -555,7 +819,9 @@ export default function OphthalmologyConsultation() {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab("refraction")}
+                    onClick={() =>
+                      setActiveTab("refraction")
+                    }
                     className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
                       activeTab === "refraction"
                         ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
@@ -566,7 +832,9 @@ export default function OphthalmologyConsultation() {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab("diagnosis")}
+                    onClick={() =>
+                      setActiveTab("diagnosis")
+                    }
                     className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
                       activeTab === "diagnosis"
                         ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
@@ -580,7 +848,9 @@ export default function OphthalmologyConsultation() {
                 {activeTab === "refraction" && (
                   <button
                     onClick={() =>
-                      setShowHistoryOverlay((previous) => !previous)
+                      setShowHistoryOverlay(
+                        (previous) => !previous
+                      )
                     }
                     className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer ${
                       showHistoryOverlay
@@ -596,6 +866,9 @@ export default function OphthalmologyConsultation() {
                   </button>
                 )}
               </div>
+
+              {/* TRIAGE SUMMARY */}
+              <TriageSummary vitals={patient.vitals} />
 
               {/* SLIT LAMP */}
               {activeTab === "slit-lamp" && (
@@ -648,46 +921,73 @@ export default function OphthalmologyConsultation() {
               {/* REFRACTION */}
               {activeTab === "refraction" && (
                 <div className="space-y-6">
-                  {showHistoryOverlay && patient.previousRefraction && (
-                    <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 border border-slate-800 space-y-3 animate-in fade-in duration-200 shadow-sm">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <div className="flex items-center gap-2">
-                          <History className="w-4 h-4 text-purple-400" />
+                  {showHistoryOverlay &&
+                    patient.previousRefraction && (
+                      <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 border border-slate-800 space-y-3 animate-in fade-in duration-200 shadow-sm">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="flex items-center gap-2">
+                            <History className="w-4 h-4 text-purple-400" />
 
-                          <h4 className="font-bold text-xs tracking-wide">
-                            Previous Record (
-                            {patient.previousRefraction.date})
-                          </h4>
-                        </div>
+                            <h4 className="font-bold text-xs tracking-wide">
+                              Previous Record (
+                              {patient.previousRefraction.date})
+                            </h4>
+                          </div>
 
-                        <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
-                          Verified Baseline
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                        <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
-                          <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
-                            OD (Right Eye)
+                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
+                            Verified Baseline
                           </span>
-
-                          Sphere: {patient.previousRefraction.od.sphere} |
-                          Cyl: {patient.previousRefraction.od.cylinder} |
-                          Axis: {patient.previousRefraction.od.axis}°
                         </div>
 
-                        <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
-                          <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
-                            OS (Left Eye)
-                          </span>
+                        <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                          <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
+                            <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
+                              OD (Right Eye)
+                            </span>
 
-                          Sphere: {patient.previousRefraction.os.sphere} |
-                          Cyl: {patient.previousRefraction.os.cylinder} |
-                          Axis: {patient.previousRefraction.os.axis}°
+                            Sphere:{" "}
+                            {
+                              patient.previousRefraction.od
+                                .sphere
+                            }{" "}
+                            | Cyl:{" "}
+                            {
+                              patient.previousRefraction.od
+                                .cylinder
+                            }{" "}
+                            | Axis:{" "}
+                            {
+                              patient.previousRefraction.od
+                                .axis
+                            }
+                            °
+                          </div>
+
+                          <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
+                            <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
+                              OS (Left Eye)
+                            </span>
+
+                            Sphere:{" "}
+                            {
+                              patient.previousRefraction.os
+                                .sphere
+                            }{" "}
+                            | Cyl:{" "}
+                            {
+                              patient.previousRefraction.os
+                                .cylinder
+                            }{" "}
+                            | Axis:{" "}
+                            {
+                              patient.previousRefraction.os
+                                .axis
+                            }
+                            °
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {[
@@ -715,33 +1015,61 @@ export default function OphthalmologyConsultation() {
                         <div className="grid grid-cols-3 gap-3">
                           {(
                             [
-                              ["sphere", "SPHERE (0.25)", "-2.00"],
-                              ["cylinder", "CYLINDER", "-0.50"],
-                              ["axis", "AXIS (0-180°)", "90"],
+                              [
+                                "sphere",
+                                "SPHERE (0.25)",
+                                "-2.00",
+                              ],
+                              [
+                                "cylinder",
+                                "CYLINDER",
+                                "-0.50",
+                              ],
+                              [
+                                "axis",
+                                "AXIS (0-180°)",
+                                "90",
+                              ],
                             ] as const
-                          ).map(([field, label, placeholder]) => (
-                            <div key={field}>
-                              <label className="text-[10px] font-bold text-slate-600 block mb-1">
-                                {label}
-                              </label>
+                          ).map(
+                            ([
+                              field,
+                              label,
+                              placeholder,
+                            ]) => (
+                              <div key={field}>
+                                <label className="text-[10px] font-bold text-slate-600 block mb-1">
+                                  {label}
+                                </label>
 
-                              <input
-                                type="text"
-                                placeholder={placeholder}
-                                value={eye.value[field]}
-                                onChange={(event) =>
-                                  eye.setValue({
-                                    ...eye.value,
-                                    [field]: event.target.value,
-                                  })
-                                }
-                                onBlur={() =>
-                                  handleRefractionBlur(eye.eye === "OD" ? "od" : "os", field)
-                                }
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                              />
-                            </div>
-                          ))}
+                                <input
+                                  type="text"
+                                  placeholder={
+                                    placeholder
+                                  }
+                                  value={
+                                    eye.value[field]
+                                  }
+                                  onChange={(event) =>
+                                    eye.setValue({
+                                      ...eye.value,
+                                      [field]:
+                                        event.target.value,
+                                    })
+                                  }
+                                  onBlur={() =>
+                                    handleRefractionBlur(
+                                      eye.eye === "OD"
+                                        ? "od"
+                                        : "os",
+                                      field
+                                    )
+                                  }
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
+                                />
+                              </div>
+                            )
+                          )}
                         </div>
                       </div>
                     ))}
@@ -764,7 +1092,9 @@ export default function OphthalmologyConsultation() {
                     <textarea
                       rows={6}
                       value={diagnosis}
-                      onChange={(event) => setDiagnosis(event.target.value)}
+                      onChange={(event) =>
+                        setDiagnosis(event.target.value)
+                      }
                       placeholder="Enter clinical diagnosis / primary impression..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                     />
@@ -792,8 +1122,8 @@ export default function OphthalmologyConsultation() {
                   feedbackType === "success"
                     ? "text-emerald-400"
                     : feedbackType === "error"
-                    ? "text-rose-400"
-                    : "text-amber-300"
+                      ? "text-rose-400"
+                      : "text-amber-300"
                 }`}
               >
                 {feedbackMessage}
@@ -803,7 +1133,9 @@ export default function OphthalmologyConsultation() {
 
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => setActiveModal("diagnostics")}
+              onClick={() =>
+                setActiveModal("diagnostics")
+              }
               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
             >
               <ClipboardList className="w-3.5 h-3.5 text-slate-300" />
@@ -811,7 +1143,9 @@ export default function OphthalmologyConsultation() {
             </button>
 
             <button
-              onClick={() => setActiveModal("surgery")}
+              onClick={() =>
+                setActiveModal("surgery")
+              }
               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
             >
               <Calendar className="w-3.5 h-3.5 text-slate-300" />
@@ -819,7 +1153,9 @@ export default function OphthalmologyConsultation() {
             </button>
 
             <button
-              onClick={() => setActiveModal("prescription")}
+              onClick={() =>
+                setActiveModal("prescription")
+              }
               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
             >
               <Pill className="w-3.5 h-3.5 text-slate-300" />
@@ -832,7 +1168,10 @@ export default function OphthalmologyConsultation() {
               className="px-5 py-2.5 bg-[#6B21A8] hover:bg-[#581c87] text-white font-extrabold rounded-xl text-xs transition shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              {isPending ? "Processing..." : "Complete Encounter"}
+
+              {isPending
+                ? "Processing..."
+                : "Complete Encounter"}
             </button>
           </div>
         </footer>
@@ -843,7 +1182,10 @@ export default function OphthalmologyConsultation() {
         <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !isPending) {
+            if (
+              event.target === event.currentTarget &&
+              !isPending
+            ) {
               setActiveModal(null);
             }
           }}
@@ -864,7 +1206,9 @@ export default function OphthalmologyConsultation() {
                   </div>
 
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     disabled={isPending}
                     className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50"
                   >
@@ -881,7 +1225,9 @@ export default function OphthalmologyConsultation() {
                       <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
-                          checked={selectedDiagnostics.includes(test.name)}
+                          checked={selectedDiagnostics.includes(
+                            test.name
+                          )}
                           onChange={(event) =>
                             toggleDiagnostic(
                               test.name,
@@ -904,7 +1250,9 @@ export default function OphthalmologyConsultation() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     disabled={isPending}
                     className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                   >
@@ -943,7 +1291,9 @@ export default function OphthalmologyConsultation() {
                   </div>
 
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
                   >
                     ✕
@@ -957,18 +1307,27 @@ export default function OphthalmologyConsultation() {
                     </label>
 
                     <select
-                      value={surgeryDetails.procedure}
+                      value={
+                        surgeryDetails.procedure
+                      }
                       onChange={(event) =>
-                        setSurgeryDetails((previous) => ({
-                          ...previous,
-                          procedure: event.target.value,
-                        }))
+                        setSurgeryDetails(
+                          (previous) => ({
+                            ...previous,
+                            procedure:
+                              event.target.value,
+                          })
+                        )
                       }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                     >
-                      {SURGERY_OPTIONS.map((procedure) => (
-                        <option key={procedure}>{procedure}</option>
-                      ))}
+                      {SURGERY_OPTIONS.map(
+                        (procedure) => (
+                          <option key={procedure}>
+                            {procedure}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
 
@@ -981,10 +1340,12 @@ export default function OphthalmologyConsultation() {
                       type="datetime-local"
                       value={surgeryDetails.date}
                       onChange={(event) =>
-                        setSurgeryDetails((previous) => ({
-                          ...previous,
-                          date: event.target.value,
-                        }))
+                        setSurgeryDetails(
+                          (previous) => ({
+                            ...previous,
+                            date: event.target.value,
+                          })
+                        )
                       }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                     />
@@ -999,10 +1360,12 @@ export default function OphthalmologyConsultation() {
                       rows={3}
                       value={surgeryDetails.notes}
                       onChange={(event) =>
-                        setSurgeryDetails((previous) => ({
-                          ...previous,
-                          notes: event.target.value,
-                        }))
+                        setSurgeryDetails(
+                          (previous) => ({
+                            ...previous,
+                            notes: event.target.value,
+                          })
+                        )
                       }
                       placeholder="Optional surgical notes..."
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
@@ -1012,7 +1375,9 @@ export default function OphthalmologyConsultation() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
@@ -1043,7 +1408,9 @@ export default function OphthalmologyConsultation() {
                   </div>
 
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     disabled={isPending}
                     className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50"
                   >
@@ -1060,12 +1427,17 @@ export default function OphthalmologyConsultation() {
                     <input
                       type="text"
                       placeholder="e.g. Latanoprost 0.005%"
-                      value={prescriptionDetails.medication}
+                      value={
+                        prescriptionDetails.medication
+                      }
                       onChange={(event) =>
-                        setPrescriptionDetails((previous) => ({
-                          ...previous,
-                          medication: event.target.value,
-                        }))
+                        setPrescriptionDetails(
+                          (previous) => ({
+                            ...previous,
+                            medication:
+                              event.target.value,
+                          })
+                        )
                       }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                     />
@@ -1080,12 +1452,17 @@ export default function OphthalmologyConsultation() {
                       <input
                         type="text"
                         placeholder="e.g. 1 drop"
-                        value={prescriptionDetails.dosage}
+                        value={
+                          prescriptionDetails.dosage
+                        }
                         onChange={(event) =>
-                          setPrescriptionDetails((previous) => ({
-                            ...previous,
-                            dosage: event.target.value,
-                          }))
+                          setPrescriptionDetails(
+                            (previous) => ({
+                              ...previous,
+                              dosage:
+                                event.target.value,
+                            })
+                          )
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                       />
@@ -1099,12 +1476,17 @@ export default function OphthalmologyConsultation() {
                       <input
                         type="text"
                         placeholder="e.g. Twice daily"
-                        value={prescriptionDetails.frequency}
+                        value={
+                          prescriptionDetails.frequency
+                        }
                         onChange={(event) =>
-                          setPrescriptionDetails((previous) => ({
-                            ...previous,
-                            frequency: event.target.value,
-                          }))
+                          setPrescriptionDetails(
+                            (previous) => ({
+                              ...previous,
+                              frequency:
+                                event.target.value,
+                            })
+                          )
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                       />
@@ -1120,12 +1502,17 @@ export default function OphthalmologyConsultation() {
                       <input
                         type="text"
                         placeholder="e.g. 7 days"
-                        value={prescriptionDetails.duration}
+                        value={
+                          prescriptionDetails.duration
+                        }
                         onChange={(event) =>
-                          setPrescriptionDetails((previous) => ({
-                            ...previous,
-                            duration: event.target.value,
-                          }))
+                          setPrescriptionDetails(
+                            (previous) => ({
+                              ...previous,
+                              duration:
+                                event.target.value,
+                            })
+                          )
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                       />
@@ -1140,12 +1527,17 @@ export default function OphthalmologyConsultation() {
                         type="number"
                         min="1"
                         step="1"
-                        value={prescriptionDetails.quantity}
+                        value={
+                          prescriptionDetails.quantity
+                        }
                         onChange={(event) =>
-                          setPrescriptionDetails((previous) => ({
-                            ...previous,
-                            quantity: event.target.value,
-                          }))
+                          setPrescriptionDetails(
+                            (previous) => ({
+                              ...previous,
+                              quantity:
+                                event.target.value,
+                            })
+                          )
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                       />
@@ -1162,12 +1554,17 @@ export default function OphthalmologyConsultation() {
                       min="0"
                       step="100"
                       placeholder="e.g. 6200"
-                      value={prescriptionDetails.pricePerUnit}
+                      value={
+                        prescriptionDetails.pricePerUnit
+                      }
                       onChange={(event) =>
-                        setPrescriptionDetails((previous) => ({
-                          ...previous,
-                          pricePerUnit: event.target.value,
-                        }))
+                        setPrescriptionDetails(
+                          (previous) => ({
+                            ...previous,
+                            pricePerUnit:
+                              event.target.value,
+                          })
+                        )
                       }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
                     />
@@ -1176,7 +1573,9 @@ export default function OphthalmologyConsultation() {
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
-                    onClick={() => setActiveModal(null)}
+                    onClick={() =>
+                      setActiveModal(null)
+                    }
                     disabled={isPending}
                     className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                   >
@@ -1188,7 +1587,9 @@ export default function OphthalmologyConsultation() {
                     disabled={isPending}
                     className="px-4 py-2 bg-[#6B21A8] text-white rounded-xl text-xs font-bold hover:bg-[#581c87] cursor-pointer disabled:opacity-50"
                   >
-                    {isPending ? "Saving..." : "Save Prescription"}
+                    {isPending
+                      ? "Saving..."
+                      : "Save Prescription"}
                   </button>
                 </div>
               </>
