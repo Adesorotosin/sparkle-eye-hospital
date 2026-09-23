@@ -26,8 +26,21 @@ export interface Invoice {
 export interface TriageVitals {
   visualAcuityOD: string; // Right eye
   visualAcuityOS: string; // Left eye
-  iop: number; // Intraocular Pressure in mmHg
+  visualAcuityOU?: string; // Both eyes
+  withCorrection?: boolean;
+  iop: number; // kept for backward compatibility; prefer iopOD/iopOS
+  iopOD?: number;
+  iopOS?: number;
+  iopInstrument?: string;
+  bpSystolic?: number;
+  bpDiastolic?: number;
+  pulse?: number;
+  temperature?: number;
+  spo2?: number;
   primaryComplaint: string;
+  symptoms?: string[];
+  severity?: "Mild" | "Moderate" | "Severe";
+  durationText?: string;
   recordedAt: string;
 }
 

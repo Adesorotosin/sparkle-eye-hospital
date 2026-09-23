@@ -24,22 +24,24 @@ export default function LoginPage() {
       const user = await authenticateStaff(username, password);
 
       // 2. Set client cookies (enforce uppercase role & SameSite safety)
-const formattedRole = String(user.role).toUpperCase();
-document.cookie = "is_logged_in=true; path=/; max-age=86400; SameSite=Lax";
-document.cookie = `user_role=${formattedRole}; path=/; max-age=86400; SameSite=Lax`;
+      const formattedRole = String(user.role).toUpperCase();
+      document.cookie = "is_logged_in=true; path=/; max-age=86400; SameSite=Lax";
+      document.cookie = `user_role=${formattedRole}; path=/; max-age=86400; SameSite=Lax`;
 
-// 3. Save token client-side if requested
-if (rememberWorkstation) {
-  localStorage.setItem("sparkle_staff_token", user.token);
-}
+      // 3. Save token client-side if requested
+      if (rememberWorkstation) {
+        localStorage.setItem("sparkle_staff_token", user.token);
+      }
 
-// 4. Determine target route using the formatted uppercase role
-const targetRoute = ROLE_REDIRECT_MAP[formattedRole] || "/admin";
+      // 4. Determine target route using the formatted uppercase role
+      const targetRoute = ROLE_REDIRECT_MAP[formattedRole] || "/admin";
 
-// 5. Hard refresh to send new cookies directly to middleware
-window.location.href = targetRoute;
+      // 5. Hard refresh to send new cookies directly to middleware
+      window.location.href = targetRoute;
     } catch (err: any) {
-      setErrorMsg(err.message || "Invalid username or password. Please check your credentials.");
+      setErrorMsg(
+        err.message || "Invalid username or password. Please check your credentials."
+      );
       setIsLoading(false);
     }
   };
@@ -75,7 +77,6 @@ window.location.href = targetRoute;
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight mb-4 text-white">
             In-House Hospital <br /> Management System
           </h1>
-          
         </div>
 
         {/* Server Status Badge */}
@@ -90,7 +91,6 @@ window.location.href = targetRoute;
       {/* RIGHT PANEL - Staff Login Form */}
       <div className="w-full md:w-[60%] lg:w-[65%] bg-slate-50/50 flex items-center justify-center p-6 md:p-12">
         <div className="w-full max-w-md bg-white rounded-2xl p-8 lg:p-10 shadow-xl shadow-slate-200/50 border border-slate-100">
-          
           {/* Card Header */}
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-1.5">

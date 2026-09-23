@@ -96,7 +96,7 @@ export default function OnboardStaffPage() {
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#4F46E5] rounded-full"></span>
             </button>
-            <div className="h-8 w-[1px] bg-[#E2E8F0]" />
+            <div className="h-8 w-px bg-[#E2E8F0]" />
             <div className="flex items-center gap-3">
               <img
                 src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80"

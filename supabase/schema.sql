@@ -50,8 +50,20 @@ create table vitals (
   patient_id uuid not null references patients(id) on delete cascade,
   visual_acuity_od text,
   visual_acuity_os text,
-  iop numeric,
+  visual_acuity_ou text,
+  with_correction boolean default false,
+  iop_od numeric,
+  iop_os numeric,
+  iop_instrument text,
+  bp_systolic numeric,
+  bp_diastolic numeric,
+  pulse numeric,
+  temperature numeric,
+  spo2 numeric,
   primary_complaint text,
+  symptoms text,                              -- comma-separated
+  severity text,
+  duration_text text,
   recorded_at timestamptz not null default now(),
   recorded_by uuid references staff(id)
 );

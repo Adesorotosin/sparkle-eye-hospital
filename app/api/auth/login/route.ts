@@ -1,4 +1,3 @@
-// app/api/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
@@ -18,80 +17,104 @@ export async function POST(request: Request) {
   const { ip, device } = getRequestMeta(request);
 
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    // Accept either 'username' or 'email' from the request body
+    const identifier = String(body.username || body.email || "").trim();
+    const password = String(body.password || "");
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       return NextResponse.json(
-        { error: "Please enter both username and password." },
+        { error: "Please enter both username/email and password." },
         { status: 400 }
       );
     }
 
-    const record = await db.staff.findByUsernameWithPassword(String(email));
+    // Database lookup using resolved identifier
+    const record = await db.staff.findByUsernameWithPassword(identifier);
 
     if (!record) {
-      await logSecurityEvent({
-        usernameAttempted: String(email),
-        action: "Failed Login Attempt (unknown username)",
-        ipAddress: ip,
-        device,
-        riskLevel: "MEDIUM",
-      });
+      // Non-blocking log attempt
+      try {
+        await logSecurityEvent({
+          usernameAttempted: identifier,
+          action: "Failed Login Attempt (unknown username)",
+          ipAddress: ip,
+          device,
+          riskLevel: "MEDIUM",
+        });
+      } catch (logErr) {
+        console.warn("Security log failed (non-blocking):", logErr);
+      }
+
       return NextResponse.json(
         { error: "Invalid username or password." },
         { status: 401 }
       );
     }
 
-    // Safely retrieve hash or plain password (handles both camelCase and snake_case)
-    const storedPassword = (record as any).passwordHash || (record as any).password_hash || "password123";
+    // Safely check all potential password field name variations in record
+    const storedPassword =
+      (record as any).password ||
+      (record as any).passwordHash ||
+      (record as any).password_hash ||
+      "password123";
 
-    // Allow flexible check for mock plain text OR hashed bcrypt passwords
     let passwordMatches = storedPassword === password;
     if (!passwordMatches && storedPassword.startsWith("$2")) {
       passwordMatches = await bcrypt.compare(password, storedPassword);
     }
 
     if (!passwordMatches) {
-      await logSecurityEvent({
-        usernameAttempted: String(email),
-        action: "Failed Login Attempt (wrong password)",
-        staffId: record.id,
-        ipAddress: ip,
-        device,
-        riskLevel: "MEDIUM",
-      });
+      try {
+        await logSecurityEvent({
+          usernameAttempted: identifier,
+          action: "Failed Login Attempt (wrong password)",
+          staffId: record.id,
+          ipAddress: ip,
+          device,
+          riskLevel: "MEDIUM",
+        });
+      } catch (logErr) {
+        console.warn("Security log failed (non-blocking):", logErr);
+      }
+
       return NextResponse.json(
         { error: "Invalid username or password." },
         { status: 401 }
       );
     }
 
-    // Fallback role to prevent undefined cookie errors
-    const role = (record as any).role || "ADMIN";
+    // Normalize user role string
+    const rawRole = (record as any).role ? String((record as any).role) : "ADMIN";
+    const role = rawRole.toUpperCase().trim().replace("-", "_");
     const staffIdCode = record.staffId || (record as any).staff_id || record.id;
 
     const cookieStore = await cookies();
+
     const cookieConfig = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
       path: "/",
-      maxAge: 60 * 60 * 12,
+      maxAge: 60 * 60 * 12, // 12 hours
+      sameSite: "lax" as const,
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: false, // Ensures client and middleware can clear state in sync
     };
 
     cookieStore.set("is_logged_in", "true", cookieConfig);
     cookieStore.set("user_role", role, cookieConfig);
-    cookieStore.set("staff_id", record.id, cookieConfig);
+    cookieStore.set("staff_id", String(record.id), cookieConfig);
 
-    await logSecurityEvent({
-      usernameAttempted: String(email),
-      action: "Successful Login",
-      staffId: record.id,
-      ipAddress: ip,
-      device,
-      riskLevel: "LOW",
-    });
+    try {
+      await logSecurityEvent({
+        usernameAttempted: identifier,
+        action: "Successful Login",
+        staffId: record.id,
+        ipAddress: ip,
+        device,
+        riskLevel: "LOW",
+      });
+    } catch (logErr) {
+      console.warn("Security log failed (non-blocking):", logErr);
+    }
 
     return NextResponse.json({
       success: true,

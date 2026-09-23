@@ -8,13 +8,13 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   "/emr": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
   "/doctor": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
   "/consultation": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
-  "/pharmacy": ["PHARMACY", "PHARMACIST", "NURSE", "ADMIN", "IT_ADMIN", "DOCTOR"],
+  "/pharmacy": ["PHARMACY", "PHARMACIST", "PHARMACY_STAFF", "NURSE", "ADMIN", "IT_ADMIN", "DOCTOR"],
   "/cashier": ["CASHIER", "ADMIN", "IT_ADMIN"],
   "/billing": ["CASHIER", "ADMIN", "IT_ADMIN", "NURSE", "DOCTOR"],
   "/nurse": ["NURSE", "ADMIN", "IT_ADMIN", "DOCTOR"],
 };
 
-// 2. Default route landing pages based on user roles
+// 2. Default route landing pages based on user roles (expanded aliases)
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
   ADMIN: "/admin",
   IT_ADMIN: "/admin",
@@ -23,6 +23,7 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
   NURSE: "/nurse",
   PHARMACY: "/pharmacy",
   PHARMACIST: "/pharmacy",
+  PHARMACY_STAFF: "/pharmacy",
   CASHIER: "/cashier",
   BILLING: "/billing",
 };
@@ -39,22 +40,23 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const userRole = request.cookies.get("user_role")?.value?.toUpperCase() || "";
+  // Allow unrestricted access to the root landing page (app/page.tsx)
+  if (pathname === "/") {
+    return NextResponse.next();
+  }
+
+  // Normalize role string (strip spaces, dashes, convert to UPPERCASE)
+  const rawRole = request.cookies.get("user_role")?.value || "";
+  const userRole = rawRole.toUpperCase().trim().replace("-", "_");
   const isLoggedIn = request.cookies.get("is_logged_in")?.value === "true";
 
   // If user is NOT logged in and trying to access a protected page, send to login (`/`)
   if (!isLoggedIn) {
-    if (pathname !== "/") {
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-    return NextResponse.next();
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // If user IS logged in and tries to access login (`/`), route to THEIR specific dashboard
-  if (isLoggedIn && pathname === "/") {
-    const defaultDashboard = ROLE_DASHBOARD_MAP[userRole] || "/admin";
-    return NextResponse.redirect(new URL(defaultDashboard, request.url));
-  }
+  // Determine user's correct home route from map
+  const userHomeRoute = ROLE_DASHBOARD_MAP[userRole];
 
   // Role-based access control check
   const protectedRoute = Object.keys(ROLE_PERMISSIONS).find((route) =>
@@ -63,10 +65,13 @@ export function middleware(request: NextRequest) {
 
   if (protectedRoute) {
     const allowedRoles = ROLE_PERMISSIONS[protectedRoute];
+
+    // Check if current user's role is permitted for this route
     if (!userRole || !allowedRoles.includes(userRole)) {
-      // Redirect unauthorized users to their proper home dashboard
-      const fallbackDashboard = ROLE_DASHBOARD_MAP[userRole] || "/";
-      return NextResponse.redirect(new URL(fallbackDashboard, request.url));
+      // Redirect to their assigned dashboard if authorized elsewhere, or login root if unmapped
+      const fallbackTarget =
+        userHomeRoute && userHomeRoute !== pathname ? userHomeRoute : "/";
+      return NextResponse.redirect(new URL(fallbackTarget, request.url));
     }
   }
 
