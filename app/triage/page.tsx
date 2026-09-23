@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,7 +10,6 @@ import {
   Clock,
   ArrowRight,
   ArrowLeft,
-  Plus,
   ChevronDown,
   User,
   AlertTriangle,
@@ -21,7 +20,7 @@ import {
 
 type Severity = "Mild" | "Moderate" | "Severe";
 
-export default function TriageVitalsPage() {
+function TriageVitalsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -142,7 +141,6 @@ export default function TriageVitalsPage() {
 
       setSaveMessage("Vitals saved successfully.");
 
-      // The doctor encounter page now uses the patient's real patient code.
       setTimeout(() => {
         router.push(`/doctor/patients/${encodeURIComponent(patientId)}/encounter`);
       }, 500);
@@ -815,5 +813,22 @@ export default function TriageVitalsPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+export default function TriageVitalsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-[#6B21A8]">
+            <Loader2 className="w-8 h-8 animate-spin" />
+            <p className="text-sm font-semibold">Loading triage dashboard...</p>
+          </div>
+        </div>
+      }
+    >
+      <TriageVitalsContent />
+    </Suspense>
   );
 }
