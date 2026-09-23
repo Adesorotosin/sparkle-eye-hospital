@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -33,6 +34,7 @@ import {
 } from "@/app/actions/billing";
 
 import type { PatientRecord } from "@/types/hospital";
+
 
 export default function BillingCheckoutView() {
   const router = useRouter();
