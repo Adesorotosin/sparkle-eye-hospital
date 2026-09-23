@@ -59,13 +59,6 @@ async function findPatient(patientCode: string) {
   };
 }
 
-/**
- * Load a real patient record for Billing.
- *
- * If a patient code is supplied, that patient is loaded.
- * If no code is supplied, the most recent patient with an unpaid
- * or draft invoice is returned.
- */
 export async function getBillingPatient(patientCode?: string) {
   try {
     if (patientCode?.trim()) {
@@ -126,7 +119,8 @@ export async function getBillingPatient(patientCode?: string) {
     if (patientError || !patient) {
       return {
         success: false,
-        message: "The patient attached to this invoice could not be found.",
+        message:
+          "The patient attached to this invoice could not be found.",
         patient: null,
       };
     }
@@ -143,23 +137,13 @@ export async function getBillingPatient(patientCode?: string) {
 
     return {
       success: false,
-      message: "An unexpected error occurred while loading billing.",
+      message:
+        "An unexpected error occurred while loading billing.",
       patient: null,
     };
   }
 }
 
-/**
- * Apply an authorized discount to the patient's current invoice.
- *
- * The admin PIN is deliberately checked on the server.
- *
- * Set:
- *
- * BILLING_ADMIN_PIN=your-secret-pin
- *
- * in your environment variables.
- */
 export async function applyBillingDiscount(input: {
   patientCode: string;
   discountType: DiscountType;
@@ -231,22 +215,10 @@ export async function applyBillingDiscount(input: {
       .limit(1)
       .maybeSingle();
 
-    if (invoiceError) {
-      console.error(
-        "Invoice lookup failed:",
-        invoiceError
-      );
-
+    if (invoiceError || !invoice) {
       return {
         success: false,
         message: "Unable to load the patient's invoice.",
-      };
-    }
-
-    if (!invoice) {
-      return {
-        success: false,
-        message: "No active invoice exists for this patient.",
       };
     }
 
@@ -257,10 +229,6 @@ export async function applyBillingDiscount(input: {
       };
     }
 
-    /*
-     * Recalculate first so the discount is applied to the
-     * current invoice subtotal.
-     */
     const recalculated = await recalcInvoice(invoice.id);
 
     const subtotal = Number(
@@ -277,7 +245,8 @@ export async function applyBillingDiscount(input: {
         };
       }
 
-      discountAmount = subtotal * (numericValue / 100);
+      discountAmount =
+        subtotal * (numericValue / 100);
     }
 
     discountAmount = Math.min(
@@ -340,7 +309,10 @@ export async function applyBillingDiscount(input: {
       grandTotal,
     };
   } catch (error) {
-    console.error("Apply billing discount error:", error);
+    console.error(
+      "Apply billing discount error:",
+      error
+    );
 
     return {
       success: false,
@@ -350,20 +322,15 @@ export async function applyBillingDiscount(input: {
   }
 }
 
-/**
- * Process payment for the current invoice.
- *
- * There is currently no separate payments table in the repository,
- * so the invoice itself becomes the source of truth for payment
- * completion while the payment method is preserved in the audit log.
- */
 export async function processBillingPayment(input: {
   patientCode: string;
   paymentMethod: BillingPaymentMethod;
   amountRendered: number;
 }): Promise<BillingActionResponse> {
   try {
-    const amountRendered = Number(input.amountRendered);
+    const amountRendered = Number(
+      input.amountRendered
+    );
 
     if (
       !Number.isFinite(amountRendered) ||
@@ -386,14 +353,17 @@ export async function processBillingPayment(input: {
       };
     }
 
-    const { data: invoice, error: invoiceError } = await supabase
-      .from("invoices")
-      .select("*")
-      .eq("patient_id", patient.id)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: invoice, error: invoiceError } =
+      await supabase
+        .from("invoices")
+        .select("*")
+        .eq("patient_id", patient.id)
+        .neq("status", "cancelled")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
 
     if (invoiceError) {
       console.error(
@@ -403,52 +373,55 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message: "Unable to load the patient's invoice.",
+        message:
+          "Unable to load the patient's invoice.",
       };
     }
 
     if (!invoice) {
       return {
         success: false,
-        message: "No active invoice exists for this patient.",
+        message:
+          "No active invoice exists for this patient.",
       };
     }
 
     if (invoice.status === "paid") {
       return {
         success: false,
-        message: "This invoice has already been paid.",
+        message:
+          "This invoice has already been paid.",
       };
     }
 
-    /*
-     * Always recalculate immediately before payment.
-     */
-    const totals = await recalcInvoice(invoice.id);
+    const totals = await recalcInvoice(
+      invoice.id
+    );
 
-    const grandTotal = Number(totals.grandTotal ?? 0);
+    const grandTotal = Number(
+      totals.grandTotal ?? 0
+    );
 
     if (grandTotal <= 0) {
       return {
         success: false,
         message:
-          "This invoice has no amount due and cannot be processed as a normal payment.",
+          "This invoice has no amount due.",
       };
     }
 
-    if (input.paymentMethod === "cash" && amountRendered < grandTotal) {
+    if (
+      input.paymentMethod === "cash" &&
+      amountRendered < grandTotal
+    ) {
       return {
         success: false,
-        message: "The amount rendered is insufficient.",
+        message:
+          "The amount rendered is insufficient.",
         grandTotal,
       };
     }
 
-    /*
-     * For POS, transfer, card and HMO, the entered amount is not
-     * treated as physical cash. The system still requires the
-     * transaction amount to cover the invoice.
-     */
     const effectivePaymentAmount =
       input.paymentMethod === "cash"
         ? amountRendered
@@ -460,19 +433,30 @@ export async function processBillingPayment(input: {
     ) {
       return {
         success: false,
-        message: "The payment amount is insufficient.",
+        message:
+          "The payment amount is insufficient.",
         grandTotal,
       };
     }
 
-    const { error: paymentError } = await supabase
-      .from("invoices")
-      .update({
-        status: "paid",
-        grand_total: grandTotal,
-      })
-      .eq("id", invoice.id)
-      .neq("status", "paid");
+    const paidAt =
+      new Date().toISOString();
+
+    /*
+     * Persist the actual payment details on the invoice.
+     */
+    const { error: paymentError } =
+      await supabase
+        .from("invoices")
+        .update({
+          status: "paid",
+          grand_total: grandTotal,
+          payment_method:
+            input.paymentMethod,
+          paid_at: paidAt,
+        })
+        .eq("id", invoice.id)
+        .neq("status", "paid");
 
     if (paymentError) {
       console.error(
@@ -482,23 +466,64 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message: "Failed to complete the payment.",
+        message:
+          "Failed to complete the payment.",
       };
     }
 
     /*
-     * Once the invoice is paid:
-     *
-     * 1. Diagnostics become completed.
-     * 2. Prescriptions become ready for dispensing.
+     * Unlock diagnostics belonging to this patient's
+     * paid clinical workflow.
      */
-    const { error: diagnosticError } = await supabase
-      .from("diagnostic_orders")
-      .update({
-        status: "completed",
-      })
-      .eq("patient_id", patient.id)
-      .eq("status", "ordered");
+    const { data: invoiceItems } =
+      await supabase
+        .from("invoice_items")
+        .select("category, name")
+        .eq("invoice_id", invoice.id);
+
+    const hasDiagnosticItems =
+      (invoiceItems ?? []).some(
+        (item) =>
+          item.category === "diagnostic"
+      );
+
+    const hasPharmacyItems =
+      (invoiceItems ?? []).some(
+        (item) =>
+          item.category === "pharmacy"
+      );
+
+    let diagnosticError = null;
+    let prescriptionError = null;
+
+    if (hasDiagnosticItems) {
+      const result =
+        await supabase
+          .from("diagnostic_orders")
+          .update({
+            status: "completed",
+          })
+          .eq("patient_id", patient.id)
+          .eq("status", "ordered");
+
+      diagnosticError =
+        result.error;
+    }
+
+    if (hasPharmacyItems) {
+      const result =
+        await supabase
+          .from("prescriptions")
+          .update({
+            status:
+              "ready_for_dispensing",
+          })
+          .eq("patient_id", patient.id)
+          .eq("status", "pending_payment");
+
+      prescriptionError =
+        result.error;
+    }
 
     if (diagnosticError) {
       console.error(
@@ -507,20 +532,20 @@ export async function processBillingPayment(input: {
       );
     }
 
-    const { error: prescriptionError } = await supabase
-      .from("prescriptions")
-      .update({
-        status: "ready_for_dispensing",
-      })
-      .eq("patient_id", patient.id)
-      .eq("status", "pending_payment");
-
     if (prescriptionError) {
       console.error(
         "Prescription status update failed:",
         prescriptionError
       );
     }
+
+    const changeDue =
+      input.paymentMethod === "cash"
+        ? Math.max(
+            0,
+            amountRendered - grandTotal
+          )
+        : 0;
 
     await logActivity({
       module: "Billing",
@@ -531,18 +556,19 @@ export async function processBillingPayment(input: {
       details: JSON.stringify({
         invoiceId: invoice.id,
         invoiceNo: invoice.invoice_no,
-        paymentMethod: input.paymentMethod,
+        paymentMethod:
+          input.paymentMethod,
         amountDue: grandTotal,
         amountRendered:
           input.paymentMethod === "cash"
             ? amountRendered
             : grandTotal,
-        changeDue:
-          input.paymentMethod === "cash"
-            ? Math.max(0, amountRendered - grandTotal)
-            : 0,
-        diagnosticsUnlocked: !diagnosticError,
-        prescriptionsUnlocked: !prescriptionError,
+        changeDue,
+        paidAt,
+        diagnosticsUnlocked:
+          !diagnosticError,
+        prescriptionsUnlocked:
+          !prescriptionError,
       }),
       financialAmount: grandTotal,
     });
@@ -557,12 +583,10 @@ export async function processBillingPayment(input: {
 
     return {
       success: true,
-      message: "Payment completed successfully.",
+      message:
+        "Payment completed successfully.",
       grandTotal,
-      changeDue:
-        input.paymentMethod === "cash"
-          ? Math.max(0, amountRendered - grandTotal)
-          : 0,
+      changeDue,
     };
   } catch (error) {
     console.error(
