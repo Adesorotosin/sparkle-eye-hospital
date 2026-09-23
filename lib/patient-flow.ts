@@ -89,14 +89,26 @@ export async function getOrCreatePatientByCode(patientCode: string) {
 }
 
 /**
- * Finds the patient's current invoice or creates a draft invoice.
+ * Finds the patient's active billing invoice or creates a new draft invoice.
+ *
+ * IMPORTANT:
+ * Only draft/pending invoices can receive new clinical items.
+ * Paid and cancelled invoices must never be reused.
  */
 export async function getOrCreateDraftInvoice(patientId: string) {
+  if (!patientId?.trim()) {
+    throw new Error("Patient ID is required.");
+  }
+
+  /*
+   * Only an invoice that is still open for billing can receive
+   * new diagnostic or pharmacy items.
+   */
   const { data: existing, error: findError } = await supabase
     .from("invoices")
     .select("*")
     .eq("patient_id", patientId)
-    .neq("status", "cancelled")
+    .in("status", ["draft", "pending"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -109,6 +121,10 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     return existing;
   }
 
+  /*
+   * No active invoice exists.
+   * Create a completely new draft invoice.
+   */
   const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(
     1000 + Math.random() * 9000
   )}`;
