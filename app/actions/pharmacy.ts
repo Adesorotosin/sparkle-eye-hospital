@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity-log";
+import { getOrCreateDraftInvoice, recalcInvoice } from "@/lib/patient-flow";
 
 export interface PharmacyPrescription {
   id: string;
