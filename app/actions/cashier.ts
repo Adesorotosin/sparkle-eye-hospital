@@ -1,7 +1,7 @@
 "use server";
 
-import { supabase } from "@/lib/supabase";
 import { revalidatePath } from "next/cache";
+import { supabase } from "@/lib/supabase";
 
 export interface CashierQueueItem {
   id: string;
@@ -11,7 +11,9 @@ export interface CashierQueueItem {
   status: "draft" | "pending" | "paid";
   grandTotal: number;
   createdAt: string;
+  paidAt?: string | null;
   invoiceNo: string;
+  paymentMethod?: string | null;
 }
 
 export interface CashierDashboardData {
@@ -24,15 +26,25 @@ export interface CashierDashboardData {
 function getLagosDayRange() {
   const now = new Date();
 
-  const lagosDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Lagos",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
+  const lagosDate = new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      timeZone: "Africa/Lagos",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }
+  ).format(now);
 
-  const start = new Date(`${lagosDate}T00:00:00+01:00`);
-  const end = new Date(`${lagosDate}T23:59:59.999+01:00`);
+  const start =
+    new Date(
+      `${lagosDate}T00:00:00+01:00`
+    );
+
+  const end =
+    new Date(
+      `${lagosDate}T23:59:59.999+01:00`
+    );
 
   return {
     start: start.toISOString(),
@@ -46,23 +58,19 @@ export async function getCashierDashboard(): Promise<{
   data: CashierDashboardData;
 }> {
   try {
-    const { start, end } = getLagosDayRange();
+    const { start, end } =
+      getLagosDayRange();
 
-    /*
-     * Load invoices first.
-     *
-     * We intentionally don't rely on Supabase relationship
-     * expansion here. That makes this work even if the generated
-     * relationship metadata is different between environments.
-     */
-    const { data: invoices, error: invoiceError } =
-      await supabase
-        .from("invoices")
-        .select("*")
-        .neq("status", "cancelled")
-        .order("created_at", {
-          ascending: false,
-        });
+    const {
+      data: invoices,
+      error: invoiceError,
+    } = await supabase
+      .from("invoices")
+      .select("*")
+      .neq("status", "cancelled")
+      .order("created_at", {
+        ascending: false,
+      });
 
     if (invoiceError) {
       console.error(
@@ -72,7 +80,8 @@ export async function getCashierDashboard(): Promise<{
 
       return {
         success: false,
-        message: "Unable to load the cashier queue.",
+        message:
+          "Unable to load the cashier queue.",
         data: {
           queue: [],
           pendingCount: 0,
@@ -82,30 +91,41 @@ export async function getCashierDashboard(): Promise<{
       };
     }
 
-    const invoiceRows = invoices ?? [];
+    const invoiceRows =
+      invoices ?? [];
 
-    /*
-     * Only show invoices which actually require cashier attention
-     * or have recently been paid.
-     *
-     * Draft + pending = checkout queue.
-     * Paid = completed history for today.
-     */
-    const relevantInvoices = invoiceRows.filter(
-      (invoice) =>
-        invoice.status === "draft" ||
-        invoice.status === "pending" ||
-        (
-          invoice.status === "paid" &&
-          invoice.created_at >= start &&
-          invoice.created_at <= end
-        )
-    );
+    const relevantInvoices =
+      invoiceRows.filter(
+        (invoice) => {
+          const isPending =
+            invoice.status ===
+              "draft" ||
+            invoice.status ===
+              "pending";
+
+          const isPaidToday =
+            invoice.status ===
+              "paid" &&
+            invoice.paid_at &&
+            invoice.paid_at >=
+              start &&
+            invoice.paid_at <=
+              end;
+
+          return (
+            isPending ||
+            isPaidToday
+          );
+        }
+      );
 
     const patientIds = [
       ...new Set(
         relevantInvoices
-          .map((invoice) => invoice.patient_id)
+          .map(
+            (invoice) =>
+              invoice.patient_id
+          )
           .filter(Boolean)
       ),
     ];
@@ -115,11 +135,15 @@ export async function getCashierDashboard(): Promise<{
       {
         patient_code: string;
         full_name: string;
-        coverage_plan: string | null;
+        coverage_plan:
+          | string
+          | null;
       }
     > = {};
 
-    if (patientIds.length > 0) {
+    if (
+      patientIds.length > 0
+    ) {
       const {
         data: patientRows,
         error: patientError,
@@ -128,7 +152,10 @@ export async function getCashierDashboard(): Promise<{
         .select(
           "id, patient_code, full_name, coverage_plan"
         )
-        .in("id", patientIds);
+        .in(
+          "id",
+          patientIds
+        );
 
       if (patientError) {
         console.error(
@@ -149,74 +176,117 @@ export async function getCashierDashboard(): Promise<{
         };
       }
 
-      patients = Object.fromEntries(
-        (patientRows ?? []).map((patient) => [
-          patient.id,
-          {
-            patient_code:
-              patient.patient_code,
-            full_name:
-              patient.full_name,
-            coverage_plan:
-              patient.coverage_plan,
-          },
-        ])
-      );
+      patients =
+        Object.fromEntries(
+          (
+            patientRows ??
+            []
+          ).map(
+            (patient) => [
+              patient.id,
+              {
+                patient_code:
+                  patient.patient_code,
+                full_name:
+                  patient.full_name,
+                coverage_plan:
+                  patient.coverage_plan,
+              },
+            ]
+          )
+        );
     }
 
     const queue: CashierQueueItem[] =
       relevantInvoices
-        .filter((invoice) => patients[invoice.patient_id])
-        .map((invoice) => {
-          const patient =
-            patients[invoice.patient_id];
+        .filter(
+          (invoice) =>
+            patients[
+              invoice.patient_id
+            ]
+        )
+        .map(
+          (invoice) => {
+            const patient =
+              patients[
+                invoice.patient_id
+              ];
 
-          return {
-            id: invoice.id,
-            patientId:
-              patient.patient_code,
-            fullName:
-              patient.full_name,
-            coveragePlan:
-              patient.coverage_plan ??
-              "Self-Pay",
-            status:
-              invoice.status as
-                | "draft"
-                | "pending"
-                | "paid",
-            grandTotal:
-              Number(
-                invoice.grand_total ?? 0
-              ),
-            createdAt:
-              invoice.created_at,
-            invoiceNo:
-              invoice.invoice_no,
-          };
-        });
+            return {
+              id: invoice.id,
 
-    const pendingCount = queue.filter(
-      (item) =>
-        item.status === "draft" ||
-        item.status === "pending"
-    ).length;
+              patientId:
+                patient.patient_code,
 
-    const completedCount = queue.filter(
-      (item) => item.status === "paid"
-    ).length;
+              fullName:
+                patient.full_name,
 
-    /*
-     * Revenue is calculated from invoices actually marked paid
-     * today, not from hard-coded dashboard values.
-     */
-    const { data: paidToday, error: revenueError } =
-      await supabase
-        .from("invoices")
-        .select("grand_total")
-        .eq("status", "paid")
-        .gte("created_at", start)
-        .lte("created_at", end);
+              coveragePlan:
+                patient.coverage_plan ??
+                "Self-Pay",
+
+              status:
+                invoice.status as
+                  | "draft"
+                  | "pending"
+                  | "paid",
+
+              grandTotal:
+                Number(
+                  invoice.grand_total ??
+                    0
+                ),
+
+              createdAt:
+                invoice.created_at,
+
+              paidAt:
+                invoice.paid_at ??
+                null,
+
+              invoiceNo:
+                invoice.invoice_no,
+
+              paymentMethod:
+                invoice.payment_method ??
+                null,
+            };
+          }
+        );
+
+    const pendingCount =
+      queue.filter(
+        (item) =>
+          item.status ===
+            "draft" ||
+          item.status ===
+            "pending"
+      ).length;
+
+    const completedCount =
+      queue.filter(
+        (item) =>
+          item.status ===
+          "paid"
+      ).length;
+
+    const {
+      data: paidToday,
+      error: revenueError,
+    } = await supabase
+      .from("invoices")
+      .select(
+        "grand_total"
+      )
+      .eq("status", "paid")
+      .gte(
+        "paid_at",
+        start
+      )
+      .lte(
+        "paid_at",
+        end
+      );
 
     if (revenueError) {
       console.warn(
@@ -225,18 +295,27 @@ export async function getCashierDashboard(): Promise<{
       );
     }
 
-    const revenue = (paidToday ?? []).reduce(
-      (sum, invoice) =>
-        sum +
-        Number(
-          invoice.grand_total ?? 0
-        ),
-      0
-    );
+    const revenue =
+      (
+        paidToday ??
+        []
+      ).reduce(
+        (
+          sum,
+          invoice
+        ) =>
+          sum +
+          Number(
+            invoice.grand_total ??
+              0
+          ),
+        0
+      );
 
     return {
       success: true,
-      message: "Cashier dashboard loaded.",
+      message:
+        "Cashier dashboard loaded.",
       data: {
         queue,
         pendingCount,
@@ -265,9 +344,17 @@ export async function getCashierDashboard(): Promise<{
 }
 
 export async function refreshCashierDashboard() {
-  revalidatePath("/cashier");
-  revalidatePath("/billing");
-  revalidatePath("/cashier/checkout");
+  revalidatePath(
+    "/cashier"
+  );
+
+  revalidatePath(
+    "/billing"
+  );
+
+  revalidatePath(
+    "/pharmacy"
+  );
 
   return getCashierDashboard();
 }
