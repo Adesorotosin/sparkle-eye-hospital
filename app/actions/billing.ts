@@ -328,23 +328,16 @@ export async function processBillingPayment(input: {
   amountRendered: number;
 }): Promise<BillingActionResponse> {
   try {
-    const amountRendered = Number(
-      input.amountRendered
-    );
+    const amountRendered = Number(input.amountRendered);
 
-    if (
-      !Number.isFinite(amountRendered) ||
-      amountRendered < 0
-    ) {
+    if (!Number.isFinite(amountRendered) || amountRendered < 0) {
       return {
         success: false,
         message: "Invalid amount rendered.",
       };
     }
 
-    const { patient, error } = await findPatient(
-      input.patientCode
-    );
+    const { patient, error } = await findPatient(input.patientCode);
 
     if (!patient) {
       return {
@@ -353,17 +346,19 @@ export async function processBillingPayment(input: {
       };
     }
 
-    const { data: invoice, error: invoiceError } =
-      await supabase
-        .from("invoices")
-        .select("*")
-        .eq("patient_id", patient.id)
-        .neq("status", "cancelled")
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+    /*
+     * Load the patient's active invoice.
+     */
+    const { data: invoice, error: invoiceError } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("patient_id", patient.id)
+      .neq("status", "cancelled")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
 
     if (invoiceError) {
       console.error(
@@ -373,51 +368,50 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message:
-          "Unable to load the patient's invoice.",
+        message: "Unable to load the patient's invoice.",
       };
     }
 
     if (!invoice) {
       return {
         success: false,
-        message:
-          "No active invoice exists for this patient.",
+        message: "No active invoice exists for this patient.",
       };
     }
 
     if (invoice.status === "paid") {
       return {
         success: false,
-        message:
-          "This invoice has already been paid.",
+        message: "This invoice has already been paid.",
       };
     }
 
-    const totals = await recalcInvoice(
-      invoice.id
-    );
+    /*
+     * Recalculate immediately before payment so the cashier
+     * always pays the current invoice amount.
+     */
+    const totals = await recalcInvoice(invoice.id);
 
-    const grandTotal = Number(
-      totals.grandTotal ?? 0
-    );
+    const grandTotal = Number(totals.grandTotal ?? 0);
 
     if (grandTotal <= 0) {
       return {
         success: false,
-        message:
-          "This invoice has no amount due.",
+        message: "This invoice has no amount due.",
       };
     }
 
+    /*
+     * Cash payments may be greater than the invoice total.
+     * Other payment methods must cover the exact invoice amount.
+     */
     if (
       input.paymentMethod === "cash" &&
       amountRendered < grandTotal
     ) {
       return {
         success: false,
-        message:
-          "The amount rendered is insufficient.",
+        message: "The amount rendered is insufficient.",
         grandTotal,
       };
     }
@@ -433,30 +427,391 @@ export async function processBillingPayment(input: {
     ) {
       return {
         success: false,
-        message:
-          "The payment amount is insufficient.",
+        message: "The payment amount is insufficient.",
         grandTotal,
       };
     }
 
-    const paidAt =
-      new Date().toISOString();
+    /*
+     * Load the actual items belonging to THIS invoice.
+     *
+     * This is important because the patient's other pending
+     * prescriptions/diagnostics must not be unlocked.
+     */
+    const { data: invoiceItems, error: invoiceItemsError } =
+      await supabase
+        .from("invoice_items")
+        .select(
+          "id, category, name, quantity, unit_price, total_price"
+        )
+        .eq("invoice_id", invoice.id);
+
+    if (invoiceItemsError) {
+      console.error(
+        "Invoice items lookup failed:",
+        invoiceItemsError
+      );
+
+      return {
+        success: false,
+        message: "Unable to verify the items on this invoice.",
+        grandTotal,
+      };
+    }
 
     /*
-     * Persist the actual payment details on the invoice.
+     * Separate clinical items from the invoice.
      */
-    const { error: paymentError } =
-      await supabase
-        .from("invoices")
-        .update({
-          status: "paid",
-          grand_total: grandTotal,
-          payment_method:
-            input.paymentMethod,
-          paid_at: paidAt,
-        })
-        .eq("id", invoice.id)
-        .neq("status", "paid");
+    const pharmacyItems = (invoiceItems ?? []).filter(
+      (item) => item.category === "pharmacy"
+    );
+
+    const diagnosticItems = (invoiceItems ?? []).filter(
+      (item) => item.category === "diagnostic"
+    );
+
+    /*
+     * Find only pending prescriptions belonging to this patient.
+     *
+     * We then match them against the pharmacy line items from
+     * this exact invoice.
+     */
+    let prescriptionsUnlocked = 0;
+
+    if (pharmacyItems.length > 0) {
+      const { data: pendingPrescriptions, error: prescriptionLookupError } =
+        await supabase
+          .from("prescriptions")
+          .select(
+            "id, drug_name, quantity, price_per_unit, total_price, created_at"
+          )
+          .eq("patient_id", patient.id)
+          .eq("status", "pending_payment")
+          .order("created_at", {
+            ascending: true,
+          });
+
+      if (prescriptionLookupError) {
+        console.error(
+          "Pending prescription lookup failed:",
+          prescriptionLookupError
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because prescriptions could not be verified.",
+          grandTotal,
+        };
+      }
+
+      /*
+       * Build a working list of pending prescriptions.
+       *
+       * We remove a prescription from this list once it is matched
+       * so two identical medications on the invoice can still be
+       * matched correctly.
+       */
+      const unmatchedPrescriptions = [
+        ...(pendingPrescriptions ?? []),
+      ];
+
+      const prescriptionIdsToUnlock: string[] = [];
+
+      for (const invoiceItem of pharmacyItems) {
+        const invoiceName = String(
+          invoiceItem.name ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const invoiceQuantity = Number(
+          invoiceItem.quantity ?? 0
+        );
+
+        const invoiceUnitPrice = Number(
+          invoiceItem.unit_price ?? 0
+        );
+
+        const matchIndex = unmatchedPrescriptions.findIndex(
+          (prescription) => {
+            const prescriptionName = String(
+              prescription.drug_name ?? ""
+            )
+              .trim()
+              .toLowerCase();
+
+            const prescriptionQuantity = Number(
+              prescription.quantity ?? 0
+            );
+
+            const prescriptionUnitPrice = Number(
+              prescription.price_per_unit ?? 0
+            );
+
+            return (
+              prescriptionName === invoiceName &&
+              prescriptionQuantity === invoiceQuantity &&
+              prescriptionUnitPrice === invoiceUnitPrice
+            );
+          }
+        );
+
+        if (matchIndex !== -1) {
+          const matched =
+            unmatchedPrescriptions[matchIndex];
+
+          prescriptionIdsToUnlock.push(
+            matched.id
+          );
+
+          unmatchedPrescriptions.splice(
+            matchIndex,
+            1
+          );
+        }
+      }
+
+      /*
+       * Only the prescriptions matched to this invoice are unlocked.
+       */
+      if (prescriptionIdsToUnlock.length > 0) {
+        const { error: prescriptionUpdateError } =
+          await supabase
+            .from("prescriptions")
+            .update({
+              status: "ready_for_dispensing",
+            })
+            .in(
+              "id",
+              prescriptionIdsToUnlock
+            )
+            .eq(
+              "status",
+              "pending_payment"
+            );
+
+        if (prescriptionUpdateError) {
+          console.error(
+            "Prescription status update failed:",
+            prescriptionUpdateError
+          );
+
+          return {
+            success: false,
+            message:
+              "Payment could not be completed because the prescription status could not be updated.",
+            grandTotal,
+          };
+        }
+
+        prescriptionsUnlocked =
+          prescriptionIdsToUnlock.length;
+      }
+
+      /*
+       * Safety check:
+       *
+       * Every pharmacy item on the invoice should correspond to
+       * a pending prescription.
+       */
+      if (
+        prescriptionsUnlocked !==
+        pharmacyItems.length
+      ) {
+        console.error(
+          "Invoice/prescription mismatch:",
+          {
+            invoiceId: invoice.id,
+            pharmacyItems,
+            matchedPrescriptionIds:
+              prescriptionIdsToUnlock,
+          }
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because one or more pharmacy items could not be matched to a prescription.",
+          grandTotal,
+        };
+      }
+    }
+
+    /*
+     * Diagnostics follow the same principle.
+     *
+     * Only diagnostic orders represented on this invoice are
+     * marked completed/unlocked.
+     */
+    let diagnosticsUnlocked = 0;
+
+    if (diagnosticItems.length > 0) {
+      const { data: diagnosticOrders, error: diagnosticLookupError } =
+        await supabase
+          .from("diagnostic_orders")
+          .select(
+            "id, name, price, status, created_at"
+          )
+          .eq("patient_id", patient.id)
+          .eq("status", "ordered")
+          .order("created_at", {
+            ascending: true,
+          });
+
+      if (diagnosticLookupError) {
+        console.error(
+          "Diagnostic order lookup failed:",
+          diagnosticLookupError
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because diagnostic orders could not be verified.",
+          grandTotal,
+        };
+      }
+
+      const unmatchedDiagnostics = [
+        ...(diagnosticOrders ?? []),
+      ];
+
+      const diagnosticIdsToUnlock: string[] = [];
+
+      for (const invoiceItem of diagnosticItems) {
+        const invoiceName = String(
+          invoiceItem.name ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const invoicePrice = Number(
+          invoiceItem.unit_price ?? 0
+        );
+
+        const matchIndex =
+          unmatchedDiagnostics.findIndex(
+            (diagnostic) => {
+              const diagnosticName = String(
+                diagnostic.name ?? ""
+              )
+                .trim()
+                .toLowerCase();
+
+              const diagnosticPrice = Number(
+                diagnostic.price ?? 0
+              );
+
+              return (
+                diagnosticName ===
+                  invoiceName &&
+                diagnosticPrice ===
+                  invoicePrice
+              );
+            }
+          );
+
+        if (matchIndex !== -1) {
+          const matched =
+            unmatchedDiagnostics[
+              matchIndex
+            ];
+
+          diagnosticIdsToUnlock.push(
+            matched.id
+          );
+
+          unmatchedDiagnostics.splice(
+            matchIndex,
+            1
+          );
+        }
+      }
+
+      /*
+       * Only diagnostic orders matched to this invoice
+       * are marked completed.
+       */
+      if (diagnosticIdsToUnlock.length > 0) {
+        const { error: diagnosticUpdateError } =
+          await supabase
+            .from("diagnostic_orders")
+            .update({
+              status: "completed",
+            })
+            .in(
+              "id",
+              diagnosticIdsToUnlock
+            )
+            .eq(
+              "status",
+              "ordered"
+            );
+
+        if (diagnosticUpdateError) {
+          console.error(
+            "Diagnostic status update failed:",
+            diagnosticUpdateError
+          );
+
+          return {
+            success: false,
+            message:
+              "Payment could not be completed because the diagnostic status could not be updated.",
+            grandTotal,
+          };
+        }
+
+        diagnosticsUnlocked =
+          diagnosticIdsToUnlock.length;
+      }
+
+      /*
+       * Safety check:
+       *
+       * Every diagnostic item on the invoice should correspond
+       * to an actual diagnostic order.
+       */
+      if (
+        diagnosticsUnlocked !==
+        diagnosticItems.length
+      ) {
+        console.error(
+          "Invoice/diagnostic mismatch:",
+          {
+            invoiceId: invoice.id,
+            diagnosticItems,
+            matchedDiagnosticIds:
+              diagnosticIdsToUnlock,
+          }
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because one or more diagnostic items could not be matched to a diagnostic order.",
+          grandTotal,
+        };
+      }
+    }
+
+    /*
+     * Now that the invoice contents have been verified and its
+     * clinical items have been identified, mark the invoice paid.
+     */
+    const paidAt = new Date().toISOString();
+
+    const { error: paymentError } = await supabase
+      .from("invoices")
+      .update({
+        status: "paid",
+        grand_total: grandTotal,
+        payment_method: input.paymentMethod,
+        paid_at: paidAt,
+      })
+      .eq("id", invoice.id)
+      .neq("status", "paid");
 
     if (paymentError) {
       console.error(
@@ -466,77 +821,8 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message:
-          "Failed to complete the payment.",
+        message: "Failed to complete the payment.",
       };
-    }
-
-    /*
-     * Unlock diagnostics belonging to this patient's
-     * paid clinical workflow.
-     */
-    const { data: invoiceItems } =
-      await supabase
-        .from("invoice_items")
-        .select("category, name")
-        .eq("invoice_id", invoice.id);
-
-    const hasDiagnosticItems =
-      (invoiceItems ?? []).some(
-        (item) =>
-          item.category === "diagnostic"
-      );
-
-    const hasPharmacyItems =
-      (invoiceItems ?? []).some(
-        (item) =>
-          item.category === "pharmacy"
-      );
-
-    let diagnosticError = null;
-    let prescriptionError = null;
-
-    if (hasDiagnosticItems) {
-      const result =
-        await supabase
-          .from("diagnostic_orders")
-          .update({
-            status: "completed",
-          })
-          .eq("patient_id", patient.id)
-          .eq("status", "ordered");
-
-      diagnosticError =
-        result.error;
-    }
-
-    if (hasPharmacyItems) {
-      const result =
-        await supabase
-          .from("prescriptions")
-          .update({
-            status:
-              "ready_for_dispensing",
-          })
-          .eq("patient_id", patient.id)
-          .eq("status", "pending_payment");
-
-      prescriptionError =
-        result.error;
-    }
-
-    if (diagnosticError) {
-      console.error(
-        "Diagnostic status update failed:",
-        diagnosticError
-      );
-    }
-
-    if (prescriptionError) {
-      console.error(
-        "Prescription status update failed:",
-        prescriptionError
-      );
     }
 
     const changeDue =
@@ -565,10 +851,8 @@ export async function processBillingPayment(input: {
             : grandTotal,
         changeDue,
         paidAt,
-        diagnosticsUnlocked:
-          !diagnosticError,
-        prescriptionsUnlocked:
-          !prescriptionError,
+        diagnosticsUnlocked,
+        prescriptionsUnlocked,
       }),
       financialAmount: grandTotal,
     });
@@ -583,8 +867,7 @@ export async function processBillingPayment(input: {
 
     return {
       success: true,
-      message:
-        "Payment completed successfully.",
+      message: "Payment completed successfully.",
       grandTotal,
       changeDue,
     };
