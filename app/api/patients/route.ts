@@ -20,6 +20,7 @@ const PATIENT_CREATE_ROLES = [
   "NURSE",
   "OPHTHALMOLOGIST",
   "DOCTOR",
+  "PHARMACIST",
 ] as const;
 
 export async function GET(request: NextRequest) {
