@@ -116,6 +116,7 @@ export async function createDiagnosticOrder(
           name,
           price,
           status: "ordered",
+          ordered_by: staff.id,
         })
         .select("id")
         .single();
@@ -299,6 +300,7 @@ export async function createPrescription(
           price_per_unit: pricePerUnit,
           total_price: totalPrice,
           status: "pending_payment",
+          prescribed_by: staff.id,
         })
         .select("id")
         .single();
