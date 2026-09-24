@@ -1,6 +1,6 @@
 // lib/patient-flow.ts
 
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import {
   PatientRecord,
@@ -35,7 +35,7 @@ export async function getPatientByCode(patientCode: string) {
     throw new Error("Patient code is required.");
   }
 
-  const { data: patient, error } = await supabase
+  const { data: patient, error } = await supabaseServer
     .from("patients")
     .select("*")
     .eq("patient_code", code)
@@ -72,7 +72,7 @@ export async function getOrCreatePatientByCode(patientCode: string) {
     return existing;
   }
 
-  const { data: created, error: createError } = await supabase
+  const { data: created, error: createError } = await supabaseServer
     .from("patients")
     .insert({
       patient_code: code,
@@ -104,7 +104,7 @@ export async function getOrCreateDraftInvoice(patientId: string) {
    * Only an invoice that is still open for billing can receive
    * new diagnostic or pharmacy items.
    */
-  const { data: existing, error: findError } = await supabase
+  const { data: existing, error: findError } = await supabaseServer
     .from("invoices")
     .select("*")
     .eq("patient_id", patientId)
@@ -129,7 +129,7 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     1000 + Math.random() * 9000
   )}`;
 
-  const { data: created, error: createError } = await supabase
+  const { data: created, error: createError } = await supabaseServer
     .from("invoices")
     .insert({
       invoice_no: invoiceNo,
@@ -150,7 +150,7 @@ export async function getOrCreateDraftInvoice(patientId: string) {
  * Recalculates an invoice from its line items.
  */
 export async function recalcInvoice(invoiceId: string) {
-  const { data: items, error: itemsError } = await supabase
+  const { data: items, error: itemsError } = await supabaseServer
     .from("invoice_items")
     .select("total_price")
     .eq("invoice_id", invoiceId);
@@ -159,7 +159,7 @@ export async function recalcInvoice(invoiceId: string) {
     throw itemsError;
   }
 
-  const { data: invoice, error: invoiceError } = await supabase
+  const { data: invoice, error: invoiceError } = await supabaseServer
     .from("invoices")
     .select("discount_amount")
     .eq("id", invoiceId)
@@ -178,7 +178,7 @@ export async function recalcInvoice(invoiceId: string) {
 
   const grandTotal = Math.max(0, subtotal - discountAmount);
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await supabaseServer
     .from("invoices")
     .update({
       subtotal,
@@ -354,7 +354,7 @@ export async function getPatientRecord(
   }
 
   const { data: patient, error: patientError } =
-    await supabase
+    await supabaseServer
       .from("patients")
       .select("*")
       .eq("patient_code", code)
@@ -376,7 +376,7 @@ export async function getPatientRecord(
     logsRes,
     encountersRes,
   ] = await Promise.all([
-    supabase
+    supabaseServer
       .from("vitals")
       .select("*")
       .eq("patient_id", patient.id)
@@ -386,7 +386,7 @@ export async function getPatientRecord(
       .limit(1)
       .maybeSingle(),
 
-    supabase
+    supabaseServer
       .from("diagnostic_orders")
       .select("*")
       .eq("patient_id", patient.id)
@@ -394,7 +394,7 @@ export async function getPatientRecord(
         ascending: true,
       }),
 
-    supabase
+    supabaseServer
       .from("prescriptions")
       .select("*")
       .eq("patient_id", patient.id)
@@ -402,7 +402,7 @@ export async function getPatientRecord(
         ascending: true,
       }),
 
-    supabase
+    supabaseServer
       .from("invoices")
       .select("*, invoice_items(*)")
       .eq("patient_id", patient.id)
@@ -413,7 +413,7 @@ export async function getPatientRecord(
       .limit(1)
       .maybeSingle(),
 
-    supabase
+    supabaseServer
       .from("activity_logs")
       .select("*")
       .eq("patient_id", patient.id)
@@ -421,7 +421,7 @@ export async function getPatientRecord(
         ascending: false,
       }),
 
-    supabase
+    supabaseServer
       .from("encounters")
       .select("*")
       .eq("patient_id", patient.id)
@@ -549,10 +549,6 @@ export async function getPatientRecord(
 
     discountReason:
       invoiceRow?.discount_reason ??
-      undefined,
-
-    approvedByPin:
-      invoiceRow?.approved_by_pin ??
       undefined,
 
     grandTotal:
@@ -690,7 +686,7 @@ export async function registerPatient(input: {
     )}`;
 
   const { data, error } =
-    await supabase
+    await supabaseServer
       .from("patients")
       .insert({
         patient_code:

@@ -33,6 +33,7 @@ import {
 } from "@/app/actions/billing";
 
 import type { PatientRecord } from "@/types/hospital";
+import type { UserRole } from "@/lib/auth";
 
 function BillingContent() {
   const router = useRouter();
@@ -47,14 +48,20 @@ function BillingContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [currentStaff, setCurrentStaff] = useState<{
+    name: string;
+    role: UserRole;
+  } | null>(null);
+
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<BillingPaymentMethod>("cash");
-  const [discountType, setDiscountType] = useState<DiscountType>("fixed");
+  const [selectedPayment, setSelectedPayment] =
+    useState<BillingPaymentMethod>("cash");
+  const [discountType, setDiscountType] =
+    useState<DiscountType>("fixed");
   const [discountInput, setDiscountInput] = useState("");
   const [reasonInput, setReasonInput] = useState(
     "Staff discount / management approval"
   );
-  const [adminPinInput, setAdminPinInput] = useState("");
   const [discountError, setDiscountError] = useState("");
   const [amountRenderedInput, setAmountRenderedInput] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -93,16 +100,71 @@ function BillingContent() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadCurrentStaff = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            router.replace("/");
+            return;
+          }
+
+          throw new Error("Unable to load authenticated staff.");
+        }
+
+        const data = await response.json();
+
+        if (!data.success || !data.user) {
+          throw new Error(
+            "Authenticated staff profile was not returned."
+          );
+        }
+
+        if (!cancelled) {
+          setCurrentStaff({
+            name: data.user.name,
+            role: data.user.role,
+          });
+        }
+      } catch (err) {
+        console.error("Current staff load error:", err);
+
+        if (!cancelled) {
+          setError("Unable to verify the current staff session.");
+        }
+      }
+    };
+
+    loadCurrentStaff();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
     loadBillingPatient();
   }, [patientCodeFromUrl]);
 
   const invoice = patient?.invoice;
   const amountRendered = Number(amountRenderedInput) || 0;
   const grandTotal = Number(invoice?.grandTotal ?? 0);
-  const isUnderpaid = selectedPayment === "cash" && amountRendered < grandTotal;
+
+  const isUnderpaid =
+    selectedPayment === "cash" && amountRendered < grandTotal;
 
   const changeDue = useMemo(() => {
     if (selectedPayment !== "cash") return 0;
+
     return Math.max(0, amountRendered - grandTotal);
   }, [selectedPayment, amountRendered, grandTotal]);
 
@@ -114,21 +176,22 @@ function BillingContent() {
 
     try {
       const numericValue = Number(discountInput);
+
       const result = await applyBillingDiscount({
         patientCode: patient.patientId,
         discountType,
         value: numericValue,
         reason: reasonInput,
-        adminPin: adminPinInput,
       });
 
       if (!result.success) {
-        setDiscountError(result.message || "Unable to apply discount.");
+        setDiscountError(
+          result.message || "Unable to apply discount."
+        );
         return;
       }
 
       setDiscountModalOpen(false);
-      setAdminPinInput("");
       await loadBillingPatient();
     } catch (err) {
       console.error("Discount application error:", err);
@@ -144,7 +207,10 @@ function BillingContent() {
 
   const handleProcessPayment = async () => {
     if (!patient) return;
-    if (selectedPayment === "cash" && amountRendered < grandTotal) return;
+
+    if (selectedPayment === "cash" && amountRendered < grandTotal) {
+      return;
+    }
 
     setProcessingPayment(true);
     setError("");
@@ -157,16 +223,21 @@ function BillingContent() {
       });
 
       if (!result.success) {
-        setError(result.message || "Unable to process payment.");
+        setError(
+          result.message || "Unable to process payment."
+        );
         return;
       }
 
       setPaymentSuccess(true);
       setLastChangeDue(result.changeDue ?? 0);
+
       await loadBillingPatient();
     } catch (err) {
       console.error("Payment processing error:", err);
-      setError("An unexpected error occurred while processing payment.");
+      setError(
+        "An unexpected error occurred while processing payment."
+      );
     } finally {
       setProcessingPayment(false);
     }
@@ -213,7 +284,10 @@ function BillingContent() {
       <div className="min-h-screen bg-[#F3F0F7] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-[#5E35B1]">
           <Loader2 className="w-8 h-8 animate-spin" />
-          <p className="text-sm font-semibold">Loading billing record...</p>
+
+          <p className="text-sm font-semibold">
+            Loading billing record...
+          </p>
         </div>
       </div>
     );
@@ -233,10 +307,12 @@ function BillingContent() {
                 className="object-contain p-1"
               />
             </div>
+
             <div>
               <h1 className="text-sm font-extrabold">
                 Sparkle Eye Specialist Hospital
               </h1>
+
               <p className="text-[11px] text-purple-200">
                 Hospital Billing & Cashier Console
               </p>
@@ -263,7 +339,8 @@ function BillingContent() {
             </h2>
 
             <p className="mt-2 text-sm text-slate-500">
-              {error || "There is currently no pending billing record."}
+              {error ||
+                "There is currently no pending billing record."}
             </p>
 
             <div className="mt-6 flex items-center justify-center gap-3">
@@ -318,8 +395,12 @@ function BillingContent() {
         <div className="flex items-center gap-6 text-xs text-purple-100 font-medium">
           <div className="flex items-center gap-2">
             <UserCheck className="w-4 h-4 text-purple-300" />
+
             <span>
-              Cashier: <strong className="text-white">Folake Adeyemi</strong>
+              Cashier:{" "}
+              <strong className="text-white">
+                {currentStaff?.name ?? "Loading..."}
+              </strong>
             </span>
           </div>
 
@@ -341,13 +422,26 @@ function BillingContent() {
       {/* PATIENT BAR */}
       <div className="w-full bg-[#5E35B1] text-white px-6 py-2.5 text-xs font-semibold flex flex-wrap items-center gap-2 print:hidden">
         <span>Patient:</span>
-        <span className="text-purple-200 font-bold">{patient.fullName}</span>
+
+        <span className="text-purple-200 font-bold">
+          {patient.fullName}
+        </span>
+
         <span className="text-purple-400">|</span>
+
         <span>ID:</span>
-        <span className="text-purple-200 font-bold">{patient.patientId}</span>
+
+        <span className="text-purple-200 font-bold">
+          {patient.patientId}
+        </span>
+
         <span className="text-purple-400">|</span>
+
         <span>Coverage Plan:</span>
-        <span className="text-purple-200 font-bold">{patient.coveragePlan}</span>
+
+        <span className="text-purple-200 font-bold">
+          {patient.coveragePlan}
+        </span>
       </div>
 
       {error && (
@@ -388,8 +482,14 @@ function BillingContent() {
           <div className="space-y-3 text-xs">
             <div className="grid grid-cols-12 font-bold text-slate-400 border-b border-slate-200 pb-2">
               <span className="col-span-7">ITEM NAME</span>
-              <span className="col-span-2 text-center">QTY</span>
-              <span className="col-span-3 text-right">AMOUNT</span>
+
+              <span className="col-span-2 text-center">
+                QTY
+              </span>
+
+              <span className="col-span-3 text-right">
+                AMOUNT
+              </span>
             </div>
 
             <div className="space-y-3 font-medium text-slate-700">
@@ -399,18 +499,24 @@ function BillingContent() {
                 </div>
               ) : (
                 invoice.items.map((item) => (
-                  <div key={item.id} className="grid grid-cols-12 items-center">
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-12 items-center"
+                  >
                     <div className="col-span-7">
                       <div className="font-semibold text-slate-800">
                         {item.name}
                       </div>
+
                       <div className="text-[10px] text-slate-400 uppercase">
                         {item.category}
                       </div>
                     </div>
+
                     <span className="col-span-2 text-center text-slate-500">
                       {item.quantity}
                     </span>
+
                     <span className="col-span-3 text-right text-slate-900 font-bold">
                       ₦{item.totalPrice.toLocaleString()}
                     </span>
@@ -424,6 +530,7 @@ function BillingContent() {
           <div className="border-t border-slate-200 pt-4 space-y-2 text-xs">
             <div className="flex justify-between text-slate-600">
               <span>Subtotal</span>
+
               <span className="font-semibold">
                 ₦{invoice.subtotal.toLocaleString()}
               </span>
@@ -435,7 +542,10 @@ function BillingContent() {
                   Discount Approved
                   <Lock className="w-3 h-3" />
                 </span>
-                <span>-₦{invoice.discountAmount.toLocaleString()}</span>
+
+                <span>
+                  -₦{invoice.discountAmount.toLocaleString()}
+                </span>
               </div>
             )}
 
@@ -448,23 +558,26 @@ function BillingContent() {
               <div className="flex items-center gap-2">
                 <span>Grand Total</span>
 
-                {invoice.status !== "paid" && (
-                  <button
-                    onClick={() => {
-                      setDiscountError("");
-                      setDiscountInput(
-                        invoice.discountAmount > 0
-                          ? String(invoice.discountAmount)
-                          : ""
-                      );
-                      setDiscountModalOpen(true);
-                    }}
-                    className="text-xs font-semibold text-[#5E35B1] hover:underline flex items-center gap-1 print:hidden"
-                  >
-                    <Lock className="w-3 h-3" />
-                    Apply Discount
-                  </button>
-                )}
+                {invoice.status !== "paid" &&
+                  currentStaff?.role === "IT_ADMIN" && (
+                    <button
+                      onClick={() => {
+                        setDiscountError("");
+
+                        setDiscountInput(
+                          invoice.discountAmount > 0
+                            ? String(invoice.discountAmount)
+                            : ""
+                        );
+
+                        setDiscountModalOpen(true);
+                      }}
+                      className="text-xs font-semibold text-[#5E35B1] hover:underline flex items-center gap-1 print:hidden"
+                    >
+                      <Lock className="w-3 h-3" />
+                      Apply Discount
+                    </button>
+                  )}
               </div>
 
               <span className="text-base text-[#5E35B1] font-extrabold">
@@ -475,6 +588,7 @@ function BillingContent() {
 
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11px] text-slate-500 print:hidden">
             <Info className="w-4 h-4 text-slate-400 shrink-0" />
+
             <span>
               All billing and payment actions are recorded in the hospital audit log.
             </span>
@@ -511,7 +625,8 @@ function BillingContent() {
                     </h3>
 
                     <p className="text-xs text-emerald-800">
-                      Invoice #{invoice.invoiceNo} is now <strong>PAID</strong>.
+                      Invoice #{invoice.invoiceNo} is now{" "}
+                      <strong>PAID</strong>.
                     </p>
                   </div>
                 </div>
@@ -519,7 +634,10 @@ function BillingContent() {
                 {lastChangeDue > 0 && (
                   <div className="p-3 bg-emerald-100 border border-emerald-200 rounded-xl flex justify-between text-xs font-bold text-emerald-900">
                     <span>Change Returned</span>
-                    <span>₦{lastChangeDue.toLocaleString()}</span>
+
+                    <span>
+                      ₦{lastChangeDue.toLocaleString()}
+                    </span>
                   </div>
                 )}
               </div>
@@ -535,6 +653,7 @@ function BillingContent() {
 
                   <div className="text-left">
                     <p>Print Patient Receipt</p>
+
                     <p className="text-[11px] text-slate-500 font-normal">
                       Generate physical or PDF receipt copy
                     </p>
@@ -553,6 +672,7 @@ function BillingContent() {
 
                   <div className="text-left">
                     <p>Return to Cashier Dashboard</p>
+
                     <p className="text-[11px] text-purple-100">
                       Back to billing queue
                     </p>
@@ -562,30 +682,33 @@ function BillingContent() {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              {patient.activityLogs && patient.activityLogs.length > 0 && (
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <span className="flex items-center gap-1.5">
-                      <History className="w-3.5 h-3.5" />
-                      Recent Audit Entries
-                    </span>
-                  </div>
+              {patient.activityLogs &&
+                patient.activityLogs.length > 0 && (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <span className="flex items-center gap-1.5">
+                        <History className="w-3.5 h-3.5" />
+                        Recent Audit Entries
+                      </span>
+                    </div>
 
-                  <div className="space-y-2 mt-3">
-                    {patient.activityLogs.slice(0, 3).map((log) => (
-                      <div
-                        key={log.id}
-                        className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100"
-                      >
-                        <span className="font-bold text-slate-800">
-                          [{log.module}]
-                        </span>{" "}
-                        {log.action}
-                      </div>
-                    ))}
+                    <div className="space-y-2 mt-3">
+                      {patient.activityLogs
+                        .slice(0, 3)
+                        .map((log) => (
+                          <div
+                            key={log.id}
+                            className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-100"
+                          >
+                            <span className="font-bold text-slate-800">
+                              [{log.module}]
+                            </span>{" "}
+                            {log.action}
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           ) : (
             <>
@@ -612,10 +735,13 @@ function BillingContent() {
                         name="payment"
                         checked={selectedPayment === method.id}
                         onChange={() =>
-                          setSelectedPayment(method.id as BillingPaymentMethod)
+                          setSelectedPayment(
+                            method.id as BillingPaymentMethod
+                          )
                         }
                         className="accent-[#5E35B1]"
                       />
+
                       <span>{method.name}</span>
                     </div>
                   </label>
@@ -626,6 +752,7 @@ function BillingContent() {
               <div className="space-y-4 border-t border-slate-200 pt-4">
                 <div className="flex justify-between text-xs font-bold">
                   <span>Amount Due</span>
+
                   <span className="text-base text-[#5E35B1]">
                     ₦{grandTotal.toLocaleString()}
                   </span>
@@ -640,15 +767,29 @@ function BillingContent() {
 
                       <div className="grid grid-cols-4 gap-2">
                         {[
-                          { label: "Exact", value: grandTotal },
-                          { label: "₦50k", value: 50000 },
-                          { label: "₦70k", value: 70000 },
-                          { label: "₦100k", value: 100000 },
+                          {
+                            label: "Exact",
+                            value: grandTotal,
+                          },
+                          {
+                            label: "₦50k",
+                            value: 50000,
+                          },
+                          {
+                            label: "₦70k",
+                            value: 70000,
+                          },
+                          {
+                            label: "₦100k",
+                            value: 100000,
+                          },
                         ].map((tender) => (
                           <button
                             key={tender.label}
                             type="button"
-                            onClick={() => handleQuickCash(tender.value)}
+                            onClick={() =>
+                              handleQuickCash(tender.value)
+                            }
                             className="py-2 px-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200"
                           >
                             {tender.label}
@@ -666,7 +807,9 @@ function BillingContent() {
                         type="number"
                         min="0"
                         value={amountRenderedInput}
-                        onChange={(e) => setAmountRenderedInput(e.target.value)}
+                        onChange={(e) =>
+                          setAmountRenderedInput(e.target.value)
+                        }
                         className={`w-full p-3 bg-white border rounded-xl font-bold text-sm ${
                           isUnderpaid
                             ? "border-amber-400"
@@ -682,6 +825,7 @@ function BillingContent() {
                     <span className="text-[10px] font-bold text-emerald-700 block">
                       Change Due
                     </span>
+
                     <span className="text-sm font-bold text-emerald-800">
                       ₦{changeDue.toLocaleString()}
                     </span>
@@ -691,14 +835,19 @@ function BillingContent() {
                     <span className="text-[10px] font-bold text-slate-500 block">
                       Outstanding
                     </span>
+
                     <span
                       className={`text-sm font-bold ${
-                        isUnderpaid ? "text-amber-700" : "text-slate-800"
+                        isUnderpaid
+                          ? "text-amber-700"
+                          : "text-slate-800"
                       }`}
                     >
                       ₦
                       {isUnderpaid
-                        ? (grandTotal - amountRendered).toLocaleString()
+                        ? (
+                            grandTotal - amountRendered
+                          ).toLocaleString()
                         : "0.00"}
                     </span>
                   </div>
@@ -706,9 +855,15 @@ function BillingContent() {
 
                 <button
                   onClick={handleProcessPayment}
-                  disabled={processingPayment || isUnderpaid || grandTotal <= 0}
+                  disabled={
+                    processingPayment ||
+                    isUnderpaid ||
+                    grandTotal <= 0
+                  }
                   className={`w-full py-3.5 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 ${
-                    processingPayment || isUnderpaid || grandTotal <= 0
+                    processingPayment ||
+                    isUnderpaid ||
+                    grandTotal <= 0
                       ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                       : "bg-[#5E35B1] hover:bg-[#4527A0] text-white"
                   }`}
@@ -741,7 +896,9 @@ function BillingContent() {
                   <Lock className="w-4 h-4" />
                 </div>
 
-                <h3 className="text-sm font-bold">Discount Authorization</h3>
+                <h3 className="text-sm font-bold">
+                  Discount Authorization
+                </h3>
               </div>
 
               <button
@@ -756,7 +913,8 @@ function BillingContent() {
               {discountError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  {discountError}
+
+                  <span>{discountError}</span>
                 </div>
               )}
 
@@ -779,7 +937,9 @@ function BillingContent() {
                   </button>
 
                   <button
-                    onClick={() => setDiscountType("percentage")}
+                    onClick={() =>
+                      setDiscountType("percentage")
+                    }
                     className={`py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 ${
                       discountType === "percentage"
                         ? "bg-purple-50 border-[#5E35B1] text-[#5E35B1]"
@@ -803,9 +963,13 @@ function BillingContent() {
                   type="number"
                   min="0"
                   value={discountInput}
-                  onChange={(e) => setDiscountInput(e.target.value)}
+                  onChange={(e) =>
+                    setDiscountInput(e.target.value)
+                  }
                   placeholder={
-                    discountType === "fixed" ? "e.g. 5000" : "e.g. 10"
+                    discountType === "fixed"
+                      ? "e.g. 5000"
+                      : "e.g. 10"
                   }
                   className="w-full p-3 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#5E35B1]"
                 />
@@ -819,27 +983,16 @@ function BillingContent() {
                 <textarea
                   rows={3}
                   value={reasonInput}
-                  onChange={(e) => setReasonInput(e.target.value)}
+                  onChange={(e) =>
+                    setReasonInput(e.target.value)
+                  }
                   className="w-full p-3 border border-slate-200 rounded-xl text-xs resize-none focus:outline-none focus:border-[#5E35B1]"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold block mb-1.5">
-                  Administrator PIN
-                </label>
-
-                <input
-                  type="password"
-                  value={adminPinInput}
-                  onChange={(e) => setAdminPinInput(e.target.value)}
-                  placeholder="Enter administrator PIN"
-                  className="w-full p-3 border border-slate-200 rounded-xl text-sm tracking-widest focus:outline-none focus:border-[#5E35B1]"
                 />
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-2 text-[11px] text-amber-800">
                 <ShieldAlert className="w-4 h-4 shrink-0" />
+
                 <span>
                   Discount authorization will be recorded in the hospital audit log.
                 </span>
@@ -847,7 +1000,9 @@ function BillingContent() {
 
               <div className="flex justify-end gap-3 pt-2">
                 <button
-                  onClick={() => setDiscountModalOpen(false)}
+                  onClick={() =>
+                    setDiscountModalOpen(false)
+                  }
                   className="px-5 py-2.5 border border-slate-200 rounded-xl text-xs font-bold"
                 >
                   Cancel
@@ -861,6 +1016,7 @@ function BillingContent() {
                   {processingDiscount && (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   )}
+
                   Authorize Discount
                 </button>
               </div>
@@ -879,7 +1035,10 @@ export default function BillingCheckoutView() {
         <div className="min-h-screen bg-[#F3F0F7] flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-[#5E35B1]">
             <Loader2 className="w-8 h-8 animate-spin" />
-            <p className="text-sm font-semibold">Loading billing record...</p>
+
+            <p className="text-sm font-semibold">
+              Loading billing record...
+            </p>
           </div>
         </div>
       }

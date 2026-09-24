@@ -1,14 +1,13 @@
-// app/api/patients/[code]/vitals/route.ts
-
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+
+import { requireRole } from "@/lib/server-auth";
+import { supabaseServer } from "@/lib/supabase-server";
 import {
   getPatientByCode,
   addActivityLog,
   getPatientRecord,
 } from "@/lib/patient-flow";
 
-// --- POST: Record triage vitals for an existing patient ---
 export async function POST(
   request: Request,
   {
@@ -18,6 +17,13 @@ export async function POST(
   }
 ) {
   try {
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "OPHTHALMOLOGIST",
+      "DOCTOR",
+      "NURSE",
+    ]);
+
     const { code } = await params;
 
     const patientCode = code?.trim();
@@ -54,16 +60,8 @@ export async function POST(
       durationText,
     } = body;
 
-    /*
-     * IMPORTANT:
-     * Triage must never create a patient.
-     *
-     * If the code does not exist, return 404.
-     */
     const patient =
-      await getPatientByCode(
-        patientCode
-      );
+      await getPatientByCode(patientCode);
 
     if (!patient) {
       return NextResponse.json(
@@ -76,9 +74,6 @@ export async function POST(
       );
     }
 
-    /*
-     * Basic validation.
-     */
     if (
       !visualAcuityOD &&
       !visualAcuityOS
@@ -94,7 +89,10 @@ export async function POST(
       );
     }
 
-    if (!primaryComplaint?.trim()) {
+    if (
+      typeof primaryComplaint !== "string" ||
+      !primaryComplaint.trim()
+    ) {
       return NextResponse.json(
         {
           error:
@@ -106,63 +104,48 @@ export async function POST(
       );
     }
 
-    /*
-     * Save the actual triage record.
-     */
     const { error: vitalsError } =
-      await supabase
+      await supabaseServer
         .from("vitals")
         .insert({
           patient_id:
             patient.id,
 
           visual_acuity_od:
-            visualAcuityOD ??
-            null,
+            visualAcuityOD ?? null,
 
           visual_acuity_os:
-            visualAcuityOS ??
-            null,
+            visualAcuityOS ?? null,
 
           visual_acuity_ou:
-            visualAcuityOU ??
-            null,
+            visualAcuityOU ?? null,
 
           with_correction:
-            withCorrection ??
-            false,
+            withCorrection ?? false,
 
           iop_od:
-            iopOD ??
-            null,
+            iopOD ?? null,
 
           iop_os:
-            iopOS ??
-            null,
+            iopOS ?? null,
 
           iop_instrument:
-            iopInstrument ??
-            null,
+            iopInstrument ?? null,
 
           bp_systolic:
-            bpSystolic ??
-            null,
+            bpSystolic ?? null,
 
           bp_diastolic:
-            bpDiastolic ??
-            null,
+            bpDiastolic ?? null,
 
           pulse:
-            pulse ??
-            null,
+            pulse ?? null,
 
           temperature:
-            temperature ??
-            null,
+            temperature ?? null,
 
           spo2:
-            spo2 ??
-            null,
+            spo2 ?? null,
 
           primary_complaint:
             primaryComplaint.trim(),
@@ -173,12 +156,13 @@ export async function POST(
               : symptoms ?? null,
 
           severity:
-            severity ??
-            null,
+            severity ?? null,
 
           duration_text:
-            durationText ??
-            null,
+            durationText ?? null,
+
+          recorded_by:
+            staff.id,
         });
 
     if (vitalsError) {
@@ -198,12 +182,9 @@ export async function POST(
       );
     }
 
-    /*
-     * Move the patient into the consultation workflow.
-     */
     const {
       error: statusError,
-    } = await supabase
+    } = await supabaseServer
       .from("patients")
       .update({
         status: "in_consultation",
@@ -217,19 +198,13 @@ export async function POST(
       );
     }
 
-    /*
-     * Audit trail.
-     */
     await addActivityLog(
       patient.id,
       "Triage",
       "Patient vitals recorded.",
-      "Nurse On-Duty"
+      staff.name
     );
 
-    /*
-     * Return the complete updated patient record.
-     */
     const updated =
       await getPatientRecord(
         patientCode
@@ -243,6 +218,35 @@ export async function POST(
       "Update vitals error:",
       error
     );
+
+    if (
+      error instanceof Error &&
+      error.message === "UNAUTHENTICATED"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Authentication required.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "FORBIDDEN"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You do not have permission to record patient vitals.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
 
     return NextResponse.json(
       {

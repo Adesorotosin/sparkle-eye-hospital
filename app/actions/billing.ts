@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { getPatientRecord, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
+import { requireRole } from "@/lib/server-auth";
+import type { PatientRecord } from "@/types/hospital";
 
 export type BillingPaymentMethod =
   | "cash"
@@ -21,6 +23,12 @@ export type BillingActionResponse = {
   grandTotal?: number;
 };
 
+export type BillingPatientResponse = {
+  success: boolean;
+  message: string;
+  patient: PatientRecord | null;
+};
+
 async function findPatient(patientCode: string) {
   const code = patientCode?.trim();
 
@@ -31,7 +39,7 @@ async function findPatient(patientCode: string) {
     };
   }
 
-  const { data: patient, error } = await supabase
+  const { data: patient, error } = await supabaseServer
     .from("patients")
     .select("id, patient_code, full_name, coverage_plan")
     .eq("patient_code", code)
@@ -59,20 +67,44 @@ async function findPatient(patientCode: string) {
   };
 }
 
-export async function getBillingPatient(patientCode?: string) {
+export async function getBillingPatient(
+  patientCode?: string
+): Promise<BillingPatientResponse> {
   try {
     if (patientCode?.trim()) {
-      const { patient, error } = await findPatient(patientCode);
+      const { data: patient, error } = await supabaseServer
+        .from("patients")
+        .select("id, patient_code, full_name, coverage_plan")
+        .eq("patient_code", patientCode.trim())
+        .maybeSingle();
+
+      if (error) {
+        console.error("Billing patient lookup failed:", error);
+
+        return {
+          success: false,
+          message: "Unable to find the patient record.",
+          patient: null,
+        };
+      }
 
       if (!patient) {
         return {
           success: false,
-          message: error ?? "Patient not found.",
+          message: `Patient ${patientCode.trim()} was not found.`,
           patient: null,
         };
       }
 
       const record = await getPatientRecord(patient.patient_code);
+
+      if (!record) {
+        return {
+          success: false,
+          message: "Unable to load the patient's billing record.",
+          patient: null,
+        };
+      }
 
       return {
         success: true,
@@ -81,7 +113,7 @@ export async function getBillingPatient(patientCode?: string) {
       };
     }
 
-    const { data: invoice, error: invoiceError } = await supabase
+    const { data: invoice, error: invoiceError } = await supabaseServer
       .from("invoices")
       .select("patient_id, status, created_at")
       .in("status", ["draft", "pending"])
@@ -90,10 +122,7 @@ export async function getBillingPatient(patientCode?: string) {
       .maybeSingle();
 
     if (invoiceError) {
-      console.error(
-        "Billing invoice lookup failed:",
-        invoiceError
-      );
+      console.error("Billing invoice lookup failed:", invoiceError);
 
       return {
         success: false,
@@ -110,7 +139,7 @@ export async function getBillingPatient(patientCode?: string) {
       };
     }
 
-    const { data: patient, error: patientError } = await supabase
+    const { data: patient, error: patientError } = await supabaseServer
       .from("patients")
       .select("patient_code")
       .eq("id", invoice.patient_id)
@@ -119,13 +148,20 @@ export async function getBillingPatient(patientCode?: string) {
     if (patientError || !patient) {
       return {
         success: false,
-        message:
-          "The patient attached to this invoice could not be found.",
+        message: "The patient attached to this invoice could not be found.",
         patient: null,
       };
     }
 
     const record = await getPatientRecord(patient.patient_code);
+
+    if (!record) {
+      return {
+        success: false,
+        message: "Unable to load the patient's billing record.",
+        patient: null,
+      };
+    }
 
     return {
       success: true,
@@ -137,8 +173,7 @@ export async function getBillingPatient(patientCode?: string) {
 
     return {
       success: false,
-      message:
-        "An unexpected error occurred while loading billing.",
+      message: "An unexpected error occurred while loading billing.",
       patient: null,
     };
   }
@@ -149,15 +184,16 @@ export async function applyBillingDiscount(input: {
   discountType: DiscountType;
   value: number;
   reason: string;
-  adminPin: string;
+  adminPin?: string;
 }): Promise<BillingActionResponse> {
   try {
+    const staff = await requireRole(["IT_ADMIN"]);
+
     const {
       patientCode,
       discountType,
       value,
       reason,
-      adminPin,
     } = input;
 
     const numericValue = Number(value);
@@ -176,24 +212,13 @@ export async function applyBillingDiscount(input: {
       };
     }
 
-    const configuredPin = process.env.BILLING_ADMIN_PIN;
-
-    if (!configuredPin) {
-      console.error(
-        "BILLING_ADMIN_PIN is not configured."
-      );
-
+    if (
+      discountType !== "fixed" &&
+      discountType !== "percentage"
+    ) {
       return {
         success: false,
-        message:
-          "Billing administrator authorization is not configured.",
-      };
-    }
-
-    if (!adminPin || adminPin !== configuredPin) {
-      return {
-        success: false,
-        message: "Invalid administrator PIN.",
+        message: "Invalid discount type.",
       };
     }
 
@@ -206,16 +231,31 @@ export async function applyBillingDiscount(input: {
       };
     }
 
-    const { data: invoice, error: invoiceError } = await supabase
-      .from("invoices")
-      .select("*")
-      .eq("patient_id", patient.id)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: invoice, error: invoiceError } =
+      await supabaseServer
+        .from("invoices")
+        .select("*")
+        .eq("patient_id", patient.id)
+        .neq("status", "cancelled")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
 
-    if (invoiceError || !invoice) {
+    if (invoiceError) {
+      console.error(
+        "Billing invoice lookup failed:",
+        invoiceError
+      );
+
+      return {
+        success: false,
+        message: "Unable to load the patient's invoice.",
+      };
+    }
+
+    if (!invoice) {
       return {
         success: false,
         message: "Unable to load the patient's invoice.",
@@ -235,13 +275,22 @@ export async function applyBillingDiscount(input: {
       recalculated.subtotal ?? invoice.subtotal ?? 0
     );
 
+    if (!Number.isFinite(subtotal) || subtotal < 0) {
+      return {
+        success: false,
+        message:
+          "Unable to calculate the invoice subtotal.",
+      };
+    }
+
     let discountAmount = numericValue;
 
     if (discountType === "percentage") {
       if (numericValue > 100) {
         return {
           success: false,
-          message: "Percentage discount cannot exceed 100%.",
+          message:
+            "Percentage discount cannot exceed 100%.",
         };
       }
 
@@ -259,16 +308,17 @@ export async function applyBillingDiscount(input: {
       subtotal - discountAmount
     );
 
-    const { error: updateError } = await supabase
-      .from("invoices")
-      .update({
-        discount_amount: discountAmount,
-        discount_reason: reason.trim(),
-        approved_by_pin: "AUTHORIZED",
-        subtotal,
-        grand_total: grandTotal,
-      })
-      .eq("id", invoice.id);
+    const { error: updateError } =
+      await supabaseServer
+        .from("invoices")
+        .update({
+          discount_amount: discountAmount,
+          discount_reason: reason.trim(),
+          approved_by_pin: "AUTHORIZED",
+          subtotal,
+          grand_total: grandTotal,
+        })
+        .eq("id", invoice.id);
 
     if (updateError) {
       console.error(
@@ -286,7 +336,8 @@ export async function applyBillingDiscount(input: {
       module: "Billing",
       category: "BILLING",
       action: `Discount applied to invoice ${invoice.invoice_no}`,
-      performedBy: "Billing Administrator",
+      performedBy: staff.name,
+      staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
         invoiceId: invoice.id,
@@ -296,6 +347,8 @@ export async function applyBillingDiscount(input: {
         discountAmount,
         reason: reason.trim(),
         grandTotal,
+        authorizedBy: staff.name,
+        authorizedByStaffId: staff.id,
       }),
       financialAmount: discountAmount,
     });
@@ -309,6 +362,24 @@ export async function applyBillingDiscount(input: {
       grandTotal,
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return {
+          success: false,
+          message:
+            "You must be signed in to apply a billing discount.",
+        };
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return {
+          success: false,
+          message:
+            "Only an authorized billing administrator can apply discounts.",
+        };
+      }
+    }
+
     console.error(
       "Apply billing discount error:",
       error
@@ -328,16 +399,47 @@ export async function processBillingPayment(input: {
   amountRendered: number;
 }): Promise<BillingActionResponse> {
   try {
-    const amountRendered = Number(input.amountRendered);
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "CASHIER",
+    ]);
 
-    if (!Number.isFinite(amountRendered) || amountRendered < 0) {
+    const amountRendered = Number(
+      input.amountRendered
+    );
+
+    if (
+      !Number.isFinite(amountRendered) ||
+      amountRendered < 0
+    ) {
       return {
         success: false,
         message: "Invalid amount rendered.",
       };
     }
 
-    const { patient, error } = await findPatient(input.patientCode);
+    const validPaymentMethods: BillingPaymentMethod[] = [
+      "cash",
+      "pos",
+      "transfer",
+      "card",
+      "hmo",
+    ];
+
+    if (
+      !validPaymentMethods.includes(
+        input.paymentMethod
+      )
+    ) {
+      return {
+        success: false,
+        message: "Invalid payment method.",
+      };
+    }
+
+    const { patient, error } = await findPatient(
+      input.patientCode
+    );
 
     if (!patient) {
       return {
@@ -349,7 +451,10 @@ export async function processBillingPayment(input: {
     /*
      * Load the patient's active invoice.
      */
-    const { data: invoice, error: invoiceError } = await supabase
+    const {
+      data: invoice,
+      error: invoiceError,
+    } = await supabaseServer
       .from("invoices")
       .select("*")
       .eq("patient_id", patient.id)
@@ -368,42 +473,52 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message: "Unable to load the patient's invoice.",
+        message:
+          "Unable to load the patient's invoice.",
       };
     }
 
     if (!invoice) {
       return {
         success: false,
-        message: "No active invoice exists for this patient.",
+        message:
+          "No active invoice exists for this patient.",
       };
     }
 
     if (invoice.status === "paid") {
       return {
         success: false,
-        message: "This invoice has already been paid.",
+        message:
+          "This invoice has already been paid.",
       };
     }
 
     /*
-     * Recalculate immediately before payment so the cashier
-     * always pays the current invoice amount.
+     * Recalculate immediately before payment so the
+     * cashier always pays the current invoice amount.
      */
     const totals = await recalcInvoice(invoice.id);
 
-    const grandTotal = Number(totals.grandTotal ?? 0);
+    const grandTotal = Number(
+      totals.grandTotal ?? 0
+    );
 
-    if (grandTotal <= 0) {
+    if (
+      !Number.isFinite(grandTotal) ||
+      grandTotal <= 0
+    ) {
       return {
         success: false,
-        message: "This invoice has no amount due.",
+        message:
+          "This invoice has no amount due.",
       };
     }
 
     /*
-     * Cash payments may be greater than the invoice total.
-     * Other payment methods must cover the exact invoice amount.
+     * Cash payments may be greater than the invoice
+     * total. Other payment methods must cover the
+     * exact invoice amount.
      */
     if (
       input.paymentMethod === "cash" &&
@@ -411,7 +526,8 @@ export async function processBillingPayment(input: {
     ) {
       return {
         success: false,
-        message: "The amount rendered is insufficient.",
+        message:
+          "The amount rendered is insufficient.",
         grandTotal,
       };
     }
@@ -427,7 +543,8 @@ export async function processBillingPayment(input: {
     ) {
       return {
         success: false,
-        message: "The payment amount is insufficient.",
+        message:
+          "The payment amount is insufficient.",
         grandTotal,
       };
     }
@@ -435,16 +552,19 @@ export async function processBillingPayment(input: {
     /*
      * Load the actual items belonging to THIS invoice.
      *
-     * This is important because the patient's other pending
-     * prescriptions/diagnostics must not be unlocked.
+     * This prevents another pending prescription or
+     * diagnostic belonging to the same patient from
+     * being unlocked accidentally.
      */
-    const { data: invoiceItems, error: invoiceItemsError } =
-      await supabase
-        .from("invoice_items")
-        .select(
-          "id, category, name, quantity, unit_price, total_price"
-        )
-        .eq("invoice_id", invoice.id);
+    const {
+      data: invoiceItems,
+      error: invoiceItemsError,
+    } = await supabaseServer
+      .from("invoice_items")
+      .select(
+        "id, category, name, quantity, unit_price, total_price"
+      )
+      .eq("invoice_id", invoice.id);
 
     if (invoiceItemsError) {
       console.error(
@@ -454,7 +574,8 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message: "Unable to verify the items on this invoice.",
+        message:
+          "Unable to verify the items on this invoice.",
         grandTotal,
       };
     }
@@ -462,34 +583,36 @@ export async function processBillingPayment(input: {
     /*
      * Separate clinical items from the invoice.
      */
-    const pharmacyItems = (invoiceItems ?? []).filter(
-      (item) => item.category === "pharmacy"
-    );
+    const pharmacyItems =
+      (invoiceItems ?? []).filter(
+        (item) => item.category === "pharmacy"
+      );
 
-    const diagnosticItems = (invoiceItems ?? []).filter(
-      (item) => item.category === "diagnostic"
-    );
+    const diagnosticItems =
+      (invoiceItems ?? []).filter(
+        (item) => item.category === "diagnostic"
+      );
 
     /*
-     * Find only pending prescriptions belonging to this patient.
-     *
-     * We then match them against the pharmacy line items from
-     * this exact invoice.
+     * Match pharmacy invoice items to pending
+     * prescriptions belonging to this patient.
      */
     let prescriptionsUnlocked = 0;
 
     if (pharmacyItems.length > 0) {
-      const { data: pendingPrescriptions, error: prescriptionLookupError } =
-        await supabase
-          .from("prescriptions")
-          .select(
-            "id, drug_name, quantity, price_per_unit, total_price, created_at"
-          )
-          .eq("patient_id", patient.id)
-          .eq("status", "pending_payment")
-          .order("created_at", {
-            ascending: true,
-          });
+      const {
+        data: pendingPrescriptions,
+        error: prescriptionLookupError,
+      } = await supabaseServer
+        .from("prescriptions")
+        .select(
+          "id, drug_name, quantity, price_per_unit, total_price, created_at"
+        )
+        .eq("patient_id", patient.id)
+        .eq("status", "pending_payment")
+        .order("created_at", {
+          ascending: true,
+        });
 
       if (prescriptionLookupError) {
         console.error(
@@ -505,13 +628,6 @@ export async function processBillingPayment(input: {
         };
       }
 
-      /*
-       * Build a working list of pending prescriptions.
-       *
-       * We remove a prescription from this list once it is matched
-       * so two identical medications on the invoice can still be
-       * matched correctly.
-       */
       const unmatchedPrescriptions = [
         ...(pendingPrescriptions ?? []),
       ];
@@ -533,29 +649,34 @@ export async function processBillingPayment(input: {
           invoiceItem.unit_price ?? 0
         );
 
-        const matchIndex = unmatchedPrescriptions.findIndex(
-          (prescription) => {
-            const prescriptionName = String(
-              prescription.drug_name ?? ""
-            )
-              .trim()
-              .toLowerCase();
+        const matchIndex =
+          unmatchedPrescriptions.findIndex(
+            (prescription) => {
+              const prescriptionName = String(
+                prescription.drug_name ?? ""
+              )
+                .trim()
+                .toLowerCase();
 
-            const prescriptionQuantity = Number(
-              prescription.quantity ?? 0
-            );
+              const prescriptionQuantity =
+                Number(
+                  prescription.quantity ?? 0
+                );
 
-            const prescriptionUnitPrice = Number(
-              prescription.price_per_unit ?? 0
-            );
+              const prescriptionUnitPrice =
+                Number(
+                  prescription.price_per_unit ?? 0
+                );
 
-            return (
-              prescriptionName === invoiceName &&
-              prescriptionQuantity === invoiceQuantity &&
-              prescriptionUnitPrice === invoiceUnitPrice
-            );
-          }
-        );
+              return (
+                prescriptionName === invoiceName &&
+                prescriptionQuantity ===
+                  invoiceQuantity &&
+                prescriptionUnitPrice ===
+                  invoiceUnitPrice
+              );
+            }
+          );
 
         if (matchIndex !== -1) {
           const matched =
@@ -573,23 +694,27 @@ export async function processBillingPayment(input: {
       }
 
       /*
-       * Only the prescriptions matched to this invoice are unlocked.
+       * Only prescriptions matched to this invoice
+       * are unlocked.
        */
-      if (prescriptionIdsToUnlock.length > 0) {
-        const { error: prescriptionUpdateError } =
-          await supabase
-            .from("prescriptions")
-            .update({
-              status: "ready_for_dispensing",
-            })
-            .in(
-              "id",
-              prescriptionIdsToUnlock
-            )
-            .eq(
-              "status",
-              "pending_payment"
-            );
+      if (
+        prescriptionIdsToUnlock.length > 0
+      ) {
+        const {
+          error: prescriptionUpdateError,
+        } = await supabaseServer
+          .from("prescriptions")
+          .update({
+            status: "ready_for_dispensing",
+          })
+          .in(
+            "id",
+            prescriptionIdsToUnlock
+          )
+          .eq(
+            "status",
+            "pending_payment"
+          );
 
         if (prescriptionUpdateError) {
           console.error(
@@ -610,10 +735,8 @@ export async function processBillingPayment(input: {
       }
 
       /*
-       * Safety check:
-       *
-       * Every pharmacy item on the invoice should correspond to
-       * a pending prescription.
+       * Every pharmacy item on the invoice should
+       * correspond to a pending prescription.
        */
       if (
         prescriptionsUnlocked !==
@@ -639,25 +762,25 @@ export async function processBillingPayment(input: {
     }
 
     /*
-     * Diagnostics follow the same principle.
-     *
-     * Only diagnostic orders represented on this invoice are
-     * marked completed/unlocked.
+     * Match diagnostic invoice items to ordered
+     * diagnostic requests belonging to this patient.
      */
     let diagnosticsUnlocked = 0;
 
     if (diagnosticItems.length > 0) {
-      const { data: diagnosticOrders, error: diagnosticLookupError } =
-        await supabase
-          .from("diagnostic_orders")
-          .select(
-            "id, name, price, status, created_at"
-          )
-          .eq("patient_id", patient.id)
-          .eq("status", "ordered")
-          .order("created_at", {
-            ascending: true,
-          });
+      const {
+        data: diagnosticOrders,
+        error: diagnosticLookupError,
+      } = await supabaseServer
+        .from("diagnostic_orders")
+        .select(
+          "id, name, price, status, created_at"
+        )
+        .eq("patient_id", patient.id)
+        .eq("status", "ordered")
+        .order("created_at", {
+          ascending: true,
+        });
 
       if (diagnosticLookupError) {
         console.error(
@@ -704,19 +827,15 @@ export async function processBillingPayment(input: {
               );
 
               return (
-                diagnosticName ===
-                  invoiceName &&
-                diagnosticPrice ===
-                  invoicePrice
+                diagnosticName === invoiceName &&
+                diagnosticPrice === invoicePrice
               );
             }
           );
 
         if (matchIndex !== -1) {
           const matched =
-            unmatchedDiagnostics[
-              matchIndex
-            ];
+            unmatchedDiagnostics[matchIndex];
 
           diagnosticIdsToUnlock.push(
             matched.id
@@ -730,24 +849,27 @@ export async function processBillingPayment(input: {
       }
 
       /*
-       * Only diagnostic orders matched to this invoice
-       * are marked completed.
+       * Only diagnostic orders matched to this
+       * invoice are marked completed.
        */
-      if (diagnosticIdsToUnlock.length > 0) {
-        const { error: diagnosticUpdateError } =
-          await supabase
-            .from("diagnostic_orders")
-            .update({
-              status: "completed",
-            })
-            .in(
-              "id",
-              diagnosticIdsToUnlock
-            )
-            .eq(
-              "status",
-              "ordered"
-            );
+      if (
+        diagnosticIdsToUnlock.length > 0
+      ) {
+        const {
+          error: diagnosticUpdateError,
+        } = await supabaseServer
+          .from("diagnostic_orders")
+          .update({
+            status: "completed",
+          })
+          .in(
+            "id",
+            diagnosticIdsToUnlock
+          )
+          .eq(
+            "status",
+            "ordered"
+          );
 
         if (diagnosticUpdateError) {
           console.error(
@@ -768,10 +890,8 @@ export async function processBillingPayment(input: {
       }
 
       /*
-       * Safety check:
-       *
-       * Every diagnostic item on the invoice should correspond
-       * to an actual diagnostic order.
+       * Every diagnostic item on the invoice should
+       * correspond to an actual diagnostic order.
        */
       if (
         diagnosticsUnlocked !==
@@ -782,8 +902,6 @@ export async function processBillingPayment(input: {
           {
             invoiceId: invoice.id,
             diagnosticItems,
-            matchedDiagnosticIds:
-              diagnosticIdsToUnlock,
           }
         );
 
@@ -797,12 +915,14 @@ export async function processBillingPayment(input: {
     }
 
     /*
-     * Now that the invoice contents have been verified and its
-     * clinical items have been identified, mark the invoice paid.
+     * Mark the invoice as paid only after all invoice
+     * items have been verified and processed.
      */
     const paidAt = new Date().toISOString();
 
-    const { error: paymentError } = await supabase
+    const {
+      error: paymentError,
+    } = await supabaseServer
       .from("invoices")
       .update({
         status: "paid",
@@ -821,7 +941,8 @@ export async function processBillingPayment(input: {
 
       return {
         success: false,
-        message: "Failed to complete the payment.",
+        message:
+          "Failed to complete the payment.",
       };
     }
 
@@ -837,7 +958,8 @@ export async function processBillingPayment(input: {
       module: "Billing",
       category: "BILLING",
       action: `Payment completed for invoice ${invoice.invoice_no}`,
-      performedBy: "Cashier",
+      performedBy: staff.name,
+      staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
         invoiceId: invoice.id,
@@ -853,6 +975,8 @@ export async function processBillingPayment(input: {
         paidAt,
         diagnosticsUnlocked,
         prescriptionsUnlocked,
+        processedBy: staff.name,
+        processedByStaffId: staff.id,
       }),
       financialAmount: grandTotal,
     });
@@ -867,11 +991,30 @@ export async function processBillingPayment(input: {
 
     return {
       success: true,
-      message: "Payment completed successfully.",
+      message:
+        "Payment completed successfully.",
       grandTotal,
       changeDue,
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return {
+          success: false,
+          message:
+            "You must be signed in to process billing payments.",
+        };
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return {
+          success: false,
+          message:
+            "You are not authorized to process billing payments.",
+        };
+      }
+    }
+
     console.error(
       "Process billing payment error:",
       error

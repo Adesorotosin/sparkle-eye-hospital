@@ -1,127 +1,274 @@
-// app/api/patients/route.ts
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
-import { registerPatient } from "@/lib/patient-flow";
+
+import { requireRole } from "@/lib/server-auth";
+import { supabaseServer } from "@/lib/supabase-server";
+import { getPatientRecord } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 
-// --- GET: List all registered patients (for the Doctor's Patient Directory, etc.) ---
-export async function GET() {
+const PATIENT_READ_ROLES = [
+  "IT_ADMIN",
+  "OPHTHALMOLOGIST",
+  "DOCTOR",
+  "NURSE",
+  "RECEPTIONIST",
+  "PHARMACIST",
+] as const;
+
+const PATIENT_UPDATE_ROLES = [
+  "IT_ADMIN",
+  "OPHTHALMOLOGIST",
+  "DOCTOR",
+  "NURSE",
+  "RECEPTIONIST",
+] as const;
+
+export async function GET(
+  request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ code: string }>;
+  }
+) {
   try {
-    const { data, error } = await supabase
-      .from("patients")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
+    await requireRole([...PATIENT_READ_ROLES]);
 
-    const patientIds = (data ?? []).map((p) => p.id);
-    const latestComplaintByPatientId = new Map<string, string>();
-    const invoiceByPatientId = new Map<string, { status: string; grandTotal: number }>();
+    const { code } = await params;
 
-    if (patientIds.length > 0) {
-      const { data: vitalsRows, error: vitalsError } = await supabase
-        .from("vitals")
-        .select("patient_id, primary_complaint, recorded_at")
-        .in("patient_id", patientIds)
-        .order("recorded_at", { ascending: false });
-      if (vitalsError) throw vitalsError;
-
-      // Rows are ordered latest-first, so the first time we see a
-      // patient_id is their most recent recorded complaint.
-      for (const row of vitalsRows ?? []) {
-        if (!latestComplaintByPatientId.has(row.patient_id) && row.primary_complaint) {
-          latestComplaintByPatientId.set(row.patient_id, row.primary_complaint);
-        }
-      }
-
-      const { data: invoiceRows, error: invoiceError } = await supabase
-        .from("invoices")
-        .select("patient_id, status, grand_total, created_at")
-        .in("patient_id", patientIds)
-        .neq("status", "cancelled")
-        .order("created_at", { ascending: false });
-      if (invoiceError) throw invoiceError;
-
-      for (const row of invoiceRows ?? []) {
-        if (!invoiceByPatientId.has(row.patient_id)) {
-          invoiceByPatientId.set(row.patient_id, {
-            status: row.status,
-            grandTotal: Number(row.grand_total),
-          });
-        }
-      }
+    if (!code?.trim()) {
+      return NextResponse.json(
+        {
+          error: "Patient code is required.",
+        },
+        { status: 400 }
+      );
     }
 
-    const patients = (data ?? []).map((p) => ({
-      patientId: p.patient_code,
-      fullName: p.full_name,
-      coveragePlan: p.coverage_plan,
-      age: p.age,
-      gender: p.gender,
-      phone: p.phone,
-      allergies: p.allergies,
-      status: p.status,
-      isWalkIn: p.is_walk_in,
-      lastVisitAt: p.last_visit_at,
-      primaryComplaint: latestComplaintByPatientId.get(p.id) || null,
-      invoiceStatus: invoiceByPatientId.get(p.id)?.status || null,
-      invoiceTotal: invoiceByPatientId.get(p.id)?.grandTotal ?? null,
-    }));
+    const patient = await getPatientRecord(
+      code.trim()
+    );
 
-    return NextResponse.json({ patients });
+    if (!patient) {
+      return NextResponse.json(
+        {
+          error: "Patient not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ patient });
   } catch (error) {
-    console.error("Patients list error:", error);
-    return NextResponse.json({ error: "Failed to load patients" }, { status: 500 });
+    console.error(
+      "Fetch patient error:",
+      error
+    );
+
+    if (
+      error instanceof Error &&
+      error.message === "UNAUTHENTICATED"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Authentication required.",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "FORBIDDEN"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You do not have permission to view this patient record.",
+        },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Failed to load patient record.",
+      },
+      { status: 500 }
+    );
   }
 }
 
-// --- POST: Register a new patient (Pharmacy walk-in, Doctor registration, Patient Directory) ---
-export async function POST(request: Request) {
+export async function PATCH(
+  request: Request,
+  {
+    params,
+  }: {
+    params: Promise<{ code: string }>;
+  }
+) {
   try {
-    const body = await request.json();
-    const { fullName, coveragePlan, age, gender, phone, allergies, status, isWalkIn } = body;
+    const staff = await requireRole([
+      ...PATIENT_UPDATE_ROLES,
+    ]);
 
-    if (!fullName) {
-      return NextResponse.json({ error: "'fullName' is required." }, { status: 400 });
+    const { code } = await params;
+
+    if (!code?.trim()) {
+      return NextResponse.json(
+        {
+          error: "Patient code is required.",
+        },
+        { status: 400 }
+      );
     }
 
-    const created = await registerPatient({
+    const body = await request.json();
+
+    const {
       fullName,
-      coveragePlan,
       age,
       gender,
       phone,
-      allergies,
-      status,
+      coveragePlan,
       isWalkIn,
-    });
+      status,
+    } = body;
+
+    const patch: Record<string, unknown> = {};
+
+    if (fullName !== undefined) {
+      if (
+        typeof fullName !== "string" ||
+        !fullName.trim()
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Full name must be a non-empty string.",
+          },
+          { status: 400 }
+        );
+      }
+
+      patch.full_name = fullName.trim();
+    }
+
+    if (age !== undefined) {
+      patch.age = age;
+    }
+
+    if (gender !== undefined) {
+      patch.gender = gender;
+    }
+
+    if (phone !== undefined) {
+      patch.phone = phone;
+    }
+
+    if (coveragePlan !== undefined) {
+      patch.coverage_plan = coveragePlan;
+    }
+
+    if (isWalkIn !== undefined) {
+      patch.is_walk_in = isWalkIn;
+    }
+
+    if (status !== undefined) {
+      patch.status = status;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json(
+        {
+          error: "No fields to update.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const {
+      data,
+      error,
+    } = await supabaseServer
+      .from("patients")
+      .update(patch)
+      .eq("patient_code", code.trim())
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        {
+          error: "Patient not found.",
+        },
+        { status: 404 }
+      );
+    }
 
     await logActivity({
       module: "Admin",
       category: "ADMIN",
-      action: `New patient registered: ${created.full_name} (${created.patient_code})`,
-      performedBy: "Pharmacy",
-      patientId: created.id,
+      action: `Patient record updated: ${data.full_name} (${data.patient_code})`,
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: data.id,
+      details: `Patient record updated by ${staff.name} (${staff.staffId}).`,
     });
+
+    return NextResponse.json({
+      patient: {
+        patientId: data.patient_code,
+        fullName: data.full_name,
+        coveragePlan: data.coverage_plan,
+        age: data.age,
+        gender: data.gender,
+        phone: data.phone,
+        allergies: data.allergies,
+        status: data.status,
+        isWalkIn: data.is_walk_in,
+        lastVisitAt: data.last_visit_at,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "Update patient error:",
+      error
+    );
+
+    if (
+      error instanceof Error &&
+      error.message === "UNAUTHENTICATED"
+    ) {
+      return NextResponse.json(
+        {
+          error: "Authentication required.",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "FORBIDDEN"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You do not have permission to update patient records.",
+        },
+        { status: 403 }
+      );
+    }
 
     return NextResponse.json(
       {
-        patient: {
-          patientId: created.patient_code,
-          fullName: created.full_name,
-          coveragePlan: created.coverage_plan,
-          age: created.age,
-          gender: created.gender,
-          phone: created.phone,
-          allergies: created.allergies,
-          status: created.status,
-          isWalkIn: created.is_walk_in,
-          lastVisitAt: created.last_visit_at,
-        },
+        error: "Failed to update patient.",
       },
-      { status: 201 }
+      { status: 500 }
     );
-  } catch (error) {
-    console.error("Patient registration error:", error);
-    return NextResponse.json({ error: "Failed to register patient" }, { status: 500 });
   }
 }

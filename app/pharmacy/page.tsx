@@ -305,42 +305,46 @@ function PharmacyContent() {
    * --------------------------------------------------
    */
 
-  const validGender = (g?: string): "Female" | "Male" | "Other" => {
-  if (g === "Female" || g === "Male" || g === "Other") return g;
-  return "Female"; // Default fallback matching PatientBannerData
-};
-
-const bannerPatient: PatientBannerData | null =
+  const bannerPatient: PatientBannerData | null =
   patient
     ? {
         id: patient.patientId,
         name: patient.fullName,
         age: patient.age ?? 0,
-        gender: validGender(patient.gender),
-        phone: patient.phone ?? "Not provided",
+        gender: (patient.gender as "Female" | "Male" | "Other") ?? "Other",
+        phone:
+          patient.phone ??
+          "Not provided",
 
         hmo: {
-          name: patient.coveragePlan || "Self-Pay",
-          type: patient.coveragePlan
-            ?.toLowerCase()
-            .includes("hmo")
-            ? "HMO Private"
-            : "Self-Pay",
+          name:
+            patient.coveragePlan ||
+            "Self-Pay",
+
+          type:
+            patient.coveragePlan
+              ?.toLowerCase()
+              .includes("hmo")
+              ? "HMO Private"
+              : "Self-Pay",
+
           status: "Verified",
         },
 
         allergies: patient.allergies
           ? patient.allergies
               .split(",")
-              .map((item: string) => item.trim())
+              .map((item) => item.trim())
               .filter(Boolean)
           : ["None"],
 
         currentStage: "pharmacy",
 
-        assignedDoctor: "Assigned Physician",
+        assignedDoctor:
+          "Assigned Physician",
 
-        visitDate: new Date().toLocaleDateString(),
+        visitDate:
+          new Date().toLocaleDateString(),
       }
     : null;
 

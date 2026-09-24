@@ -1,46 +1,75 @@
 // app/api/notifications/route.ts
+
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/server-auth";
 
 function timeAgo(dateStr?: string | null) {
   if (!dateStr) return "Just now";
+
   const time = new Date(dateStr).getTime();
-  if (isNaN(time)) return "Just now";
+
+  if (Number.isNaN(time)) {
+    return "Just now";
+  }
 
   const diffMs = Date.now() - time;
   const mins = Math.floor(diffMs / 60000);
+
   if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+
+  if (mins < 60) {
+    return `${mins} minute${mins === 1 ? "" : "s"} ago`;
+  }
+
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+
+  if (hours < 24) {
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
   const days = Math.floor(hours / 24);
+
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 // --- GET: Fetch manual notifications + live-derived system alerts ---
 export async function GET() {
   try {
+    await requireRole([
+      "IT_ADMIN",
+      "PHARMACIST",
+      "RECEPTIONIST",
+      "CASHIER",
+      "NURSE",
+      "OPHTHALMOLOGIST",
+      "DOCTOR",
+    ]);
+
     const [
       manualRes,
       stockRes,
       invoiceRes,
       loginRes,
     ] = await Promise.allSettled([
-      supabase
+      supabaseServer
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50),
-      supabase
+
+      supabaseServer
         .from("inventory_items")
         .select("*"),
-      supabase
+
+      supabaseServer
         .from("invoices")
         .select("*, patients:patient_id(full_name)")
         .in("status", ["draft", "pending"])
         .order("created_at", { ascending: false })
         .limit(10),
-      supabase
+
+      supabaseServer
         .from("security_logs")
         .select("*")
         .in("risk_level", ["MEDIUM", "CRITICAL"])
@@ -48,39 +77,88 @@ export async function GET() {
         .limit(10),
     ]);
 
-    // Extract query results safely without breaking the whole feed if one table fails
-    const manual = manualRes.status === "fulfilled" && !manualRes.value.error ? manualRes.value.data : [];
-    const lowStock = stockRes.status === "fulfilled" && !stockRes.value.error ? stockRes.value.data : [];
-    const unpaidInvoices = invoiceRes.status === "fulfilled" && !invoiceRes.value.error ? invoiceRes.value.data : [];
-    const riskyLogins = loginRes.status === "fulfilled" && !loginRes.value.error ? loginRes.value.data : [];
+    const manual =
+      manualRes.status === "fulfilled" && !manualRes.value.error
+        ? manualRes.value.data
+        : [];
 
-    // Log individual table query errors for debugging without crashing the endpoint
-    if (manualRes.status === "fulfilled" && manualRes.value.error) {
-      console.warn("Notifications table query warning:", manualRes.value.error.message);
+    const lowStock =
+      stockRes.status === "fulfilled" && !stockRes.value.error
+        ? stockRes.value.data
+        : [];
+
+    const unpaidInvoices =
+      invoiceRes.status === "fulfilled" && !invoiceRes.value.error
+        ? invoiceRes.value.data
+        : [];
+
+    const riskyLogins =
+      loginRes.status === "fulfilled" && !loginRes.value.error
+        ? loginRes.value.data
+        : [];
+
+    if (
+      manualRes.status === "fulfilled" &&
+      manualRes.value.error
+    ) {
+      console.warn(
+        "Notifications table query warning:",
+        manualRes.value.error.message
+      );
     }
-    if (stockRes.status === "fulfilled" && stockRes.value.error) {
-      console.warn("Inventory items table query warning:", stockRes.value.error.message);
+
+    if (
+      stockRes.status === "fulfilled" &&
+      stockRes.value.error
+    ) {
+      console.warn(
+        "Inventory items table query warning:",
+        stockRes.value.error.message
+      );
     }
-    if (invoiceRes.status === "fulfilled" && invoiceRes.value.error) {
-      console.warn("Invoices table query warning:", invoiceRes.value.error.message);
+
+    if (
+      invoiceRes.status === "fulfilled" &&
+      invoiceRes.value.error
+    ) {
+      console.warn(
+        "Invoices table query warning:",
+        invoiceRes.value.error.message
+      );
     }
-    if (loginRes.status === "fulfilled" && loginRes.value.error) {
-      console.warn("Security logs table query warning:", loginRes.value.error.message);
+
+    if (
+      loginRes.status === "fulfilled" &&
+      loginRes.value.error
+    ) {
+      console.warn(
+        "Security logs table query warning:",
+        loginRes.value.error.message
+      );
     }
 
     const derived: any[] = [];
 
     // 1. Low stock items
     (lowStock ?? [])
-      .filter((item) => Number(item.stock) <= Number(item.reorder_level))
+      .filter(
+        (item) =>
+          Number(item.stock) <=
+          Number(item.reorder_level)
+      )
       .forEach((item) => {
         derived.push({
           id: `stock-${item.id}`,
           type: "Finance",
           title: `Low Stock: ${item.name}`,
           message: `Only ${item.stock} left in stock (reorder level: ${item.reorder_level}). SKU ${item.sku ?? "N/A"}.`,
-          timestamp: timeAgo(item.updated_at ?? item.created_at),
-          target: item.domain === "pharmacy" ? "Pharmacy" : "Inventory Staff",
+          timestamp: timeAgo(
+            item.updated_at ?? item.created_at
+          ),
+          target:
+            item.domain === "pharmacy"
+              ? "Pharmacy"
+              : "Inventory Staff",
           category: "Security",
         });
       });
@@ -91,7 +169,9 @@ export async function GET() {
         id: `invoice-${inv.id}`,
         type: "Finance",
         title: `Unpaid Invoice: ${inv.invoice_no ?? inv.id}`,
-        message: `₦${Number(inv.grand_total ?? 0).toLocaleString()} outstanding for ${
+        message: `₦${Number(
+          inv.grand_total ?? 0
+        ).toLocaleString()} outstanding for ${
           inv.patients?.full_name ?? "a patient"
         }.`,
         timestamp: timeAgo(inv.created_at),
@@ -106,7 +186,9 @@ export async function GET() {
         id: `login-${log.id}`,
         type: "Emergency",
         title: log.action ?? "Security Event",
-        message: `Attempted username "${log.username_attempted ?? "Unknown"}" from ${
+        message: `Attempted username "${
+          log.username_attempted ?? "Unknown"
+        }" from ${
           log.ip_address ?? "unknown IP"
         }.`,
         timestamp: timeAgo(log.created_at),
@@ -115,7 +197,7 @@ export async function GET() {
       });
     });
 
-    // 4. Broadcasted/Manual notifications
+    // 4. Manual notifications
     const manualMapped = (manual ?? []).map((n) => ({
       id: n.id,
       type: n.type,
@@ -128,13 +210,46 @@ export async function GET() {
       _createdAt: n.created_at,
     }));
 
-    const allNotifications = [...manualMapped, ...derived];
+    const allNotifications = [
+      ...manualMapped,
+      ...derived,
+    ];
 
-    return NextResponse.json({ notifications: allNotifications }, { status: 200 });
-  } catch (error: any) {
-    console.error("Notifications error:", error);
     return NextResponse.json(
-      { error: "Failed to load notifications", details: error?.message || error },
+      {
+        notifications: allNotifications,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (message === "FORBIDDEN") {
+      return NextResponse.json(
+        {
+          error:
+            "You do not have permission to view notifications.",
+        },
+        { status: 403 }
+      );
+    }
+
+    console.error("Notifications error:", error);
+
+    return NextResponse.json(
+      {
+        error: "Failed to load notifications",
+      },
       { status: 500 }
     );
   }
@@ -143,32 +258,112 @@ export async function GET() {
 // --- POST: Broadcast a manual notification ---
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { type, title, message, category, target, triggeredBy } = body;
+    const staff = await requireRole([
+      "IT_ADMIN",
+    ]);
 
-    if (!type || !title || !message || !category) {
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        { error: "'type', 'title', 'message', and 'category' are required." },
+        {
+          error: "Invalid JSON request body.",
+        },
         { status: 400 }
       );
     }
 
-    const { data, error } = await supabase
-      .from("notifications")
-      .insert({
-        type,
-        title,
-        message,
-        category,
-        target: target || null,
-        triggered_by: triggeredBy || null,
-      })
-      .select("*")
-      .single();
+    if (
+      typeof body !== "object" ||
+      body === null
+    ) {
+      return NextResponse.json(
+        {
+          error: "Request body must be a JSON object.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const {
+      type,
+      title,
+      message,
+      category,
+      target,
+    } = body as {
+      type?: unknown;
+      title?: unknown;
+      message?: unknown;
+      category?: unknown;
+      target?: unknown;
+    };
+
+    if (
+      typeof type !== "string" ||
+      !type.trim() ||
+      typeof title !== "string" ||
+      !title.trim() ||
+      typeof message !== "string" ||
+      !message.trim() ||
+      typeof category !== "string" ||
+      !category.trim()
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "'type', 'title', 'message', and 'category' are required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      target !== undefined &&
+      target !== null &&
+      typeof target !== "string"
+    ) {
+      return NextResponse.json(
+        {
+          error: "'target' must be a string.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } =
+      await supabaseServer
+        .from("notifications")
+        .insert({
+          type: type.trim(),
+          title: title.trim(),
+          message: message.trim(),
+          category: category.trim(),
+          target:
+            typeof target === "string" &&
+            target.trim()
+              ? target.trim()
+              : null,
+          triggered_by: staff.name,
+        })
+        .select("*")
+        .single();
 
     if (error) {
-      console.error("Supabase notification insert error:", error);
-      throw error;
+      console.error(
+        "Supabase notification insert error:",
+        error
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Failed to broadcast notification.",
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json(
@@ -186,10 +381,39 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Notification broadcast error:", error);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+        },
+        { status: 401 }
+      );
+    }
+
+    if (message === "FORBIDDEN") {
+      return NextResponse.json(
+        {
+          error:
+            "Only IT administrators can broadcast notifications.",
+        },
+        { status: 403 }
+      );
+    }
+
+    console.error(
+      "Notification broadcast error:",
+      error
+    );
+
     return NextResponse.json(
-      { error: "Failed to broadcast notification", details: error?.message || error },
+      {
+        error:
+          "Failed to broadcast notification.",
+      },
       { status: 500 }
     );
   }

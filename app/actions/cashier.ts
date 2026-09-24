@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 
 export interface CashierQueueItem {
   id: string;
@@ -64,7 +64,7 @@ export async function getCashierDashboard(): Promise<{
     const {
       data: invoices,
       error: invoiceError,
-    } = await supabase
+    } = await supabaseServer
       .from("invoices")
       .select("*")
       .neq("status", "cancelled")
@@ -147,7 +147,7 @@ export async function getCashierDashboard(): Promise<{
       const {
         data: patientRows,
         error: patientError,
-      } = await supabase
+      } = await supabaseServer
         .from("patients")
         .select(
           "id, patient_code, full_name, coverage_plan"
@@ -273,7 +273,7 @@ export async function getCashierDashboard(): Promise<{
     const {
       data: paidToday,
       error: revenueError,
-    } = await supabase
+    } = await supabaseServer
       .from("invoices")
       .select(
         "grand_total"

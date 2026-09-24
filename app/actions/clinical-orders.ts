@@ -1,9 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
-import { getOrCreateDraftInvoice, recalcInvoice } from "@/lib/patient-flow";
+import { supabaseServer } from "@/lib/supabase-server";
+import {
+  getOrCreateDraftInvoice,
+  recalcInvoice,
+} from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
+import { requireRole } from "@/lib/server-auth";
 
 export type DiagnosticOrderInput = {
   patientCode: string;
@@ -33,7 +37,7 @@ async function findPatient(patientCode: string) {
     };
   }
 
-  const { data: patient, error } = await supabase
+  const { data: patient, error } = await supabaseServer
     .from("patients")
     .select("id, patient_code, full_name")
     .eq("patient_code", patientCode.trim())
@@ -69,6 +73,12 @@ export async function createDiagnosticOrder(
   input: DiagnosticOrderInput
 ): Promise<ClinicalOrderResponse> {
   try {
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "OPHTHALMOLOGIST",
+      "DOCTOR",
+    ]);
+
     const name = input.name?.trim();
     const price = Number(input.price);
 
@@ -98,16 +108,17 @@ export async function createDiagnosticOrder(
     /*
      * Create the clinical diagnostic order.
      */
-    const { data: diagnostic, error: diagnosticError } = await supabase
-      .from("diagnostic_orders")
-      .insert({
-        patient_id: patient.id,
-        name,
-        price,
-        status: "ordered",
-      })
-      .select("id")
-      .single();
+    const { data: diagnostic, error: diagnosticError } =
+      await supabaseServer
+        .from("diagnostic_orders")
+        .insert({
+          patient_id: patient.id,
+          name,
+          price,
+          status: "ordered",
+        })
+        .select("id")
+        .single();
 
     if (diagnosticError) {
       console.error(
@@ -129,7 +140,7 @@ export async function createDiagnosticOrder(
     /*
      * Add the diagnostic to the invoice.
      */
-    const { error: itemError } = await supabase
+    const { error: itemError } = await supabaseServer
       .from("invoice_items")
       .insert({
         invoice_id: invoice.id,
@@ -146,10 +157,6 @@ export async function createDiagnosticOrder(
         itemError
       );
 
-      /*
-       * The diagnostic was already created. Do not pretend the entire
-       * operation succeeded because billing failed.
-       */
       return {
         success: false,
         message:
@@ -161,13 +168,15 @@ export async function createDiagnosticOrder(
     await recalcInvoice(invoice.id);
 
     /*
-     * Record the clinical activity.
+     * Record the clinical activity using the actual
+     * authenticated staff member.
      */
     await logActivity({
       module: "Diagnostics",
       category: "CLINICAL",
       action: `Diagnostic order created: ${name}`,
-      performedBy: "Attending Physician",
+      performedBy: staff.name,
+      staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
         diagnosticOrderId: diagnostic.id,
@@ -190,6 +199,23 @@ export async function createDiagnosticOrder(
       id: diagnostic.id,
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return {
+          success: false,
+          message: "You must be signed in to perform this action.",
+        };
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return {
+          success: false,
+          message:
+            "You are not authorized to create diagnostic orders.",
+        };
+      }
+    }
+
     console.error("Create diagnostic order error:", error);
 
     return {
@@ -208,6 +234,12 @@ export async function createPrescription(
   input: PrescriptionInput
 ): Promise<ClinicalOrderResponse> {
   try {
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "OPHTHALMOLOGIST",
+      "DOCTOR",
+    ]);
+
     const drugName = input.drugName?.trim();
     const dosage = input.dosage?.trim();
 
@@ -257,7 +289,7 @@ export async function createPrescription(
      * Create the actual prescription.
      */
     const { data: prescription, error: prescriptionError } =
-      await supabase
+      await supabaseServer
         .from("prescriptions")
         .insert({
           patient_id: patient.id,
@@ -291,7 +323,7 @@ export async function createPrescription(
     /*
      * Add the medication to billing.
      */
-    const { error: itemError } = await supabase
+    const { error: itemError } = await supabaseServer
       .from("invoice_items")
       .insert({
         invoice_id: invoice.id,
@@ -319,13 +351,15 @@ export async function createPrescription(
     await recalcInvoice(invoice.id);
 
     /*
-     * Record the pharmacy activity.
+     * Record the pharmacy activity using the actual
+     * authenticated staff member.
      */
     await logActivity({
       module: "Pharmacy",
       category: "CLINICAL",
       action: `Prescription created: ${drugName}`,
-      performedBy: "Attending Physician",
+      performedBy: staff.name,
+      staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
         prescriptionId: prescription.id,
@@ -352,6 +386,23 @@ export async function createPrescription(
       id: prescription.id,
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return {
+          success: false,
+          message: "You must be signed in to perform this action.",
+        };
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return {
+          success: false,
+          message:
+            "You are not authorized to create prescriptions.",
+        };
+      }
+    }
+
     console.error("Create prescription error:", error);
 
     return {

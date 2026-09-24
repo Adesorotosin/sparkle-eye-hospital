@@ -1,33 +1,47 @@
 // lib/auth.ts
 
 export const ROLE_REDIRECT_MAP: Record<string, string> = {
-  ADMIN: "/admin",
-  SUPER_ADMIN: "/admin",
+  IT_ADMIN: "/admin",
+  OPHTHALMOLOGIST: "/doctor",
   DOCTOR: "/doctor",
   NURSE: "/nurse",
-  // Pharmacy roles
-  PHARMACY: "/pharmacy",
   PHARMACIST: "/pharmacy",
-  // Cashier & Billing roles
   CASHIER: "/cashier",
-  BILLING: "/billing",
-  // Additional hospital departments
   RECEPTIONIST: "/receptionist",
-  LAB: "/laboratory",
-  LABORATORY: "/laboratory",
 };
 
-export async function authenticateStaff(username: string, password: string) {
+export type UserRole =
+  | "IT_ADMIN"
+  | "OPHTHALMOLOGIST"
+  | "DOCTOR"
+  | "PHARMACIST"
+  | "NURSE"
+  | "CASHIER"
+  | "RECEPTIONIST";
+
+export async function authenticateStaff(
+  username: string,
+  password: string,
+  rememberWorkstation = false
+) {
   const response = await fetch("/api/auth/login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: username, password }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username,
+      password,
+      rememberWorkstation,
+    }),
   });
 
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Authentication failed");
+    throw new Error(
+      data.error || "Authentication failed"
+    );
   }
 
   return data.user;

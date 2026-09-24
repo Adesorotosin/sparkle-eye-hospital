@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
-import { getPatientById, PatientRecord } from "@/lib/patients";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
 import {
   createDiagnosticOrder,
@@ -20,6 +19,85 @@ type Refraction = {
   sphere: string;
   cylinder: string;
   axis: string;
+};
+
+type PatientVitals = {
+  visualAcuityOD: string;
+  visualAcuityOS: string;
+  visualAcuityOU?: string;
+  withCorrection?: boolean;
+
+  iop?: number;
+  iopOD?: number;
+  iopOS?: number;
+  iopInstrument?: string;
+
+  bpSystolic?: number;
+  bpDiastolic?: number;
+  pulse?: number;
+  temperature?: number;
+  spo2?: number;
+
+  primaryComplaint: string;
+  symptoms?: string[];
+  severity?: "Mild" | "Moderate" | "Severe";
+  durationText?: string;
+
+  recordedAt: string;
+};
+
+type PatientEncounter = {
+  id: string;
+  slitLampOD?: string;
+  slitLampOS?: string;
+  refractionOD?: Refraction;
+  refractionOS?: Refraction;
+  diagnosis?: string;
+  status: "draft" | "completed";
+  createdAt: string;
+};
+
+type PatientRecord = {
+  id: string;
+  name: string;
+  age: number;
+  gender: string;
+  mrn: string;
+  allergies: string[];
+
+  vitals?: PatientVitals;
+
+  history: {
+    date: string;
+    title: string;
+    details: string;
+  }[];
+
+  imaging: {
+    id: string;
+    type: string;
+    date: string;
+    color: string;
+    path: string;
+  }[];
+
+  slitLamp: {
+    od: string;
+    os: string;
+  };
+
+  refraction: {
+    od: Refraction;
+    os: Refraction;
+  };
+
+  previousRefraction?: {
+    date: string;
+    od: Refraction;
+    os: Refraction;
+  };
+
+  diagnosis: string;
 };
 
 type DiagnosticTest = {
@@ -56,6 +134,169 @@ const SURGERY_OPTIONS = [
   "Pterygium Excision with Graft",
   "Intravitreal Injection",
 ];
+
+function formatEncounterDate(value?: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function safeRefraction(
+  value?: Partial<Refraction> | null
+): Refraction {
+  return {
+    sphere: value?.sphere ?? "",
+    cylinder: value?.cylinder ?? "",
+    axis: value?.axis ?? "",
+  };
+}
+
+function mapApiPatientToRecord(apiPatient: any): PatientRecord {
+  const encounters = Array.isArray(apiPatient?.encounters)
+    ? apiPatient.encounters
+    : [];
+
+  const latestEncounter = encounters[0];
+  const previousEncounter = encounters[1];
+
+  const currentSlitLamp = {
+    od: latestEncounter?.slitLampOD ?? "",
+    os: latestEncounter?.slitLampOS ?? "",
+  };
+
+  const currentRefraction = {
+    od: safeRefraction(latestEncounter?.refractionOD),
+    os: safeRefraction(latestEncounter?.refractionOS),
+  };
+
+  const previousRefraction = previousEncounter
+    ? {
+        date: formatEncounterDate(previousEncounter.createdAt),
+        od: safeRefraction(previousEncounter.refractionOD),
+        os: safeRefraction(previousEncounter.refractionOS),
+      }
+    : undefined;
+
+  const history = encounters.map((encounter: PatientEncounter) => {
+    const details = [
+      encounter.diagnosis
+        ? `Diagnosis: ${encounter.diagnosis}`
+        : "No diagnosis recorded.",
+
+      encounter.slitLampOD || encounter.slitLampOS
+        ? "Slit lamp findings recorded."
+        : null,
+
+      encounter.refractionOD || encounter.refractionOS
+        ? "Refraction recorded."
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return {
+      date: formatEncounterDate(encounter.createdAt),
+      title:
+        encounter.status === "completed"
+          ? "Completed Consultation"
+          : "Consultation Draft",
+      details: details || "Consultation record saved.",
+    };
+  });
+
+  if (apiPatient?.vitals) {
+    const vitals = apiPatient.vitals as PatientVitals;
+
+    const triageDetails = [
+      vitals.primaryComplaint
+        ? `Complaint: ${vitals.primaryComplaint}`
+        : null,
+
+      `VA: OD ${vitals.visualAcuityOD || "—"}, OS ${
+        vitals.visualAcuityOS || "—"
+      }`,
+
+      vitals.iopOD !== undefined || vitals.iopOS !== undefined
+        ? `IOP: OD ${vitals.iopOD ?? "—"} / OS ${
+            vitals.iopOS ?? "—"
+          } mmHg`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" • ");
+
+    history.push({
+      date: formatEncounterDate(vitals.recordedAt),
+      title: "Triage & Vitals",
+      details: triageDetails || "Triage information recorded.",
+    });
+  }
+
+history.sort(
+  (
+    a: {
+      date: string;
+      title: string;
+      details: string;
+    },
+    b: {
+      date: string;
+      title: string;
+      details: string;
+    }
+  ) => {
+    const dateA = new Date(
+      a.date.split("/").reverse().join("-")
+    ).getTime();
+
+    const dateB = new Date(
+      b.date.split("/").reverse().join("-")
+    ).getTime();
+
+    if (Number.isNaN(dateA) || Number.isNaN(dateB)) {
+      return 0;
+    }
+
+    return dateB - dateA;
+  }
+);
+
+  return {
+    id: apiPatient.patientId,
+    name: apiPatient.fullName ?? "",
+    age: apiPatient.age ?? 0,
+    gender: apiPatient.gender ?? "",
+    mrn: apiPatient.patientId,
+    allergies:
+      typeof apiPatient.allergies === "string"
+        ? apiPatient.allergies
+            .split(",")
+            .map((item: string) => item.trim())
+            .filter(Boolean)
+        : Array.isArray(apiPatient.allergies)
+          ? apiPatient.allergies
+          : [],
+    vitals: apiPatient.vitals,
+    history,
+    imaging: [],
+    slitLamp: currentSlitLamp,
+    refraction: currentRefraction,
+    previousRefraction,
+    diagnosis: latestEncounter?.diagnosis ?? "",
+  };
+}
 
 function TriageSummary({
   vitals,
@@ -336,54 +577,92 @@ export default function OphthalmologyConsultation() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadPatientData() {
-      if (!id) {
-        setLoading(false);
-        return;
+ async function loadPatientData() {
+  if (!id) {
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `/api/patients/${encodeURIComponent(id)}`,
+      {
+        method: "GET",
+        cache: "no-store",
       }
+    );
 
-      try {
-        const data = await getPatientById(id);
-
-        if (cancelled) {
-          return;
-        }
-
-        if (data) {
-          setPatient(data);
-
-          setSlitLampOD(data.slitLamp?.od ?? "");
-          setSlitLampOS(data.slitLamp?.os ?? "");
-
-          setRefractionOD({
-            sphere: data.refraction?.od?.sphere ?? "",
-            cylinder: data.refraction?.od?.cylinder ?? "",
-            axis: data.refraction?.od?.axis ?? "",
-          });
-
-          setRefractionOS({
-            sphere: data.refraction?.os?.sphere ?? "",
-            cylinder: data.refraction?.os?.cylinder ?? "",
-            axis: data.refraction?.os?.axis ?? "",
-          });
-
-          setDiagnosis(data.diagnosis ?? "");
-        }
-      } catch (error) {
-        console.error("Failed to load patient record:", error);
-
-        if (!cancelled) {
-          showFeedback(
-            "Unable to load this patient record. Please try again.",
-            "error"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
+    if (cancelled) {
+      return;
     }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error(
+          "Your session has expired. Please sign in again."
+        );
+      }
+
+      if (response.status === 403) {
+        throw new Error(
+          "You are not authorized to view this patient."
+        );
+      }
+
+      if (response.status === 404) {
+        throw new Error("Patient record not found.");
+      }
+
+      throw new Error("Unable to load this patient record.");
+    }
+
+    const result = await response.json();
+
+    if (!result?.patient) {
+      throw new Error("Patient record not found.");
+    }
+
+    const data = mapApiPatientToRecord(result.patient);
+
+    if (cancelled) {
+      return;
+    }
+
+    setPatient(data);
+
+    setSlitLampOD(data.slitLamp?.od ?? "");
+    setSlitLampOS(data.slitLamp?.os ?? "");
+
+    setRefractionOD({
+      sphere: data.refraction?.od?.sphere ?? "",
+      cylinder: data.refraction?.od?.cylinder ?? "",
+      axis: data.refraction?.od?.axis ?? "",
+    });
+
+    setRefractionOS({
+      sphere: data.refraction?.os?.sphere ?? "",
+      cylinder: data.refraction?.os?.cylinder ?? "",
+      axis: data.refraction?.os?.axis ?? "",
+    });
+
+    setDiagnosis(data.diagnosis ?? "");
+  } catch (error) {
+    console.error("Failed to load patient record:", error);
+
+    if (!cancelled) {
+      showFeedback(
+        error instanceof Error
+          ? error.message
+          : "Unable to load this patient record. Please try again.",
+        "error"
+      );
+    }
+  } finally {
+    if (!cancelled) {
+      setLoading(false);
+    }
+  }
+}
 
     loadPatientData();
 

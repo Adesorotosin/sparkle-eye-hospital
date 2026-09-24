@@ -1,77 +1,190 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// 1. Defined permissions for each protected route prefix
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  "/admin": ["ADMIN", "IT_ADMIN"],
-  "/audit": ["ADMIN", "IT_ADMIN"],
-  "/emr": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
-  "/doctor": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
-  "/consultation": ["OPHTHALMOLOGIST", "DOCTOR", "NURSE", "ADMIN", "IT_ADMIN"],
-  "/pharmacy": ["PHARMACY", "PHARMACIST", "PHARMACY_STAFF", "NURSE", "ADMIN", "IT_ADMIN", "DOCTOR"],
-  "/cashier": ["CASHIER", "ADMIN", "IT_ADMIN"],
-  "/billing": ["CASHIER", "ADMIN", "IT_ADMIN", "NURSE", "DOCTOR"],
-  "/nurse": ["NURSE", "ADMIN", "IT_ADMIN", "DOCTOR"],
+  "/admin": ["IT_ADMIN"],
+  "/audit": ["IT_ADMIN"],
+
+  "/emr": [
+    "IT_ADMIN",
+    "OPHTHALMOLOGIST",
+    "DOCTOR",
+    "NURSE",
+  ],
+
+  "/doctor": [
+    "IT_ADMIN",
+    "OPHTHALMOLOGIST",
+    "DOCTOR",
+    "NURSE",
+  ],
+
+  "/consultation": [
+    "IT_ADMIN",
+    "OPHTHALMOLOGIST",
+    "DOCTOR",
+    "NURSE",
+  ],
+
+  "/pharmacy": [
+    "IT_ADMIN",
+    "PHARMACIST",
+    "NURSE",
+    "DOCTOR",
+  ],
+
+  "/cashier": [
+    "IT_ADMIN",
+    "CASHIER",
+  ],
+
+  "/billing": [
+    "IT_ADMIN",
+    "CASHIER",
+    "NURSE",
+    "DOCTOR",
+  ],
+
+  "/nurse": [
+    "IT_ADMIN",
+    "NURSE",
+    "DOCTOR",
+  ],
+
+  "/receptionist": [
+    "IT_ADMIN",
+    "RECEPTIONIST",
+  ],
+
+  "/laboratory": [
+    "IT_ADMIN",
+    "DOCTOR",
+    "OPHTHALMOLOGIST",
+    "NURSE",
+  ],
 };
 
-// 2. Default route landing pages based on user roles (expanded aliases)
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
-  ADMIN: "/admin",
   IT_ADMIN: "/admin",
-  DOCTOR: "/doctor",
   OPHTHALMOLOGIST: "/doctor",
+  DOCTOR: "/doctor",
   NURSE: "/nurse",
-  PHARMACY: "/pharmacy",
   PHARMACIST: "/pharmacy",
-  PHARMACY_STAFF: "/pharmacy",
   CASHIER: "/cashier",
-  BILLING: "/billing",
+  RECEPTIONIST: "/receptionist",
 };
 
-export function middleware(request: NextRequest) {
+function normalizeRole(role: unknown) {
+  return String(role ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function isProtectedPage(pathname: string) {
+  return Object.keys(ROLE_PERMISSIONS).some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(`${route}/`)
+  );
+}
+
+async function getAuthenticatedUser(request: NextRequest) {
+  const cookie = request.headers.get("cookie");
+
+  if (!cookie) {
+    return null;
+  }
+
+  const url = new URL("/api/auth/me", request.url);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        cookie,
+      },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data?.success || !data?.user) {
+      return null;
+    }
+
+    return data.user;
+  } catch {
+    return null;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Bypass authentication check for API routes, Next.js internals, and static assets
+  // API routes perform their own authentication/authorization.
+  if (pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
+  // Allow Next.js internals and static assets.
   if (
-    pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // Allow unrestricted access to the root landing page (app/page.tsx)
+  // Login page is public.
   if (pathname === "/") {
     return NextResponse.next();
   }
 
-  // Normalize role string (strip spaces, dashes, convert to UPPERCASE)
-  const rawRole = request.cookies.get("user_role")?.value || "";
-  const userRole = rawRole.toUpperCase().trim().replace("-", "_");
-  const isLoggedIn = request.cookies.get("is_logged_in")?.value === "true";
-
-  // If user is NOT logged in and trying to access a protected page, send to login (`/`)
-  if (!isLoggedIn) {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Only protected application pages need authentication.
+  if (!isProtectedPage(pathname)) {
+    return NextResponse.next();
   }
 
-  // Determine user's correct home route from map
-  const userHomeRoute = ROLE_DASHBOARD_MAP[userRole];
+  // The database-backed session is now the source of truth.
+  const user = await getAuthenticatedUser(request);
 
-  // Role-based access control check
-  const protectedRoute = Object.keys(ROLE_PERMISSIONS).find((route) =>
-    pathname.startsWith(route)
+  if (!user) {
+    const loginUrl = new URL("/", request.url);
+
+    // Preserve the page the user originally requested.
+    loginUrl.searchParams.set(
+      "redirect",
+      pathname
+    );
+
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const userRole = normalizeRole(user.role);
+
+  const protectedRoute = Object.keys(
+    ROLE_PERMISSIONS
+  ).find(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(`${route}/`)
   );
 
   if (protectedRoute) {
-    const allowedRoles = ROLE_PERMISSIONS[protectedRoute];
+    const allowedRoles =
+      ROLE_PERMISSIONS[protectedRoute];
 
-    // Check if current user's role is permitted for this route
-    if (!userRole || !allowedRoles.includes(userRole)) {
-      // Redirect to their assigned dashboard if authorized elsewhere, or login root if unmapped
+    if (!allowedRoles.includes(userRole)) {
       const fallbackTarget =
-        userHomeRoute && userHomeRoute !== pathname ? userHomeRoute : "/";
-      return NextResponse.redirect(new URL(fallbackTarget, request.url));
+        ROLE_DASHBOARD_MAP[userRole] || "/";
+
+      return NextResponse.redirect(
+        new URL(fallbackTarget, request.url)
+      );
     }
   }
 
@@ -90,5 +203,7 @@ export const config = {
     "/cashier/:path*",
     "/billing/:path*",
     "/nurse/:path*",
+    "/receptionist/:path*",
+    "/laboratory/:path*",
   ],
 };

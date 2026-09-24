@@ -1,8 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
+import { requireRole } from "@/lib/server-auth";
 
 export interface ConsultationFormData {
   patientId: string;
@@ -37,6 +38,16 @@ export async function saveConsultationEncounter(
   formData: ConsultationFormData
 ): Promise<ConsultationResponse> {
   try {
+    /*
+     * Only authenticated clinical staff may create consultation
+     * encounters.
+     */
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "OPHTHALMOLOGIST",
+      "DOCTOR",
+    ]);
+
     if (!formData.patientId?.trim()) {
       return {
         success: false,
@@ -52,10 +63,10 @@ export async function saveConsultationEncounter(
      *
      * SPK-30892
      */
-    const { data: patient, error: patientError } = await supabase
+    const { data: patient, error: patientError } = await supabaseServer
       .from("patients")
       .select("id, patient_code, full_name")
-      .eq("patient_code", formData.patientId)
+      .eq("patient_code", formData.patientId.trim())
       .maybeSingle();
 
     if (patientError) {
@@ -83,10 +94,14 @@ export async function saveConsultationEncounter(
     /*
      * Basic validation before writing clinical information.
      */
-    if (formData.status === "completed" && !formData.diagnosis.trim()) {
+    if (
+      formData.status === "completed" &&
+      !formData.diagnosis.trim()
+    ) {
       return {
         success: false,
-        message: "A diagnosis is required before completing the encounter.",
+        message:
+          "A diagnosis is required before completing the encounter.",
       };
     }
 
@@ -96,32 +111,33 @@ export async function saveConsultationEncounter(
      * We intentionally INSERT instead of UPDATE because an encounter
      * represents a clinical event/history item.
      */
-    const { data: encounter, error: encounterError } = await supabase
-      .from("encounters")
-      .insert({
-        patient_id: patient.id,
+    const { data: encounter, error: encounterError } =
+      await supabaseServer
+        .from("encounters")
+        .insert({
+          patient_id: patient.id,
 
-        slit_lamp_od: formData.slitLampOD.trim() || null,
-        slit_lamp_os: formData.slitLampOS.trim() || null,
+          slit_lamp_od: formData.slitLampOD.trim() || null,
+          slit_lamp_os: formData.slitLampOS.trim() || null,
 
-        refraction_od: {
-          sphere: formData.refractionOD.sphere.trim(),
-          cylinder: formData.refractionOD.cylinder.trim(),
-          axis: formData.refractionOD.axis.trim(),
-        },
+          refraction_od: {
+            sphere: formData.refractionOD.sphere.trim(),
+            cylinder: formData.refractionOD.cylinder.trim(),
+            axis: formData.refractionOD.axis.trim(),
+          },
 
-        refraction_os: {
-          sphere: formData.refractionOS.sphere.trim(),
-          cylinder: formData.refractionOS.cylinder.trim(),
-          axis: formData.refractionOS.axis.trim(),
-        },
+          refraction_os: {
+            sphere: formData.refractionOS.sphere.trim(),
+            cylinder: formData.refractionOS.cylinder.trim(),
+            axis: formData.refractionOS.axis.trim(),
+          },
 
-        diagnosis: formData.diagnosis.trim() || null,
+          diagnosis: formData.diagnosis.trim() || null,
 
-        status: formData.status,
-      })
-      .select("id")
-      .single();
+          status: formData.status,
+        })
+        .select("id")
+        .single();
 
     if (encounterError) {
       console.error("Encounter save failed:", encounterError);
@@ -135,7 +151,7 @@ export async function saveConsultationEncounter(
     /*
      * Keep the patient's workflow status synchronized.
      */
-    const { error: patientUpdateError } = await supabase
+    const { error: patientUpdateError } = await supabaseServer
       .from("patients")
       .update({
         status:
@@ -158,7 +174,8 @@ export async function saveConsultationEncounter(
     }
 
     /*
-     * Write an auditable clinical activity entry.
+     * Write an auditable clinical activity entry using the
+     * authenticated staff member instead of a hardcoded identity.
      */
     await logActivity({
       module: "Consultation",
@@ -173,7 +190,8 @@ export async function saveConsultationEncounter(
             }`
           : "Consultation saved as draft.",
 
-      performedBy: "Attending Physician",
+      performedBy: staff.name,
+      staffId: staff.id,
 
       patientId: patient.id,
 
@@ -209,11 +227,29 @@ export async function saveConsultationEncounter(
       encounterId: encounter.id,
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return {
+          success: false,
+          message: "You must be signed in to save a consultation.",
+        };
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return {
+          success: false,
+          message:
+            "You are not authorized to save consultation records.",
+        };
+      }
+    }
+
     console.error("Failed to save consultation:", error);
 
     return {
       success: false,
-      message: "An unexpected error occurred while saving the consultation.",
+      message:
+        "An unexpected error occurred while saving the consultation.",
     };
   }
 }

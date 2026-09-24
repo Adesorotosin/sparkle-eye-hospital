@@ -245,3 +245,39 @@ alter table notifications enable row level security;
 -- No policies are created, which means: with RLS enabled and the anon key,
 -- ALL access is denied by default. Only the service role key (used only
 -- in server-side API routes, never shipped to the browser) can read/write.
+-- ============================================================
+-- AUTHENTICATION SESSIONS
+-- Server-side sessions for hospital staff
+-- ============================================================
+
+create table auth_sessions (
+  id uuid primary key default gen_random_uuid(),
+
+  staff_id uuid not null
+    references staff(id)
+    on delete cascade,
+
+  token_hash text unique not null,
+
+  expires_at timestamptz not null,
+
+  created_at timestamptz not null default now(),
+
+  last_seen_at timestamptz,
+
+  revoked_at timestamptz
+);
+
+create index idx_auth_sessions_token_hash
+  on auth_sessions(token_hash);
+
+create index idx_auth_sessions_staff_id
+  on auth_sessions(staff_id);
+
+create index idx_auth_sessions_expires_at
+  on auth_sessions(expires_at);
+
+alter table auth_sessions enable row level security;
+
+-- No public/anon policies.
+-- Only the server-side Supabase secret key can access sessions.

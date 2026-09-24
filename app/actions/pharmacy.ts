@@ -1,12 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import {
   getOrCreateDraftInvoice,
   recalcInvoice,
 } from "@/lib/patient-flow";
+import { requireRole } from "@/lib/server-auth";
+
+const PHARMACY_READ_ROLES = [
+  "IT_ADMIN",
+  "PHARMACIST",
+  "NURSE",
+  "DOCTOR",
+  "OPHTHALMOLOGIST",
+] as const;
+
+const PHARMACY_WRITE_ROLES = [
+  "IT_ADMIN",
+  "PHARMACIST",
+] as const;
 
 export interface PharmacyPrescription {
   id: string;
@@ -44,6 +58,8 @@ export async function getPharmacyPatient(
   patientCode: string
 ) {
   try {
+    await requireRole([...PHARMACY_READ_ROLES]);
+
     const code = patientCode?.trim();
 
     if (!code) {
@@ -55,7 +71,7 @@ export async function getPharmacyPatient(
     }
 
     const { data: patient, error: patientError } =
-      await supabase
+      await supabaseServer
         .from("patients")
         .select(
           "id, patient_code, full_name, coverage_plan, age, gender, phone, allergies"
@@ -87,7 +103,7 @@ export async function getPharmacyPatient(
     const {
       data: prescriptions,
       error: prescriptionError,
-    } = await supabase
+    } = await supabaseServer
       .from("prescriptions")
       .select("*")
       .eq("patient_id", patient.id)
@@ -153,6 +169,28 @@ export async function getPharmacyPatient(
       patient: mappedPatient,
     };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return {
+        success: false,
+        message: "Authentication required.",
+        patient: null,
+      };
+    }
+
+    if (message === "FORBIDDEN") {
+      return {
+        success: false,
+        message:
+          "You are not authorized to access pharmacy records.",
+        patient: null,
+      };
+    }
+
     console.error(
       "Get pharmacy patient error:",
       error
@@ -169,18 +207,21 @@ export async function getPharmacyPatient(
 
 export async function getPharmacyQueue() {
   try {
+    await requireRole([...PHARMACY_READ_ROLES]);
+
     const {
       data: prescriptions,
       error: prescriptionError,
-    } = await supabase
-      .from("prescriptions")
-      .select(
-        "id, patient_id, quantity, total_price, created_at"
-      )
-      .eq("status", "ready_for_dispensing")
-      .order("created_at", {
-        ascending: true,
-      });
+    } =
+      await supabaseServer
+        .from("prescriptions")
+        .select(
+          "id, patient_id, quantity, total_price, created_at"
+        )
+        .eq("status", "ready_for_dispensing")
+        .order("created_at", {
+          ascending: true,
+        });
 
     if (prescriptionError) {
       throw prescriptionError;
@@ -208,12 +249,13 @@ export async function getPharmacyQueue() {
     const {
       data: patients,
       error: patientError,
-    } = await supabase
-      .from("patients")
-      .select(
-        "id, patient_code, full_name"
-      )
-      .in("id", patientIds);
+    } =
+      await supabaseServer
+        .from("patients")
+        .select(
+          "id, patient_code, full_name"
+        )
+        .in("id", patientIds);
 
     if (patientError) {
       throw patientError;
@@ -284,6 +326,28 @@ export async function getPharmacyQueue() {
       ),
     };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return {
+        success: false,
+        message: "Authentication required.",
+        queue: [],
+      };
+    }
+
+    if (message === "FORBIDDEN") {
+      return {
+        success: false,
+        message:
+          "You are not authorized to access the pharmacy queue.",
+        queue: [],
+      };
+    }
+
     console.error(
       "Get pharmacy queue error:",
       error
@@ -317,16 +381,25 @@ export async function createPharmacyPrescription(
   input: CreatePharmacyPrescriptionInput
 ): Promise<CreatePharmacyPrescriptionResponse> {
   try {
-    const patientCode = input.patientCode?.trim();
-    const drugName = input.drugName?.trim();
-    const dosage = input.dosage?.trim();
+    const staff =
+      await requireRole([
+        ...PHARMACY_WRITE_ROLES,
+      ]);
 
-    const quantity = Number(input.quantity);
-    const pricePerUnit = Number(input.pricePerUnit);
+    const patientCode =
+      input.patientCode?.trim();
 
-    // -----------------------------
-    // VALIDATION
-    // -----------------------------
+    const drugName =
+      input.drugName?.trim();
+
+    const dosage =
+      input.dosage?.trim();
+
+    const quantity =
+      Number(input.quantity);
+
+    const pricePerUnit =
+      Number(input.pricePerUnit);
 
     if (!patientCode) {
       return {
@@ -345,35 +418,47 @@ export async function createPharmacyPrescription(
     if (!dosage) {
       return {
         success: false,
-        message: "Dosage and medication instructions are required.",
+        message:
+          "Dosage and medication instructions are required.",
       };
     }
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
+    if (
+      !Number.isInteger(quantity) ||
+      quantity <= 0
+    ) {
       return {
         success: false,
-        message: "Quantity must be a whole number greater than zero.",
+        message:
+          "Quantity must be a whole number greater than zero.",
       };
     }
 
-    if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
+    if (
+      !Number.isFinite(pricePerUnit) ||
+      pricePerUnit < 0
+    ) {
       return {
         success: false,
-        message: "Price per unit is invalid.",
+        message:
+          "Price per unit is invalid.",
       };
     }
 
-    const totalPrice = quantity * pricePerUnit;
+    const totalPrice =
+      quantity * pricePerUnit;
 
-    // -----------------------------
-    // FIND REAL PATIENT
-    // -----------------------------
-
-    const { data: patient, error: patientError } = await supabase
-      .from("patients")
-      .select("id, patient_code, full_name")
-      .eq("patient_code", patientCode)
-      .maybeSingle();
+    const {
+      data: patient,
+      error: patientError,
+    } =
+      await supabaseServer
+        .from("patients")
+        .select(
+          "id, patient_code, full_name"
+        )
+        .eq("patient_code", patientCode)
+        .maybeSingle();
 
     if (patientError) {
       console.error(
@@ -383,23 +468,24 @@ export async function createPharmacyPrescription(
 
       return {
         success: false,
-        message: "Unable to find the patient record.",
+        message:
+          "Unable to find the patient record.",
       };
     }
 
     if (!patient) {
       return {
         success: false,
-        message: `Patient ${patientCode} was not found.`,
+        message:
+          `Patient ${patientCode} was not found.`,
       };
     }
 
-    // -----------------------------
-    // CREATE PRESCRIPTION
-    // -----------------------------
-
-    const { data: prescription, error: prescriptionError } =
-      await supabase
+    const {
+      data: prescription,
+      error: prescriptionError,
+    } =
+      await supabaseServer
         .from("prescriptions")
         .insert({
           patient_id: patient.id,
@@ -421,30 +507,29 @@ export async function createPharmacyPrescription(
 
       return {
         success: false,
-        message: "Failed to create the prescription.",
+        message:
+          "Failed to create the prescription.",
       };
     }
 
-    // -----------------------------
-    // GET / CREATE ACTIVE INVOICE
-    // -----------------------------
+    const invoice =
+      await getOrCreateDraftInvoice(
+        patient.id
+      );
 
-    const invoice = await getOrCreateDraftInvoice(patient.id);
-
-    // -----------------------------
-    // ADD MEDICATION TO BILL
-    // -----------------------------
-
-    const { error: invoiceItemError } = await supabase
-      .from("invoice_items")
-      .insert({
-        invoice_id: invoice.id,
-        category: "pharmacy",
-        name: drugName,
-        quantity,
-        unit_price: pricePerUnit,
-        total_price: totalPrice,
-      });
+    const {
+      error: invoiceItemError,
+    } =
+      await supabaseServer
+        .from("invoice_items")
+        .insert({
+          invoice_id: invoice.id,
+          category: "pharmacy",
+          name: drugName,
+          quantity,
+          unit_price: pricePerUnit,
+          total_price: totalPrice,
+        });
 
     if (invoiceItemError) {
       console.error(
@@ -452,10 +537,7 @@ export async function createPharmacyPrescription(
         invoiceItemError
       );
 
-      // Do not pretend the entire operation succeeded.
-      // Remove the prescription because the billing record could
-      // not be created for it.
-      await supabase
+      await supabaseServer
         .from("prescriptions")
         .delete()
         .eq("id", prescription.id);
@@ -467,37 +549,30 @@ export async function createPharmacyPrescription(
       };
     }
 
-    // -----------------------------
-    // RECALCULATE INVOICE
-    // -----------------------------
-
     await recalcInvoice(invoice.id);
-
-    // -----------------------------
-    // ACTIVITY LOG
-    // -----------------------------
 
     await logActivity({
       module: "Pharmacy",
       category: "CLINICAL",
-      action: `Pharmacy prescription added: ${drugName}`,
-      performedBy: "Pharmacy",
+      action:
+        `Pharmacy prescription added: ${drugName}`,
+      performedBy: staff.name,
       patientId: patient.id,
+      staffId: staff.id,
       details: JSON.stringify({
-        prescriptionId: prescription.id,
-        patientCode: patient.patient_code,
+        prescriptionId:
+          prescription.id,
+        patientCode:
+          patient.patient_code,
         drugName,
         dosage,
         quantity,
         pricePerUnit,
         totalPrice,
       }),
-      financialAmount: totalPrice,
+      financialAmount:
+        totalPrice,
     });
-
-    // -----------------------------
-    // REFRESH RELATED MODULES
-    // -----------------------------
 
     revalidatePath("/pharmacy");
     revalidatePath("/billing");
@@ -505,11 +580,32 @@ export async function createPharmacyPrescription(
 
     return {
       success: true,
-      message: `${drugName} has been added to the patient's prescription and bill.`,
+      message:
+        `${drugName} has been added to the patient's prescription and bill.`,
       id: prescription.id,
       totalPrice,
     };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return {
+        success: false,
+        message: "Authentication required.",
+      };
+    }
+
+    if (message === "FORBIDDEN") {
+      return {
+        success: false,
+        message:
+          "You are not authorized to create pharmacy prescriptions.",
+      };
+    }
+
     console.error(
       "Create pharmacy prescription error:",
       error
@@ -527,25 +623,33 @@ export async function dispensePatientPrescriptions(
   patientCode: string
 ) {
   try {
-    const code = patientCode?.trim();
+    const staff =
+      await requireRole([
+        ...PHARMACY_WRITE_ROLES,
+      ]);
+
+    const code =
+      patientCode?.trim();
 
     if (!code) {
       return {
         success: false,
-        message: "Patient code is required.",
+        message:
+          "Patient code is required.",
       };
     }
 
     const {
       data: patient,
       error: patientError,
-    } = await supabase
-      .from("patients")
-      .select(
-        "id, patient_code, full_name"
-      )
-      .eq("patient_code", code)
-      .maybeSingle();
+    } =
+      await supabaseServer
+        .from("patients")
+        .select(
+          "id, patient_code, full_name"
+        )
+        .eq("patient_code", code)
+        .maybeSingle();
 
     if (patientError) {
       throw patientError;
@@ -559,21 +663,18 @@ export async function dispensePatientPrescriptions(
       };
     }
 
-    /*
-     * Only prescriptions that have already been
-     * paid by Cashier are allowed into dispensing.
-     */
     const {
       data: prescriptions,
       error: prescriptionError,
-    } = await supabase
-      .from("prescriptions")
-      .select("*")
-      .eq("patient_id", patient.id)
-      .eq(
-        "status",
-        "ready_for_dispensing"
-      );
+    } =
+      await supabaseServer
+        .from("prescriptions")
+        .select("*")
+        .eq("patient_id", patient.id)
+        .eq(
+          "status",
+          "ready_for_dispensing"
+        );
 
     if (prescriptionError) {
       throw prescriptionError;
@@ -590,10 +691,6 @@ export async function dispensePatientPrescriptions(
       };
     }
 
-    /*
-     * Find every matching pharmacy stock item
-     * and verify stock BEFORE deducting anything.
-     */
     const stockChecks: Array<{
       prescription: any;
       inventory: any;
@@ -605,18 +702,22 @@ export async function dispensePatientPrescriptions(
       const {
         data: inventory,
         error: inventoryError,
-      } = await supabase
-        .from("inventory_items")
-        .select(
-          "sku, name, stock, domain, price"
-        )
-        .eq("domain", "pharmacy")
-        .ilike(
-          "name",
-          prescription.drug_name
-        )
-        .limit(1)
-        .maybeSingle();
+      } =
+        await supabaseServer
+          .from("inventory_items")
+          .select(
+            "sku, name, stock, domain, price"
+          )
+          .eq(
+            "domain",
+            "pharmacy"
+          )
+          .ilike(
+            "name",
+            prescription.drug_name
+          )
+          .limit(1)
+          .maybeSingle();
 
       if (inventoryError) {
         throw inventoryError;
@@ -630,15 +731,19 @@ export async function dispensePatientPrescriptions(
         };
       }
 
-      const requiredQuantity = Number(
-        prescription.quantity ?? 0
-      );
+      const requiredQuantity =
+        Number(
+          prescription.quantity ?? 0
+        );
 
-      const availableStock = Number(
-        inventory.stock ?? 0
-      );
+      const availableStock =
+        Number(
+          inventory.stock ?? 0
+        );
 
-      if (requiredQuantity <= 0) {
+      if (
+        requiredQuantity <= 0
+      ) {
         return {
           success: false,
           message:
@@ -664,10 +769,6 @@ export async function dispensePatientPrescriptions(
       });
     }
 
-    /*
-     * All stock has been validated.
-     * Now deduct stock using SKU.
-     */
     for (const item of stockChecks) {
       const newStock =
         Number(
@@ -677,24 +778,22 @@ export async function dispensePatientPrescriptions(
 
       const {
         error: stockUpdateError,
-      } = await supabase
-        .from("inventory_items")
-        .update({
-          stock: newStock,
-        })
-        .eq(
-          "sku",
-          item.inventory.sku
-        );
+      } =
+        await supabaseServer
+          .from("inventory_items")
+          .update({
+            stock: newStock,
+          })
+          .eq(
+            "sku",
+            item.inventory.sku
+          );
 
       if (stockUpdateError) {
         throw stockUpdateError;
       }
     }
 
-    /*
-     * Mark prescriptions as dispensed.
-     */
     const prescriptionIds =
       prescriptions.map(
         (prescription) =>
@@ -703,19 +802,20 @@ export async function dispensePatientPrescriptions(
 
     const {
       error: dispenseError,
-    } = await supabase
-      .from("prescriptions")
-      .update({
-        status: "dispensed",
-      })
-      .in(
-        "id",
-        prescriptionIds
-      )
-      .eq(
-        "status",
-        "ready_for_dispensing"
-      );
+    } =
+      await supabaseServer
+        .from("prescriptions")
+        .update({
+          status: "dispensed",
+        })
+        .in(
+          "id",
+          prescriptionIds
+        )
+        .eq(
+          "status",
+          "ready_for_dispensing"
+        );
 
     if (dispenseError) {
       throw dispenseError;
@@ -737,28 +837,23 @@ export async function dispensePatientPrescriptions(
       category: "CLINICAL",
       action:
         `Prescription dispensed for ${patient.full_name}`,
-      performedBy: "Pharmacy",
+      performedBy: staff.name,
       patientId: patient.id,
+      staffId: staff.id,
       details: JSON.stringify({
         patientCode:
           patient.patient_code,
-
         prescriptionIds,
-
         itemCount:
           prescriptions.length,
-
         totalAmount,
-
         inventoryDeducted:
           stockChecks.map(
             (item) => ({
               sku:
                 item.inventory.sku,
-
               drug:
                 item.inventory.name,
-
               quantity:
                 item.requiredQuantity,
             })
@@ -781,6 +876,26 @@ export async function dispensePatientPrescriptions(
         prescriptions.length,
     };
   } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return {
+        success: false,
+        message: "Authentication required.",
+      };
+    }
+
+    if (message === "FORBIDDEN") {
+      return {
+        success: false,
+        message:
+          "You are not authorized to dispense pharmacy prescriptions.",
+      };
+    }
+
     console.error(
       "Dispense prescriptions error:",
       error
