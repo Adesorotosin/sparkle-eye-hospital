@@ -156,10 +156,39 @@ export async function POST(
       );
     }
 
+    /*
+     * Move the patient into the doctor's clinical queue only after
+     * the vitals transaction succeeds. This keeps the workflow:
+     * Reception → Nurse/Triage → Doctor.
+     */
+    const { error: statusUpdateError } = await supabaseServer
+      .from("patients")
+      .update({
+        status: "in_consultation",
+      })
+      .eq("id", patient.id);
+
+    if (statusUpdateError) {
+      console.error(
+        "Patient workflow status update failed:",
+        statusUpdateError
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Vitals were recorded, but the patient could not be moved to the doctor queue. Please refresh and try again.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
     await addActivityLog(
       patient.id,
       "Triage",
-      "Patient vitals recorded.",
+      "Patient vitals recorded and sent to doctor queue.",
       staff.name
     );
 
