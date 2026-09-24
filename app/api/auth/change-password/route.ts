@@ -26,25 +26,65 @@ function getRequestMeta(request: NextRequest) {
   };
 }
 
+function jsonResponse(
+  body: Record<string, unknown>,
+  status = 200
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const staff = await requireAuth();
 
-    const body = await request.json();
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Invalid request body.",
+        },
+        400
+      );
+    }
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "Invalid request body.",
+        },
+        400
+      );
+    }
+
+    const requestBody = body as Record<string, unknown>;
 
     const currentPassword =
-      typeof body?.currentPassword === "string"
-        ? body.currentPassword
+      typeof requestBody.currentPassword === "string"
+        ? requestBody.currentPassword
         : "";
 
     const newPassword =
-      typeof body?.newPassword === "string"
-        ? body.newPassword
+      typeof requestBody.newPassword === "string"
+        ? requestBody.newPassword
         : "";
 
     const confirmPassword =
-      typeof body?.confirmPassword === "string"
-        ? body.confirmPassword
+      typeof requestBody.confirmPassword === "string"
+        ? requestBody.confirmPassword
         : "";
 
     if (
@@ -52,88 +92,99 @@ export async function POST(request: NextRequest) {
       !newPassword ||
       !confirmPassword
     ) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: "All password fields are required.",
         },
-        { status: 400 }
+        400
       );
     }
 
-    if (newPassword !== confirmPassword) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "New passwords do not match.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (newPassword.length < 8) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "New password must be at least 8 characters long.",
-        },
-        { status: 400 }
-      );
-    }
+  if (currentPassword.length > 128) {
+  return jsonResponse(
+    {
+      success: false,
+      error:
+        "Current password must not exceed 128 characters.",
+    },
+    400
+  );
+}
 
     if (newPassword.length > 128) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "New password must not exceed 128 characters.",
         },
-        { status: 400 }
+        400
+      );
+    }
+
+    if (newPassword !== confirmPassword) {
+      return jsonResponse(
+        {
+          success: false,
+          error: "New passwords do not match.",
+        },
+        400
+      );
+    }
+
+    if (newPassword.length < 8) {
+      return jsonResponse(
+        {
+          success: false,
+          error:
+            "New password must be at least 8 characters long.",
+        },
+        400
       );
     }
 
     if (!/[A-Z]/.test(newPassword)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "New password must contain at least one uppercase letter.",
         },
-        { status: 400 }
+        400
       );
     }
 
     if (!/[0-9]/.test(newPassword)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "New password must contain at least one number.",
         },
-        { status: 400 }
+        400
       );
     }
 
     if (!/[^A-Za-z0-9]/.test(newPassword)) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "New password must contain at least one special character.",
         },
-        { status: 400 }
+        400
       );
     }
 
     if (currentPassword === newPassword) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "New password must be different from your current password.",
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -152,24 +203,23 @@ export async function POST(request: NextRequest) {
         staffError
       );
 
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            "Unable to verify your account.",
+          error: "Unable to verify your account.",
         },
-        { status: 500 }
+        500
       );
     }
 
     if (!staffRecord) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error:
             "Authenticated staff account was not found.",
         },
-        { status: 401 }
+        401
       );
     }
 
@@ -177,13 +227,12 @@ export async function POST(request: NextRequest) {
       !staffRecord.is_active ||
       staffRecord.deleted_at
     ) {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            "This staff account is inactive.",
+          error: "This staff account is inactive.",
         },
-        { status: 403 }
+        403
       );
     }
 
@@ -196,23 +245,31 @@ export async function POST(request: NextRequest) {
       const { ipAddress, userAgent } =
         getRequestMeta(request);
 
-      await supabaseServer
-        .from("security_logs")
-        .insert({
-          staff_id: staff.id,
-          username_attempted: staffRecord.username,
-          action: "Password Change Failed",
-          ip_address: ipAddress,
-          device: userAgent,
-          risk_level: "MEDIUM",
-        });
+      const { error: securityLogError } =
+        await supabaseServer
+          .from("security_logs")
+          .insert({
+            staff_id: staff.id,
+            username_attempted: staffRecord.username,
+            action: "Password Change Failed",
+            ip_address: ipAddress,
+            device: userAgent,
+            risk_level: "MEDIUM",
+          });
 
-      return NextResponse.json(
+      if (securityLogError) {
+        console.error(
+          "Password change failure security log failed:",
+          securityLogError
+        );
+      }
+
+      return jsonResponse(
         {
           success: false,
           error: "Current password is incorrect.",
         },
-        { status: 401 }
+        401
       );
     }
 
@@ -236,13 +293,12 @@ export async function POST(request: NextRequest) {
         updateError
       );
 
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
-          error:
-            "Unable to update your password.",
+          error: "Unable to update your password.",
         },
-        { status: 500 }
+        500
       );
     }
 
@@ -268,14 +324,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Revoke all active sessions for this staff member.
-    // The user must sign in again using the new password.
+    /*
+     * Revoke every active session belonging to this staff member.
+     *
+     * If this bulk operation fails, we still revoke the current
+     * session below. This guarantees that the session used to
+     * perform the password change cannot remain active.
+     */
     const { error: sessionRevokeError } =
       await supabaseServer
         .from("auth_sessions")
         .update({
-          revoked_at:
-            new Date().toISOString(),
+          revoked_at: new Date().toISOString(),
         })
         .eq("staff_id", staff.id)
         .is("revoked_at", null);
@@ -285,11 +345,19 @@ export async function POST(request: NextRequest) {
         "Password change session revocation failed:",
         sessionRevokeError
       );
+
+      /*
+       * The password has already been changed, so we cannot
+       * safely report that the entire operation failed.
+       *
+       * We still revoke the current session below and tell the
+       * user to sign in again.
+       */
     }
 
     await revokeCurrentSession();
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       message:
         "Password changed successfully. Please sign in again.",
@@ -301,12 +369,12 @@ export async function POST(request: NextRequest) {
         : "";
 
     if (message === "UNAUTHENTICATED") {
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: "Authentication required.",
         },
-        { status: 401 }
+        401
       );
     }
 
@@ -315,13 +383,12 @@ export async function POST(request: NextRequest) {
       error
     );
 
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
-        error:
-          "Unable to change password.",
+        error: "Unable to change password.",
       },
-      { status: 500 }
+      500
     );
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Shield,
@@ -12,25 +12,26 @@ import {
   AlertTriangle,
   UserPlus,
   CheckCircle2,
-  RotateCcw,
   Trash2,
   UserX,
   UserCheck,
+  Loader2,
 } from "lucide-react";
 
-// --- Types ---
 interface StaffMember {
   id: string;
-  staffId: string;
+  staff_id: string;
+  username: string;
   name: string;
   email: string;
   role: string;
-  department: string;
-  assignedFacilities: string;
-  initials: string;
-  roleColor: string;
-  permissions: Record<string, boolean>;
-  isActive: boolean;
+  title: string | null;
+  department: string | null;
+  assigned_facilities: string[] | string | null;
+  permissions: Record<string, boolean> | null;
+  is_active: boolean;
+  deleted_at: string | null;
+  created_at: string;
 }
 
 interface PermissionGroup {
@@ -45,17 +46,28 @@ interface PermissionGroup {
   }[];
 }
 
-// --- Data Definitions ---
 const PERMISSION_GROUPS: PermissionGroup[] = [
   {
     id: "clinical",
     title: "CLINICAL EHR ACCESS",
     icon: Stethoscope,
     items: [
-      { key: "view_patient_records", label: "View Patient Records" },
-      { key: "edit_clinical_notes", label: "Edit Clinical Notes" },
-      { key: "order_diagnostics", label: "Order Diagnostics" },
-      { key: "view_lab_results", label: "View Lab Results" },
+      {
+        key: "view_patient_records",
+        label: "View Patient Records",
+      },
+      {
+        key: "edit_clinical_notes",
+        label: "Edit Clinical Notes",
+      },
+      {
+        key: "order_diagnostics",
+        label: "Order Diagnostics",
+      },
+      {
+        key: "view_lab_results",
+        label: "View Lab Results",
+      },
     ],
   },
   {
@@ -63,13 +75,20 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     title: "PRESCRIPTION & MEDICATION",
     icon: Pill,
     items: [
-      { key: "issue_prescriptions", label: "Issue Prescriptions" },
+      {
+        key: "issue_prescriptions",
+        label: "Issue Prescriptions",
+      },
       {
         key: "controlled_substance_override",
         label: "Controlled Substance Override",
-        warning: "Requires DEA/MDCN authorization",
+        warning:
+          "Requires appropriate professional authorization",
       },
-      { key: "pharmacy_dispensing_approval", label: "Pharmacy Dispensing Approval" },
+      {
+        key: "pharmacy_dispensing_approval",
+        label: "Pharmacy Dispensing Approval",
+      },
     ],
   },
   {
@@ -77,10 +96,22 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     title: "FINANCIAL & BILLING",
     icon: DollarSign,
     items: [
-      { key: "view_financial_reports", label: "View Financial Reports" },
-      { key: "insurance_claims_access", label: "Insurance Claims Access" },
-      { key: "revenue_dashboard", label: "Revenue Dashboard" },
-      { key: "approve_refunds", label: "Approve Refunds" },
+      {
+        key: "view_financial_reports",
+        label: "View Financial Reports",
+      },
+      {
+        key: "insurance_claims_access",
+        label: "Insurance Claims Access",
+      },
+      {
+        key: "revenue_dashboard",
+        label: "Revenue Dashboard",
+      },
+      {
+        key: "approve_refunds",
+        label: "Approve Refunds",
+      },
     ],
   },
   {
@@ -88,13 +119,19 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
     title: "SYSTEM ADMINISTRATION",
     icon: Shield,
     items: [
-      { key: "user_account_management", label: "User Account Management" },
+      {
+        key: "user_account_management",
+        label: "User Account Management",
+      },
       {
         key: "system_configuration",
         label: "System Configuration",
-        badge: "Restricted — Super Admin Only",
+        badge: "Restricted — IT Admin",
       },
-      { key: "audit_log_access", label: "Audit Log Access" },
+      {
+        key: "audit_log_access",
+        label: "Audit Log Access",
+      },
       {
         key: "api_key_management",
         label: "API Key Management",
@@ -104,906 +141,1280 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
   },
 ];
 
-const INITIAL_STAFF: StaffMember[] = [
-  {
-    id: "1",
-    staffId: "VF-2024-0142",
-    name: "Dr. James Okoro",
-    email: "james.okoro@visionfirst.ng",
-    role: "Senior Ophthalmologist",
-    department: "Ophthalmology",
-    assignedFacilities: "Main Campus, OR-1, OR-2",
-    initials: "JO",
-    roleColor: "bg-purple-100 text-purple-700 border-purple-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: true,
-      order_diagnostics: true,
-      view_lab_results: true,
-      issue_prescriptions: true,
-      controlled_substance_override: false,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: true,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: true,
-      api_key_management: false,
-    },
+const ROLE_LABELS: Record<string, string> = {
+  IT_ADMIN: "IT Administrator",
+  OPHTHALMOLOGIST: "Ophthalmologist",
+  DOCTOR: "Doctor",
+  PHARMACIST: "Pharmacist",
+  NURSE: "Nurse",
+  CASHIER: "Cashier",
+  RECEPTIONIST: "Receptionist",
+};
+
+const ROLE_STYLES: Record<string, string> = {
+  IT_ADMIN:
+    "bg-red-50 text-red-700 border-red-200",
+  OPHTHALMOLOGIST:
+    "bg-purple-50 text-purple-700 border-purple-200",
+  DOCTOR:
+    "bg-blue-50 text-blue-700 border-blue-200",
+  PHARMACIST:
+    "bg-green-50 text-green-700 border-green-200",
+  NURSE:
+    "bg-pink-50 text-pink-700 border-pink-200",
+  CASHIER:
+    "bg-amber-50 text-amber-700 border-amber-200",
+  RECEPTIONIST:
+    "bg-slate-50 text-slate-700 border-slate-200",
+};
+
+const DEFAULT_PERMISSIONS: Record<
+  string,
+  Record<string, boolean>
+> = {
+  IT_ADMIN: {
+    view_patient_records: true,
+    edit_clinical_notes: true,
+    order_diagnostics: true,
+    view_lab_results: true,
+    issue_prescriptions: true,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: true,
+    insurance_claims_access: true,
+    revenue_dashboard: true,
+    approve_refunds: true,
+    user_account_management: true,
+    system_configuration: true,
+    audit_log_access: true,
+    api_key_management: true,
   },
-  {
-    id: "2",
-    staffId: "VF-2024-0098",
-    name: "Dr. Amina Bello",
-    email: "amina.bello@visionfirst.ng",
-    role: "Retina Specialist",
-    department: "Ophthalmology",
-    assignedFacilities: "Main Campus, Laser Suite",
-    initials: "AB",
-    roleColor: "bg-purple-100 text-purple-700 border-purple-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: true,
-      order_diagnostics: true,
-      view_lab_results: true,
-      issue_prescriptions: true,
-      controlled_substance_override: true,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: false,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: false,
-      api_key_management: false,
-    },
+
+  OPHTHALMOLOGIST: {
+    view_patient_records: true,
+    edit_clinical_notes: true,
+    order_diagnostics: true,
+    view_lab_results: true,
+    issue_prescriptions: true,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-  {
-    id: "3",
-    staffId: "VF-2023-0312",
-    name: "Maria Lopez, RN",
-    email: "maria.lopez@visionfirst.ng",
-    role: "Senior Nurse",
-    department: "Surgery",
-    assignedFacilities: "OR-1, OR-2, Recovery",
-    initials: "ML",
-    roleColor: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: true,
-      order_diagnostics: false,
-      view_lab_results: true,
-      issue_prescriptions: false,
-      controlled_substance_override: false,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: false,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: false,
-      api_key_management: false,
-    },
+
+  DOCTOR: {
+    view_patient_records: true,
+    edit_clinical_notes: true,
+    order_diagnostics: true,
+    view_lab_results: true,
+    issue_prescriptions: true,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-  {
-    id: "4",
-    staffId: "VF-2024-0201",
-    name: "Dr. Kevin Huang",
-    email: "kevin.huang@visionfirst.ng",
-    role: "Anesthetist",
-    department: "Anesthesiology",
-    assignedFacilities: "OR-1, OR-2",
-    initials: "KH",
-    roleColor: "bg-indigo-100 text-indigo-700 border-indigo-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: true,
-      order_diagnostics: true,
-      view_lab_results: true,
-      issue_prescriptions: true,
-      controlled_substance_override: true,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: false,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: false,
-      api_key_management: false,
-    },
+
+  PHARMACIST: {
+    view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: true,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: true,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-  {
-    id: "5",
-    staffId: "VF-2023-0445",
-    name: "Adebayo Funmi",
-    email: "adebayo.funmi@visionfirst.ng",
-    role: "Lead Pharmacist",
-    department: "Pharmacy",
-    assignedFacilities: "Main Pharmacy, Ward Dispensary",
-    initials: "AF",
-    roleColor: "bg-amber-100 text-amber-700 border-amber-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: false,
-      order_diagnostics: false,
-      view_lab_results: true,
-      issue_prescriptions: false,
-      controlled_substance_override: true,
-      pharmacy_dispensing_approval: true,
-      view_financial_reports: true,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: true,
-      api_key_management: false,
-    },
+
+  NURSE: {
+    view_patient_records: true,
+    edit_clinical_notes: true,
+    order_diagnostics: false,
+    view_lab_results: true,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-  {
-    id: "6",
-    staffId: "VF-2024-0389",
-    name: "Sarah Ogundimu",
-    email: "sarah.ogundimu@visionfirst.ng",
-    role: "Front Desk Lead",
-    department: "Patient Services",
-    assignedFacilities: "Reception, Scheduling",
-    initials: "SO",
-    roleColor: "bg-pink-100 text-pink-700 border-pink-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: false,
-      order_diagnostics: false,
-      view_lab_results: false,
-      issue_prescriptions: false,
-      controlled_substance_override: false,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: true,
-      insurance_claims_access: true,
-      revenue_dashboard: false,
-      approve_refunds: true,
-      user_account_management: true,
-      system_configuration: false,
-      audit_log_access: true,
-      api_key_management: false,
-    },
+
+  CASHIER: {
+    view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: true,
+    insurance_claims_access: true,
+    revenue_dashboard: true,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-  {
-    id: "7",
-    staffId: "VF-2023-0567",
-    name: "James Carter",
-    email: "james.carter@visionfirst.ng",
-    role: "Surgical Technician",
-    department: "Surgery",
-    assignedFacilities: "OR-1, OR-2",
-    initials: "JC",
-    roleColor: "bg-slate-100 text-slate-700 border-slate-200",
-    isActive: true,
-    permissions: {
-      view_patient_records: true,
-      edit_clinical_notes: false,
-      order_diagnostics: false,
-      view_lab_results: false,
-      issue_prescriptions: false,
-      controlled_substance_override: false,
-      pharmacy_dispensing_approval: false,
-      view_financial_reports: false,
-      insurance_claims_access: false,
-      revenue_dashboard: false,
-      approve_refunds: false,
-      user_account_management: false,
-      system_configuration: false,
-      audit_log_access: false,
-      api_key_management: false,
-    },
+
+  RECEPTIONIST: {
+    view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
   },
-];
+};
+
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "?";
+  }
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return (
+    parts[0][0] +
+    parts[parts.length - 1][0]
+  ).toUpperCase();
+}
+
+function getRoleLabel(role: string) {
+  return ROLE_LABELS[role] ?? role;
+}
+
+function getRoleStyle(role: string) {
+  return (
+    ROLE_STYLES[role] ??
+    "bg-slate-50 text-slate-700 border-slate-200"
+  );
+}
+
+function getFacilitiesText(
+  facilities: StaffMember["assigned_facilities"]
+) {
+  if (!facilities) {
+    return "Not assigned";
+  }
+
+  if (Array.isArray(facilities)) {
+    return facilities.length > 0
+      ? facilities.join(", ")
+      : "Not assigned";
+  }
+
+  return facilities || "Not assigned";
+}
+
+function getPermissionsForStaff(
+  staff: StaffMember | null
+) {
+  if (!staff) {
+    return {};
+  }
+
+  return {
+    ...(DEFAULT_PERMISSIONS[staff.role] ?? {}),
+    ...(staff.permissions ?? {}),
+  };
+}
 
 export default function AccessControlPage() {
-  const [staffList, setStaffList] = useState<StaffMember[]>(INITIAL_STAFF);
-  const [activeTab, setActiveTab] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>("1");
-  const [draftPermissions, setDraftPermissions] = useState<Record<string, boolean>>(
-    INITIAL_STAFF[0].permissions
-  );
-  const [hasChanges, setHasChanges] = useState(false);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [staffList, setStaffList] = useState<
+    StaffMember[]
+  >([]);
 
-  // Modal State
-  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
-  const [newStaff, setNewStaff] = useState({
-    name: "",
-    email: "",
-    role: "Senior Ophthalmologist",
-    department: "Ophthalmology",
-    assignedFacilities: "Main Campus",
-  });
+  const [selectedStaffId, setSelectedStaffId] =
+    useState<string | null>(null);
 
-  const activeStaff = useMemo(
-    () => staffList.find((s) => s.id === selectedStaffId) || null,
+  const [draftPermissions, setDraftPermissions] =
+    useState<Record<string, boolean>>({});
+
+  const [searchTerm, setSearchTerm] =
+    useState("");
+
+  const [showInactive, setShowInactive] =
+    useState(false);
+
+  const [showDeleteModal, setShowDeleteModal] =
+    useState(false);
+
+  const [notification, setNotification] =
+    useState<string | null>(null);
+
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  const [processingStaffId, setProcessingStaffId] =
+    useState<string | null>(null);
+
+  const selectedStaff = useMemo(
+    () =>
+      staffList.find(
+        (staff) =>
+          staff.id === selectedStaffId
+      ) ?? null,
     [staffList, selectedStaffId]
   );
 
   const filteredStaff = useMemo(() => {
-    return staffList.filter((m) => {
-      const matchesSearch =
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.staffId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.department.toLowerCase().includes(searchQuery.toLowerCase());
+    const normalizedSearch =
+      searchTerm.trim().toLowerCase();
 
-      if (!matchesSearch) return false;
-
-      if (activeTab === "doctors") return /doctor|ophthalmologist|specialist|anesthetist/i.test(m.role);
-      if (activeTab === "nurses") return /nurse/i.test(m.role);
-      if (activeTab === "pharmacists") return /pharmacist/i.test(m.role);
-      if (activeTab === "frontdesk") return /front desk/i.test(m.role);
-      if (activeTab === "admins") return /admin/i.test(m.role);
-
-      return true;
-    });
-  }, [staffList, searchQuery, activeTab]);
-
-  const tabCounts = useMemo(() => {
-    return {
-      all: staffList.length,
-      doctors: staffList.filter((m) =>
-        /doctor|ophthalmologist|specialist|anesthetist/i.test(m.role)
-      ).length,
-      nurses: staffList.filter((m) => /nurse/i.test(m.role)).length,
-      pharmacists: staffList.filter((m) => /pharmacist/i.test(m.role)).length,
-      frontdesk: staffList.filter((m) => /front desk/i.test(m.role)).length,
-      admins: staffList.filter((m) => /admin/i.test(m.role)).length,
-    };
-  }, [staffList]);
-
-  const TAB_FILTERS = [
-    { id: "all", label: "All Staff", count: tabCounts.all },
-    { id: "doctors", label: "Doctors", count: tabCounts.doctors },
-    { id: "nurses", label: "Nurses", count: tabCounts.nurses },
-    { id: "pharmacists", label: "Pharmacists", count: tabCounts.pharmacists },
-    { id: "frontdesk", label: "Front Desk", count: tabCounts.frontdesk },
-    { id: "admins", label: "Admins", count: tabCounts.admins },
-  ];
-
-  const handleSelectStaff = (member: StaffMember) => {
-    if (hasChanges) {
-      const confirmDiscard = window.confirm(
-        "You have unsaved permission edits. Switch staff member and discard changes?"
-      );
-      if (!confirmDiscard) return;
-    }
-    setSelectedStaffId(member.id);
-    setDraftPermissions({ ...member.permissions });
-    setHasChanges(false);
-  };
-
-  const handleCloseDrawer = () => {
-    if (hasChanges) {
-      const confirmDiscard = window.confirm(
-        "You have unsaved changes. Are you sure you want to close without saving?"
-      );
-      if (!confirmDiscard) return;
-    }
-    setSelectedStaffId(null);
-    setHasChanges(false);
-  };
-
-  const handleTogglePermission = (key: string) => {
-    setDraftPermissions((prev) => {
-      const updated = { ...prev, [key]: !prev[key] };
-      setHasChanges(true);
-      return updated;
-    });
-  };
-
-  const handleResetPermissions = () => {
-    if (activeStaff) {
-      setDraftPermissions({ ...activeStaff.permissions });
-      setHasChanges(false);
-    }
-  };
-
-  const handleSaveChanges = () => {
-    if (!selectedStaffId) return;
-    setStaffList((prev) =>
-      prev.map((s) =>
-        s.id === selectedStaffId ? { ...s, permissions: { ...draftPermissions } } : s
-      )
-    );
-    setHasChanges(false);
-    setNotification("Permissions saved successfully!");
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  const handleOpenAddStaff = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsAddStaffOpen(true);
-  };
-
-  const handleAddStaffSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const initials = newStaff.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-
-    const createdStaff: StaffMember = {
-      id: String(Date.now()),
-      staffId: `VF-2026-0${Math.floor(100 + Math.random() * 900)}`,
-      name: newStaff.name,
-      email: newStaff.email,
-      role: newStaff.role,
-      department: newStaff.department,
-      assignedFacilities: newStaff.assignedFacilities,
-      initials: initials || "ST",
-      roleColor: "bg-indigo-100 text-indigo-700 border-indigo-200",
-      isActive: true,
-      permissions: {
-        view_patient_records: true,
-        edit_clinical_notes: false,
-        order_diagnostics: false,
-        view_lab_results: false,
-        issue_prescriptions: false,
-        controlled_substance_override: false,
-        pharmacy_dispensing_approval: false,
-        view_financial_reports: false,
-        insurance_claims_access: false,
-        revenue_dashboard: false,
-        approve_refunds: false,
-        user_account_management: false,
-        system_configuration: false,
-        audit_log_access: false,
-        api_key_management: false,
-      },
-    };
-
-    setStaffList((prev) => [createdStaff, ...prev]);
-    setSelectedStaffId(createdStaff.id);
-    setDraftPermissions(createdStaff.permissions);
-    setIsAddStaffOpen(false);
-    setNewStaff({
-      name: "",
-      email: "",
-      role: "Senior Ophthalmologist",
-      department: "Ophthalmology",
-      assignedFacilities: "Main Campus",
-    });
-    setNotification(`Successfully onboarded ${createdStaff.name}`);
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  // --- Temporary Status Toggle Handler (Active / Suspended) ---
-  const handleToggleStatus = async (e: React.MouseEvent, member: StaffMember) => {
-    e.stopPropagation();
-
-    const newStatus = !member.isActive;
-    const actionText = newStatus ? "reactivate" : "temporarily suspend access for";
-
-    const confirmAction = window.confirm(
-      `Are you sure you want to ${actionText} ${member.name} (${member.staffId})?`
-    );
-
-    if (!confirmAction) return;
-
-    try {
-      // 1. Send PATCH update to API
-      const res = await fetch(`/api/staff/${member.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: newStatus }),
-      });
-
-      if (!res.ok) {
-        console.warn("API route unavailable, performing local state update.");
+    return staffList.filter((staff) => {
+      if (
+        !showInactive &&
+        (!staff.is_active || staff.deleted_at)
+      ) {
+        return false;
       }
 
-      // 2. Update state locally
-      setStaffList((prev) =>
-        prev.map((s) => (s.id === member.id ? { ...s, isActive: newStatus } : s))
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [
+        staff.name,
+        staff.email,
+        staff.username,
+        staff.staff_id,
+        staff.role,
+        staff.department ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch);
+    });
+  }, [
+    staffList,
+    searchTerm,
+    showInactive,
+  ]);
+
+  const activeCount = staffList.filter(
+    (staff) =>
+      staff.is_active &&
+      !staff.deleted_at
+  ).length;
+
+  const inactiveCount =
+    staffList.length - activeCount;
+
+  async function loadStaff() {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        "/api/staff",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to load staff directory."
+        );
+      }
+
+      const staff: StaffMember[] =
+        Array.isArray(data?.staff)
+          ? data.staff
+          : [];
+
+      setStaffList(staff);
+
+      if (staff.length > 0) {
+        const firstActive =
+          staff.find(
+            (member) =>
+              member.is_active &&
+              !member.deleted_at
+          ) ?? staff[0];
+
+        setSelectedStaffId(
+          firstActive.id
+        );
+      } else {
+        setSelectedStaffId(null);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load staff:",
+        error
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load staff directory."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadStaff();
+  }, []);
+
+  useEffect(() => {
+    if (selectedStaff) {
+      setDraftPermissions(
+        getPermissionsForStaff(
+          selectedStaff
+        )
+      );
+    } else {
+      setDraftPermissions({});
+    }
+  }, [selectedStaff]);
+
+  function togglePermission(
+    key: string
+  ) {
+    setDraftPermissions((previous) => ({
+      ...previous,
+      [key]: !previous[key],
+    }));
+  }
+
+  async function handleSaveChanges() {
+    if (!selectedStaff) {
+      return;
+    }
+
+    setSaving(true);
+    setNotification(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/staff/${selectedStaff.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            permissions:
+              draftPermissions,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to save permissions."
+        );
+      }
+
+      if (!data?.staff) {
+        throw new Error(
+          "The server did not return the updated staff record."
+        );
+      }
+
+      setStaffList((previous) =>
+        previous.map((staff) =>
+          staff.id === selectedStaff.id
+            ? data.staff
+            : staff
+        )
       );
 
       setNotification(
-        `${member.name} has been ${newStatus ? "reactivated" : "temporarily suspended"}.`
+        "Permissions saved successfully."
       );
-      setTimeout(() => setNotification(null), 3000);
     } catch (error) {
-      // Fallback for client-only state toggle
-      setStaffList((prev) =>
-        prev.map((s) => (s.id === member.id ? { ...s, isActive: newStatus } : s))
+      console.error(
+        "Permission update failed:",
+        error
       );
-      setNotification(
-        `${member.name} has been ${newStatus ? "reactivated" : "temporarily suspended"}.`
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to save permissions."
       );
-      setTimeout(() => setNotification(null), 3000);
+    } finally {
+      setSaving(false);
     }
-  };
+  }
 
-  // --- Permanent Deactivation / Soft-Delete Handler ---
-  const handleDeleteStaff = async (e: React.MouseEvent, member: StaffMember) => {
-    e.stopPropagation();
-
-    const confirmDelete = window.confirm(
-      `Are you sure you want to soft-delete ${member.name} (${member.staffId})? This will remove them from active directory lists.`
-    );
-
-    if (!confirmDelete) return;
+  async function handleToggleStatus(
+    member: StaffMember
+  ) {
+    setProcessingStaffId(member.id);
+    setNotification(null);
+    setErrorMessage(null);
 
     try {
-      const res = await fetch(`/api/staff/${member.id}`, {
-        method: "DELETE",
-      });
+      const nextStatus =
+        !member.is_active;
 
-      if (!res.ok) {
-        console.warn("API route unavailable, performing local soft-delete.");
+      const response = await fetch(
+        `/api/staff/${member.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            isActive: nextStatus,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to update staff status."
+        );
       }
 
-      setStaffList((prev) => prev.filter((s) => s.id !== member.id));
-
-      if (selectedStaffId === member.id) {
-        setSelectedStaffId(null);
-        setHasChanges(false);
+      if (!data?.staff) {
+        throw new Error(
+          "The server did not return the updated staff record."
+        );
       }
 
-      setNotification(`${member.name} has been soft-deleted from the database.`);
-      setTimeout(() => setNotification(null), 3000);
+      setStaffList((previous) =>
+        previous.map((staff) =>
+          staff.id === member.id
+            ? data.staff
+            : staff
+        )
+      );
+
+      setNotification(
+        nextStatus
+          ? `${member.name} has been reactivated.`
+          : `${member.name} has been suspended.`
+      );
     } catch (error) {
-      setStaffList((prev) => prev.filter((s) => s.id !== member.id));
-      if (selectedStaffId === member.id) {
-        setSelectedStaffId(null);
-        setHasChanges(false);
-      }
-      setNotification(`${member.name} has been removed from active view.`);
-      setTimeout(() => setNotification(null), 3000);
+      console.error(
+        "Staff status update failed:",
+        error
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to update staff status."
+      );
+    } finally {
+      setProcessingStaffId(null);
     }
-  };
+  }
+
+  async function handleDeleteStaff() {
+    if (!selectedStaff) {
+      return;
+    }
+
+    const deletedStaffId =
+      selectedStaff.id;
+
+    const deletedStaffName =
+      selectedStaff.name;
+
+    setProcessingStaffId(
+      deletedStaffId
+    );
+
+    setNotification(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/staff/${deletedStaffId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to deactivate staff member."
+        );
+      }
+
+      if (!data?.staff) {
+        throw new Error(
+          "The server did not return the updated staff record."
+        );
+      }
+
+      setStaffList((previous) =>
+        previous.map((staff) =>
+          staff.id === deletedStaffId
+            ? data.staff
+            : staff
+        )
+      );
+
+      setShowDeleteModal(false);
+
+      const nextStaff = staffList.find(
+        (staff) =>
+          staff.id !== deletedStaffId &&
+          staff.is_active &&
+          !staff.deleted_at
+      );
+
+      setSelectedStaffId(
+        nextStaff?.id ?? null
+      );
+
+      setNotification(
+        `${deletedStaffName} has been deactivated.`
+      );
+    } catch (error) {
+      console.error(
+        "Staff deletion failed:",
+        error
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to deactivate staff member."
+      );
+    } finally {
+      setProcessingStaffId(null);
+    }
+  }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 bg-slate-50 min-h-screen">
-      {/* Page Notification Banner */}
-      {notification && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3 rounded-lg flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            <span>{notification}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setNotification(null)}
-            className="text-emerald-500 hover:text-emerald-700"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-sans pb-12">
+      {/* HEADER */}
+      <header className="bg-white border-b border-[#E2E8F0]">
+        <div className="max-w-7xl mx-auto px-6 py-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Staff & Access Control
+              </h1>
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Staff Directory & Access Control
-          </h1>
-          <p className="text-xs text-slate-500 font-medium">
-            VisionFirst Eye Hospital — System Administration
-          </p>
-        </div>
+              <p className="text-sm text-[#64748B] mt-1">
+                Manage staff accounts, account status,
+                and application permissions.
+              </p>
+            </div>
 
-        <div className="flex items-center gap-3">
-          {/* Search Box */}
-          <div className="relative flex-1 md:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search staff by name, ID, or role..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
-            />
-          </div>
-
-          {/* Add Staff Button */}
-          <button
-            type="button"
-            onClick={handleOpenAddStaff}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition-colors whitespace-nowrap shadow-sm cursor-pointer"
-          >
-            <UserPlus className="h-4 w-4" />
-            <span>Add Staff</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Role Filter Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-px">
-        {TAB_FILTERS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 whitespace-nowrap transition-all ${
-              activeTab === tab.id
-                ? "border-indigo-600 text-indigo-600 bg-indigo-50/50"
-                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-            }`}
-          >
-            <span>{tab.label}</span>
-            <span
-              className={`px-1.5 py-0.5 text-[10px] rounded-full font-bold ${
-                activeTab === tab.id
-                  ? "bg-indigo-100 text-indigo-700"
-                  : "bg-slate-100 text-slate-600"
-              }`}
+            <a
+              href="/admin/access-control/new"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold shadow-sm transition-colors"
             >
-              {tab.count}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* Main Content Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Table Card */}
-        <div className={`${selectedStaffId ? "lg:col-span-7" : "lg:col-span-12"} bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all`}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  <th className="py-3 px-4">Staff Member</th>
-                  <th className="py-3 px-4">Role & Dept</th>
-                  <th className="py-3 px-4 hidden md:table-cell">Facilities</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
-                {filteredStaff.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
-                      No staff members match your filter criteria.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredStaff.map((member) => {
-                    const isSelected = member.id === selectedStaffId;
-                    return (
-                      <tr
-                        key={member.id}
-                        onClick={() => handleSelectStaff(member)}
-                        className={`cursor-pointer transition-colors ${
-                          !member.isActive
-                            ? "bg-amber-50/40 opacity-75 hover:bg-amber-50/70"
-                            : isSelected
-                            ? "bg-indigo-50/60"
-                            : "hover:bg-slate-50"
-                        }`}
-                      >
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${
-                              member.isActive ? "bg-slate-200 text-slate-700" : "bg-amber-200 text-amber-800"
-                            }`}>
-                              {member.initials}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-semibold text-slate-900">{member.name}</p>
-                                {!member.isActive && (
-                                  <span className="px-1.5 py-0.2 text-[9px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300">
-                                    Suspended
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-400">{member.staffId}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold border rounded-md mb-1 ${member.roleColor}`}>
-                            {member.role}
-                          </span>
-                          <p className="text-[11px] text-slate-500">{member.department}</p>
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 hidden md:table-cell text-[11px]">
-                          {member.assignedFacilities}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Toggle Suspend / Reactivate Status */}
-                            <button
-                              type="button"
-                              title={member.isActive ? "Temporarily Suspend Access" : "Reactivate Access"}
-                              onClick={(e) => handleToggleStatus(e, member)}
-                              className={`p-1 rounded-md transition-colors ${
-                                member.isActive
-                                  ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-                                  : "text-amber-600 bg-amber-100 hover:text-emerald-600 hover:bg-emerald-50"
-                              }`}
-                            >
-                              {member.isActive ? (
-                                <UserX className="h-4 w-4" />
-                              ) : (
-                                <UserCheck className="h-4 w-4" />
-                              )}
-                            </button>
-
-                            {/* Drawer Trigger */}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectStaff(member);
-                              }}
-                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
-                                isSelected
-                                  ? "bg-indigo-600 text-white"
-                                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                              }`}
-                            >
-                              {isSelected ? "Editing" : "Permissions"}
-                            </button>
-
-                            {/* Soft Delete */}
-                            <button
-                              type="button"
-                              title="Delete Staff"
-                              onClick={(e) => handleDeleteStaff(e, member)}
-                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+              <UserPlus className="w-4 h-4" />
+              Add Staff Member
+            </a>
           </div>
         </div>
+      </header>
 
-        {/* Permissions Side Drawer */}
-        {activeStaff && (
-          <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-md p-5 space-y-5 sticky top-6">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900">{activeStaff.name}</h2>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold border rounded-md ${activeStaff.roleColor}`}>
-                    {activeStaff.role}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">{activeStaff.email}</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseDrawer}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <main className="max-w-7xl mx-auto px-6 pt-6">
+        {/* NOTIFICATIONS */}
+        {notification && (
+          <div className="mb-5 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
 
-            {!activeStaff.isActive && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                <span>
-                  This account is currently <strong>suspended</strong>. Permission changes will apply once reactivated.
-                </span>
-              </div>
-            )}
+            <span>{notification}</span>
 
-            <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1">
-              {PERMISSION_GROUPS.map((group) => {
-                const Icon = group.icon;
-                return (
-                  <div key={group.id} className="space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 tracking-wider">
-                      <Icon className="h-4 w-4 text-indigo-600" />
-                      <span>{group.title}</span>
-                    </div>
-
-                    <div className="space-y-2 pl-2 border-l-2 border-slate-100">
-                      {group.items.map((item) => {
-                        const isChecked = !!draftPermissions[item.key];
-                        return (
-                          <div
-                            key={item.key}
-                            onClick={() => handleTogglePermission(item.key)}
-                            className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-                          >
-                            <div className="space-y-0.5">
-                              <p className="text-xs font-medium text-slate-800">{item.label}</p>
-                              {item.badge && (
-                                <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded">
-                                  {item.badge}
-                                </span>
-                              )}
-                              {item.warning && (
-                                <p className="text-[10px] text-amber-600 flex items-center gap-1">
-                                  <AlertTriangle className="h-3 w-3" />
-                                  <span>{item.warning}</span>
-                                </p>
-                              )}
-                            </div>
-
-                            <button
-                              type="button"
-                              className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors shrink-0 ${
-                                isChecked ? "bg-indigo-600" : "bg-slate-200"
-                              }`}
-                            >
-                              <div
-                                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                                  isChecked ? "translate-x-4" : "translate-x-0"
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={handleResetPermissions}
-                disabled={!hasChanges}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors ${
-                  hasChanges
-                    ? "border-slate-300 text-slate-700 hover:bg-slate-50"
-                    : "border-slate-100 text-slate-300 cursor-not-allowed"
-                }`}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                <span>Reset</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveChanges}
-                disabled={!hasChanges}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-lg transition-colors shadow-sm ${
-                  hasChanges
-                    ? "bg-indigo-600 hover:bg-indigo-700"
-                    : "bg-indigo-300 cursor-not-allowed"
-                }`}
-              >
-                <Check className="h-4 w-4" />
-                <span>Save Access Rights</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setNotification(null)
+              }
+              className="ml-auto"
+              aria-label="Dismiss notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
-      </div>
 
-      {/* Add Staff Modal */}
-      {isAddStaffOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900">Add New Staff Member</h3>
-              <button
-                type="button"
-                onClick={() => setIsAddStaffOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        {errorMessage && (
+          <div className="mb-5 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+
+            <span>{errorMessage}</span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setErrorMessage(null)
+              }
+              className="ml-auto"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* SUMMARY CARDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+              Total Staff
+            </p>
+
+            <p className="text-2xl font-bold mt-2">
+              {staffList.length}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+              Active
+            </p>
+
+            <p className="text-2xl font-bold text-green-700 mt-2">
+              {activeCount}
+            </p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+              Inactive
+            </p>
+
+            <p className="text-2xl font-bold text-slate-500 mt-2">
+              {inactiveCount}
+            </p>
+          </div>
+        </div>
+
+        {/* SEARCH / FILTER */}
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 shadow-sm mb-6">
+          <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <div className="relative flex-1 max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) =>
+                  setSearchTerm(
+                    event.target.value
+                  )
+                }
+                placeholder="Search by name, email, username, staff ID or role..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm outline-none focus:ring-2 focus:ring-[#4F46E5]"
+              />
             </div>
 
-            <form onSubmit={handleAddStaffSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Dr. Jane Doe"
-                  value={newStaff.name}
-                  onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
+            <label className="inline-flex items-center gap-2 text-sm text-[#475569] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(event) =>
+                  setShowInactive(
+                    event.target.checked
+                  )
+                }
+                className="w-4 h-4 accent-[#4F46E5]"
+              />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="j.doe@visionfirst.ng"
-                  value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
-              </div>
+              Show inactive staff
+            </label>
+          </div>
+        </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={newStaff.role}
-                    onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    <option value="Senior Ophthalmologist">Senior Ophthalmologist</option>
-                    <option value="Retina Specialist">Retina Specialist</option>
-                    <option value="Senior Nurse">Senior Nurse</option>
-                    <option value="Anesthetist">Anesthetist</option>
-                    <option value="Lead Pharmacist">Lead Pharmacist</option>
-                    <option value="Front Desk Lead">Front Desk Lead</option>
-                  </select>
-                </div>
+        {loading ? (
+          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-[300px] flex items-center justify-center">
+            <div className="flex items-center gap-3 text-sm text-[#64748B]">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Loading staff directory...
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            {/* STAFF DIRECTORY */}
+            <section className="xl:col-span-2 bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#E2E8F0]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-semibold">
+                      Staff Directory
+                    </h2>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newStaff.department}
-                    onChange={(e) => setNewStaff({ ...newStaff, department: e.target.value })}
-                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                  />
+                    <p className="text-xs text-[#64748B] mt-1">
+                      {filteredStaff.length} staff member
+                      {filteredStaff.length === 1
+                        ? ""
+                        : "s"}{" "}
+                      shown
+                    </p>
+                  </div>
+
+                  <Shield className="w-5 h-5 text-[#4F46E5]" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Assigned Facilities
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newStaff.assignedFacilities}
-                  onChange={(e) =>
-                    setNewStaff({ ...newStaff, assignedFacilities: e.target.value })
-                  }
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-xs bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
+              <div className="divide-y divide-[#E2E8F0]">
+                {filteredStaff.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-sm font-medium text-[#334155]">
+                      No staff members found.
+                    </p>
+
+                    <p className="text-xs text-[#64748B] mt-1">
+                      Try changing your search or
+                      inactive filter.
+                    </p>
+                  </div>
+                ) : (
+                  filteredStaff.map(
+                    (member) => {
+                      const isSelected =
+                        member.id ===
+                        selectedStaffId;
+
+                      return (
+                        <button
+                          key={member.id}
+                          type="button"
+                          onClick={() =>
+                            setSelectedStaffId(
+                              member.id
+                            )
+                          }
+                          className={`w-full text-left p-4 transition-colors ${
+                            isSelected
+                              ? "bg-indigo-50"
+                              : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isSelected
+                                  ? "bg-[#4F46E5] text-white"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {getInitials(
+                                member.name
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm truncate">
+                                    {member.name}
+                                  </p>
+
+                                  <p className="text-xs text-[#64748B] truncate mt-0.5">
+                                    {member.email}
+                                  </p>
+                                </div>
+
+                                <span
+                                  className={`shrink-0 px-2 py-1 rounded-full border text-[10px] font-semibold ${getRoleStyle(
+                                    member.role
+                                  )}`}
+                                >
+                                  {getRoleLabel(
+                                    member.role
+                                  )}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[11px] text-[#64748B]">
+                                  {member.staff_id}
+                                </span>
+
+                                <span className="text-[#CBD5E1]">
+                                  •
+                                </span>
+
+                                <span
+                                  className={`text-[11px] font-medium ${
+                                    member.is_active &&
+                                    !member.deleted_at
+                                      ? "text-green-600"
+                                      : "text-slate-500"
+                                  }`}
+                                >
+                                  {member.is_active &&
+                                  !member.deleted_at
+                                    ? "Active"
+                                    : "Inactive"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    }
+                  )
+                )}
+              </div>
+            </section>
+
+            {/* DETAILS / PERMISSIONS */}
+            <section className="xl:col-span-3">
+              {!selectedStaff ? (
+                <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-[400px] flex items-center justify-center">
+                  <div className="text-center px-6">
+                    <Shield className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+
+                    <p className="font-semibold text-slate-700">
+                      Select a staff member
+                    </p>
+
+                    <p className="text-sm text-slate-500 mt-1">
+                      Choose a staff account from the
+                      directory to manage its permissions.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* PROFILE */}
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-indigo-100 text-[#4F46E5] flex items-center justify-center font-bold">
+                          {getInitials(
+                            selectedStaff.name
+                          )}
+                        </div>
+
+                        <div>
+                          <h2 className="text-lg font-bold">
+                            {selectedStaff.name}
+                          </h2>
+
+                          <p className="text-sm text-[#64748B]">
+                            {selectedStaff.title ||
+                              getRoleLabel(
+                                selectedStaff.role
+                              )}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <span
+                              className={`px-2 py-1 rounded-full border text-[10px] font-semibold ${getRoleStyle(
+                                selectedStaff.role
+                              )}`}
+                            >
+                              {getRoleLabel(
+                                selectedStaff.role
+                              )}
+                            </span>
+
+                            <span className="text-xs text-[#64748B]">
+                              {selectedStaff.staff_id}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                          selectedStaff.is_active &&
+                          !selectedStaff.deleted_at
+                            ? "bg-green-50 text-green-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            selectedStaff.is_active &&
+                            !selectedStaff.deleted_at
+                              ? "bg-green-500"
+                              : "bg-slate-400"
+                          }`}
+                        />
+
+                        {selectedStaff.is_active &&
+                        !selectedStaff.deleted_at
+                          ? "Active"
+                          : "Inactive"}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 pt-5 border-t border-[#E2E8F0]">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-[#94A3B8]">
+                          Username
+                        </p>
+
+                        <p className="text-sm mt-1">
+                          {selectedStaff.username}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-[#94A3B8]">
+                          Department
+                        </p>
+
+                        <p className="text-sm mt-1">
+                          {selectedStaff.department ||
+                            "Not specified"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-[#94A3B8]">
+                          Email
+                        </p>
+
+                        <p className="text-sm mt-1 break-all">
+                          {selectedStaff.email}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide font-semibold text-[#94A3B8]">
+                          Facilities
+                        </p>
+
+                        <p className="text-sm mt-1">
+                          {getFacilitiesText(
+                            selectedStaff.assigned_facilities
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* PERMISSIONS */}
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+                    <div className="px-5 py-4 border-b border-[#E2E8F0]">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <h2 className="font-semibold">
+                            Permissions
+                          </h2>
+
+                          <p className="text-xs text-[#64748B] mt-1">
+                            These permissions are stored with
+                            the staff account.
+                          </p>
+                        </div>
+
+                        <span className="text-[11px] bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-2.5 py-1">
+                          Server authorization still applies
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-5">
+                      {PERMISSION_GROUPS.map(
+                        (group) => {
+                          const Icon =
+                            group.icon;
+
+                          return (
+                            <div
+                              key={group.id}
+                              className="border border-[#E2E8F0] rounded-xl overflow-hidden"
+                            >
+                              <div className="px-4 py-3 bg-slate-50 border-b border-[#E2E8F0] flex items-center gap-2">
+                                <Icon className="w-4 h-4 text-[#4F46E5]" />
+
+                                <h3 className="text-xs font-bold tracking-wide text-[#334155]">
+                                  {group.title}
+                                </h3>
+                              </div>
+
+                              <div className="divide-y divide-[#E2E8F0]">
+                                {group.items.map(
+                                  (item) => (
+                                    <label
+                                      key={
+                                        item.key
+                                      }
+                                      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-slate-50"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(
+                                          draftPermissions[
+                                            item.key
+                                          ]
+                                        )}
+                                        onChange={() =>
+                                          togglePermission(
+                                            item.key
+                                          )
+                                        }
+                                        className="mt-0.5 w-4 h-4 accent-[#4F46E5]"
+                                      />
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="text-sm font-medium">
+                                            {
+                                              item.label
+                                            }
+                                          </span>
+
+                                          {item.badge && (
+                                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                              {
+                                                item.badge
+                                              }
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {item.warning && (
+                                          <div className="flex items-center gap-1.5 mt-1 text-[11px] text-amber-600">
+                                            <AlertTriangle className="w-3.5 h-3.5" />
+
+                                            {
+                                              item.warning
+                                            }
+                                          </div>
+                                        )}
+                                      </div>
+                                    </label>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+
+                    <div className="px-5 py-4 border-t border-[#E2E8F0] bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <p className="text-xs text-[#64748B]">
+                        Changes are saved to the staff
+                        record and recorded in the admin
+                        activity log.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={
+                          handleSaveChanges
+                        }
+                        disabled={saving}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold transition-colors"
+                      >
+                        {saving ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
+
+                        {saving
+                          ? "Saving..."
+                          : "Save Permissions"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ACCOUNT ACTIONS */}
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-sm">
+                    <h2 className="font-semibold">
+                      Account Actions
+                    </h2>
+
+                    <p className="text-xs text-[#64748B] mt-1 mb-5">
+                      These actions affect the actual staff
+                      account on the server.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleToggleStatus(
+                            selectedStaff
+                          )
+                        }
+                        disabled={
+                          processingStaffId ===
+                          selectedStaff.id
+                        }
+                        className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-semibold transition-colors disabled:opacity-60 ${
+                          selectedStaff.is_active
+                            ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                            : "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                        }`}
+                      >
+                        {processingStaffId ===
+                        selectedStaff.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : selectedStaff.is_active ? (
+                          <UserX className="w-4 h-4" />
+                        ) : (
+                          <UserCheck className="w-4 h-4" />
+                        )}
+
+                        {selectedStaff.is_active
+                          ? "Suspend Account"
+                          : "Reactivate Account"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowDeleteModal(
+                            true
+                          )
+                        }
+                        disabled={
+                          processingStaffId ===
+                          selectedStaff.id
+                        }
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-sm font-semibold transition-colors disabled:opacity-60"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Deactivate Staff
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* DELETE CONFIRMATION */}
+      {showDeleteModal &&
+        selectedStaff && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              type="button"
+              aria-label="Close confirmation"
+              onClick={() =>
+                setShowDeleteModal(false)
+              }
+              className="absolute inset-0 bg-slate-900/40"
+            />
+
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+
+                <div>
+                  <h2 className="font-bold text-lg">
+                    Deactivate staff member?
+                  </h2>
+
+                  <p className="text-sm text-[#64748B] mt-2">
+                    This will deactivate{" "}
+                    <strong>
+                      {selectedStaff.name}
+                    </strong>{" "}
+                    and mark the account as deleted.
+                    The database record will not be
+                    physically removed.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex justify-end gap-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setIsAddStaffOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  onClick={() =>
+                    setShowDeleteModal(
+                      false
+                    )
+                  }
+                  className="px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm font-medium hover:bg-slate-50"
                 >
                   Cancel
                 </button>
+
                 <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm"
+                  type="button"
+                  onClick={
+                    handleDeleteStaff
+                  }
+                  disabled={
+                    processingStaffId ===
+                    selectedStaff.id
+                  }
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-semibold"
                 >
-                  Save & Onboard Staff
+                  {processingStaffId ===
+                    selectedStaff.id && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+
+                  Deactivate Staff
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

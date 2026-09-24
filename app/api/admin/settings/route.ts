@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { requireRole } from "@/lib/server-auth";
+
 // --- TYPES FOR SYSTEM SETTINGS ---
+
 export interface HospitalProfile {
   name: string;
   licenseId: string;
@@ -40,7 +43,9 @@ export interface SystemSettingsPayload {
 }
 
 // --- MOCK IN-MEMORY DATABASE STORE ---
-// Replace this with your actual database call (e.g., Supabase, Prisma, or MongoDB)
+// This is still temporary.
+// Persistence should be moved to Supabase in a later step.
+
 let systemSettingsStore: SystemSettingsPayload = {
   profile: {
     name: "Sparkle Eye Specialist Hospital",
@@ -51,6 +56,7 @@ let systemSettingsStore: SystemSettingsPayload = {
     city: "Lagos",
     state: "Lagos State",
   },
+
   modules: {
     ehr: true,
     pharmacy: true,
@@ -59,22 +65,69 @@ let systemSettingsStore: SystemSettingsPayload = {
     patientPortal: false,
     telemedicine: false,
   },
+
   billing: {
     vatRate: "7.5%",
     invoiceDueDays: "14 Days",
   },
+
   departments: [
-    { id: 1, name: "Ophthalmology & OCT Diagnostic", status: "Active", staffCount: 12 },
-    { id: 2, name: "Pharmacy & Dispensing", status: "Active", staffCount: 6 },
-    { id: 3, name: "Surgical Suite & Recovery", status: "Active", staffCount: 8 },
+    {
+      id: 1,
+      name: "Ophthalmology & OCT Diagnostic",
+      status: "Active",
+      staffCount: 12,
+    },
+    {
+      id: 2,
+      name: "Pharmacy & Dispensing",
+      status: "Active",
+      staffCount: 6,
+    },
+    {
+      id: 3,
+      name: "Surgical Suite & Recovery",
+      status: "Active",
+      staffCount: 8,
+    },
   ],
 };
 
-// --- GET HANDLER: FETCH SYSTEM SETTINGS ---
+function unauthorizedResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Authentication required.",
+    },
+    { status: 401 }
+  );
+}
+
+function forbiddenResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      error: "You are not authorized to manage system settings.",
+    },
+    { status: 403 }
+  );
+}
+
+function serverErrorResponse(message: string) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: message,
+    },
+    { status: 500 }
+  );
+}
+
+// --- GET HANDLER ---
+
 export async function GET() {
   try {
-    // TODO: Fetch settings from your database
-    // const settings = await db.systemSettings.findFirst();
+    await requireRole(["IT_ADMIN"]);
 
     return NextResponse.json(
       {
@@ -84,57 +137,113 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
-    console.error("GET /api/admin/settings error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to retrieve system settings." },
-      { status: 500 }
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return unauthorizedResponse();
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return forbiddenResponse();
+      }
+    }
+
+    console.error(
+      "GET /api/admin/settings error:",
+      error
+    );
+
+    return serverErrorResponse(
+      "Failed to retrieve system settings."
     );
   }
 }
 
-// --- PUT/POST HANDLER: UPDATE SYSTEM SETTINGS ---
+// --- PUT HANDLER ---
+
 export async function PUT(request: Request) {
   try {
-    const body: Partial<SystemSettingsPayload> = await request.json();
+    await requireRole(["IT_ADMIN"]);
 
-    // basic validation check
-    if (!body || typeof body !== "object") {
+    const body =
+      (await request.json()) as Partial<SystemSettingsPayload>;
+
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
       return NextResponse.json(
-        { success: false, error: "Invalid request payload." },
+        {
+          success: false,
+          error: "Invalid request payload.",
+        },
         { status: 400 }
       );
     }
 
-    // Merge incoming changes into store
     systemSettingsStore = {
       ...systemSettingsStore,
-      ...(body.profile && { profile: { ...systemSettingsStore.profile, ...body.profile } }),
-      ...(body.modules && { modules: { ...systemSettingsStore.modules, ...body.modules } }),
-      ...(body.billing && { billing: { ...systemSettingsStore.billing, ...body.billing } }),
-      ...(body.departments && { departments: body.departments }),
-    };
 
-    // TODO: Save to your database table
-    // await db.systemSettings.update({ where: { id: 1 }, data: systemSettingsStore });
+      ...(body.profile && {
+        profile: {
+          ...systemSettingsStore.profile,
+          ...body.profile,
+        },
+      }),
+
+      ...(body.modules && {
+        modules: {
+          ...systemSettingsStore.modules,
+          ...body.modules,
+        },
+      }),
+
+      ...(body.billing && {
+        billing: {
+          ...systemSettingsStore.billing,
+          ...body.billing,
+        },
+      }),
+
+      ...(body.departments && {
+        departments: body.departments,
+      }),
+    };
 
     return NextResponse.json(
       {
         success: true,
-        message: "System settings updated successfully.",
+        message:
+          "System settings updated successfully.",
         data: systemSettingsStore,
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error("PUT /api/admin/settings error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to update system settings." },
-      { status: 500 }
+    if (error instanceof Error) {
+      if (error.message === "UNAUTHENTICATED") {
+        return unauthorizedResponse();
+      }
+
+      if (error.message === "FORBIDDEN") {
+        return forbiddenResponse();
+      }
+    }
+
+    console.error(
+      "PUT /api/admin/settings error:",
+      error
+    );
+
+    return serverErrorResponse(
+      "Failed to update system settings."
     );
   }
 }
 
-// Support POST as an alias for PUT
+// --- POST HANDLER ---
+// Keep POST as a compatibility alias for PUT.
+
 export async function POST(request: Request) {
   return PUT(request);
 }

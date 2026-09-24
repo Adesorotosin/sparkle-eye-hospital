@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/server-auth";
 
 export interface CashierQueueItem {
   id: string;
@@ -36,15 +38,13 @@ function getLagosDayRange() {
     }
   ).format(now);
 
-  const start =
-    new Date(
-      `${lagosDate}T00:00:00+01:00`
-    );
+  const start = new Date(
+    `${lagosDate}T00:00:00+01:00`
+  );
 
-  const end =
-    new Date(
-      `${lagosDate}T23:59:59.999+01:00`
-    );
+  const end = new Date(
+    `${lagosDate}T23:59:59.999+01:00`
+  );
 
   return {
     start: start.toISOString(),
@@ -58,6 +58,11 @@ export async function getCashierDashboard(): Promise<{
   data: CashierDashboardData;
 }> {
   try {
+    await requireRole([
+      "IT_ADMIN",
+      "CASHIER",
+    ]);
+
     const { start, end } =
       getLagosDayRange();
 
@@ -324,6 +329,42 @@ export async function getCashierDashboard(): Promise<{
       },
     };
   } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        "UNAUTHENTICATED"
+      ) {
+        return {
+          success: false,
+          message:
+            "You must be signed in to view the cashier dashboard.",
+          data: {
+            queue: [],
+            pendingCount: 0,
+            completedCount: 0,
+            revenue: 0,
+          },
+        };
+      }
+
+      if (
+        error.message ===
+        "FORBIDDEN"
+      ) {
+        return {
+          success: false,
+          message:
+            "You are not authorized to view the cashier dashboard.",
+          data: {
+            queue: [],
+            pendingCount: 0,
+            completedCount: 0,
+            revenue: 0,
+          },
+        };
+      }
+    }
+
     console.error(
       "Get cashier dashboard error:",
       error

@@ -58,10 +58,9 @@ export async function POST(
       symptoms,
       severity,
       durationText,
-    } = body;
+    } = body ?? {};
 
-    const patient =
-      await getPatientByCode(patientCode);
+    const patient = await getPatientByCode(patientCode);
 
     if (!patient) {
       return NextResponse.json(
@@ -74,10 +73,7 @@ export async function POST(
       );
     }
 
-    if (
-      !visualAcuityOD &&
-      !visualAcuityOS
-    ) {
+    if (!visualAcuityOD && !visualAcuityOS) {
       return NextResponse.json(
         {
           error:
@@ -95,8 +91,7 @@ export async function POST(
     ) {
       return NextResponse.json(
         {
-          error:
-            "Primary complaint is required.",
+          error: "Primary complaint is required.",
         },
         {
           status: 400,
@@ -104,97 +99,60 @@ export async function POST(
       );
     }
 
-    const { error: vitalsError } =
-      await supabaseServer
-        .from("vitals")
-        .insert({
-          patient_id:
-            patient.id,
-
-          visual_acuity_od:
-            visualAcuityOD ?? null,
-
-          visual_acuity_os:
-            visualAcuityOS ?? null,
-
-          visual_acuity_ou:
-            visualAcuityOU ?? null,
-
-          with_correction:
-            withCorrection ?? false,
-
-          iop_od:
-            iopOD ?? null,
-
-          iop_os:
-            iopOS ?? null,
-
-          iop_instrument:
-            iopInstrument ?? null,
-
-          bp_systolic:
-            bpSystolic ?? null,
-
-          bp_diastolic:
-            bpDiastolic ?? null,
-
-          pulse:
-            pulse ?? null,
-
-          temperature:
-            temperature ?? null,
-
-          spo2:
-            spo2 ?? null,
-
-          primary_complaint:
-            primaryComplaint.trim(),
-
-          symptoms:
-            Array.isArray(symptoms)
-              ? symptoms.join(", ")
-              : symptoms ?? null,
-
-          severity:
-            severity ?? null,
-
-          duration_text:
-            durationText ?? null,
-
-          recorded_by:
-            staff.id,
-        });
+    const { data: vitalsId, error: vitalsError } =
+      await supabaseServer.rpc("record_patient_vitals", {
+        p_patient_id: patient.id,
+        p_visual_acuity_od:
+          visualAcuityOD ?? null,
+        p_visual_acuity_os:
+          visualAcuityOS ?? null,
+        p_visual_acuity_ou:
+          visualAcuityOU ?? null,
+        p_with_correction:
+          withCorrection ?? false,
+        p_iop_od:
+          iopOD ?? null,
+        p_iop_os:
+          iopOS ?? null,
+        p_iop_instrument:
+          iopInstrument ?? null,
+        p_bp_systolic:
+          bpSystolic ?? null,
+        p_bp_diastolic:
+          bpDiastolic ?? null,
+        p_pulse:
+          pulse ?? null,
+        p_temperature:
+          temperature ?? null,
+        p_spo2:
+          spo2 ?? null,
+        p_primary_complaint:
+          primaryComplaint.trim(),
+        p_symptoms:
+          Array.isArray(symptoms)
+            ? symptoms.join(", ")
+            : symptoms ?? null,
+        p_severity:
+          severity ?? null,
+        p_duration_text:
+          durationText ?? null,
+        p_recorded_by:
+          staff.id,
+      });
 
     if (vitalsError) {
       console.error(
-        "Vitals creation failed:",
+        "Atomic vitals recording failed:",
         vitalsError
       );
 
       return NextResponse.json(
         {
-          error:
-            "Failed to record patient vitals.",
+          error: "Failed to record patient vitals.",
         },
         {
           status: 500,
         }
-      );
-    }
-
-    const {
-      error: statusError,
-    } = await supabaseServer
-      .from("patients")
-      .update({
-        status: "in_consultation",
-      })
-      .eq("id", patient.id);
-
-    if (statusError) {
-      console.error(
-        "Patient status update failed:",
-        statusError
       );
     }
 
@@ -205,19 +163,14 @@ export async function POST(
       staff.name
     );
 
-    const updated =
-      await getPatientRecord(
-        patientCode
-      );
+    const updated = await getPatientRecord(patientCode);
 
     return NextResponse.json({
       patient: updated,
+      vitalsId,
     });
   } catch (error) {
-    console.error(
-      "Update vitals error:",
-      error
-    );
+    console.error("Update vitals error:", error);
 
     if (
       error instanceof Error &&
@@ -250,8 +203,7 @@ export async function POST(
 
     return NextResponse.json(
       {
-        error:
-          "Failed to record patient vitals.",
+        error: "Failed to record patient vitals.",
       },
       {
         status: 500,

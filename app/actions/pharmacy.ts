@@ -619,292 +619,94 @@ export async function createPharmacyPrescription(
   }
 }
 
-export async function dispensePatientPrescriptions(
-  patientCode: string
-) {
+export async function dispensePatientPrescriptions(patientCode: string) {
   try {
-    const staff =
-      await requireRole([
-        ...PHARMACY_WRITE_ROLES,
-      ]);
+    const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
 
-    const code =
-      patientCode?.trim();
+    const code = patientCode?.trim();
 
     if (!code) {
       return {
         success: false,
-        message:
-          "Patient code is required.",
+        message: "Patient code is required.",
       };
     }
 
-    const {
-      data: patient,
-      error: patientError,
-    } =
-      await supabaseServer
-        .from("patients")
-        .select(
-          "id, patient_code, full_name"
-        )
-        .eq("patient_code", code)
-        .maybeSingle();
+    // Query the patient directly from Supabase
+    const { data: patient, error: patientError } = await supabaseServer
+      .from("patients")
+      .select("id, patient_code, full_name")
+      .eq("patient_code", code)
+      .maybeSingle();
 
-    if (patientError) {
-      throw patientError;
-    }
+   if (patientError) {
+  console.error("Patient lookup failed:", patientError);
 
-    if (!patient) {
+  return {
+    success: false,
+    message: "Failed to load patient.",
+  };
+}
+
+if (!patient) {
+  return {
+    success: false,
+    message: `Patient ${code} was not found.`,
+  };
+}
+
+    const { data, error } = await supabaseServer.rpc(
+      "dispense_patient_prescriptions",
+      {
+        p_patient_id: patient.id,
+      }
+    );
+
+    if (error) {
+      console.error("Atomic prescription dispensing failed:", error);
+
       return {
         success: false,
         message:
-          `Patient ${code} was not found.`,
+          error.message || "Failed to dispense patient prescriptions.",
       };
     }
-
-    const {
-      data: prescriptions,
-      error: prescriptionError,
-    } =
-      await supabaseServer
-        .from("prescriptions")
-        .select("*")
-        .eq("patient_id", patient.id)
-        .eq(
-          "status",
-          "ready_for_dispensing"
-        );
-
-    if (prescriptionError) {
-      throw prescriptionError;
-    }
-
-    if (
-      !prescriptions ||
-      prescriptions.length === 0
-    ) {
-      return {
-        success: false,
-        message:
-          "There are no paid prescriptions ready for dispensing.",
-      };
-    }
-
-    const stockChecks: Array<{
-      prescription: any;
-      inventory: any;
-      requiredQuantity: number;
-    }> = [];
-
-    for (const prescription of
-      prescriptions) {
-      const {
-        data: inventory,
-        error: inventoryError,
-      } =
-        await supabaseServer
-          .from("inventory_items")
-          .select(
-            "sku, name, stock, domain, price"
-          )
-          .eq(
-            "domain",
-            "pharmacy"
-          )
-          .ilike(
-            "name",
-            prescription.drug_name
-          )
-          .limit(1)
-          .maybeSingle();
-
-      if (inventoryError) {
-        throw inventoryError;
-      }
-
-      if (!inventory) {
-        return {
-          success: false,
-          message:
-            `No pharmacy stock record was found for ${prescription.drug_name}.`,
-        };
-      }
-
-      const requiredQuantity =
-        Number(
-          prescription.quantity ?? 0
-        );
-
-      const availableStock =
-        Number(
-          inventory.stock ?? 0
-        );
-
-      if (
-        requiredQuantity <= 0
-      ) {
-        return {
-          success: false,
-          message:
-            `Invalid quantity for ${prescription.drug_name}.`,
-        };
-      }
-
-      if (
-        availableStock <
-        requiredQuantity
-      ) {
-        return {
-          success: false,
-          message:
-            `Insufficient stock for ${prescription.drug_name}. Available: ${availableStock}, required: ${requiredQuantity}.`,
-        };
-      }
-
-      stockChecks.push({
-        prescription,
-        inventory,
-        requiredQuantity,
-      });
-    }
-
-    for (const item of stockChecks) {
-      const newStock =
-        Number(
-          item.inventory.stock
-        ) -
-        item.requiredQuantity;
-
-      const {
-        error: stockUpdateError,
-      } =
-        await supabaseServer
-          .from("inventory_items")
-          .update({
-            stock: newStock,
-          })
-          .eq(
-            "sku",
-            item.inventory.sku
-          );
-
-      if (stockUpdateError) {
-        throw stockUpdateError;
-      }
-    }
-
-    const prescriptionIds =
-      prescriptions.map(
-        (prescription) =>
-          prescription.id
-      );
-
-    const {
-      error: dispenseError,
-    } =
-      await supabaseServer
-        .from("prescriptions")
-        .update({
-          status: "dispensed",
-        })
-        .in(
-          "id",
-          prescriptionIds
-        )
-        .eq(
-          "status",
-          "ready_for_dispensing"
-        );
-
-    if (dispenseError) {
-      throw dispenseError;
-    }
-
-    const totalAmount =
-      prescriptions.reduce(
-        (sum, prescription) =>
-          sum +
-          Number(
-            prescription.total_price ??
-              0
-          ),
-        0
-      );
 
     await logActivity({
+      patientId: patient.id,
       module: "Pharmacy",
       category: "CLINICAL",
-      action:
-        `Prescription dispensed for ${patient.full_name}`,
+      action: "Patient prescriptions dispensed and sent to cashier.",
       performedBy: staff.name,
-      patientId: patient.id,
-      staffId: staff.id,
-      details: JSON.stringify({
-        patientCode:
-          patient.patient_code,
-        prescriptionIds,
-        itemCount:
-          prescriptions.length,
-        totalAmount,
-        inventoryDeducted:
-          stockChecks.map(
-            (item) => ({
-              sku:
-                item.inventory.sku,
-              drug:
-                item.inventory.name,
-              quantity:
-                item.requiredQuantity,
-            })
-          ),
-      }),
-      financialAmount:
-        totalAmount,
     });
 
     revalidatePath("/pharmacy");
-    revalidatePath("/cashier");
-    revalidatePath("/billing");
 
     return {
       success: true,
-      message:
-        "Prescription dispensed successfully.",
-      totalAmount,
-      prescriptionCount:
-        prescriptions.length,
+      message: "Prescriptions dispensed successfully.",
+      result: data,
     };
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "";
+    console.error("Dispense prescriptions error:", error);
 
-    if (message === "UNAUTHENTICATED") {
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
       return {
         success: false,
         message: "Authentication required.",
       };
     }
 
-    if (message === "FORBIDDEN") {
+    if (error instanceof Error && error.message === "FORBIDDEN") {
       return {
         success: false,
-        message:
-          "You are not authorized to dispense pharmacy prescriptions.",
+        message: "You do not have permission to dispense prescriptions.",
       };
     }
 
-    console.error(
-      "Dispense prescriptions error:",
-      error
-    );
-
     return {
       success: false,
-      message:
-        "An unexpected error occurred while dispensing the prescription.",
+      message: "Failed to dispense patient prescriptions.",
     };
   }
 }

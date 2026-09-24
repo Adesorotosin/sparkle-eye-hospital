@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
-import { getPatientRecord } from "@/lib/patient-flow";
+import { registerPatient } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 
 const PATIENT_READ_ROLES = [
@@ -14,260 +14,268 @@ const PATIENT_READ_ROLES = [
   "PHARMACIST",
 ] as const;
 
-const PATIENT_UPDATE_ROLES = [
+const PATIENT_CREATE_ROLES = [
   "IT_ADMIN",
+  "RECEPTIONIST",
+  "NURSE",
   "OPHTHALMOLOGIST",
   "DOCTOR",
-  "NURSE",
-  "RECEPTIONIST",
 ] as const;
 
-export async function GET(
-  request: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ code: string }>;
-  }
-) {
+export async function GET(request: NextRequest) {
   try {
     await requireRole([...PATIENT_READ_ROLES]);
 
-    const { code } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const search = searchParams.get("search")?.trim() || "";
 
-    if (!code?.trim()) {
-      return NextResponse.json(
-        {
-          error: "Patient code is required.",
-        },
-        { status: 400 }
+    let query = supabaseServer
+      .from("patients")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (search) {
+      query = query.or(
+        `patient_code.ilike.%${search}%,full_name.ilike.%${search}%,phone.ilike.%${search}%`
       );
     }
 
-    const patient = await getPatientRecord(
-      code.trim()
-    );
+    const { data, error } = await query;
 
-    if (!patient) {
+    if (error) {
+      console.error("Patient list failed:", error);
+
       return NextResponse.json(
-        {
-          error: "Patient not found.",
-        },
-        { status: 404 }
+        { error: "Failed to load patients." },
+        { status: 500 }
       );
     }
 
-    return NextResponse.json({ patient });
+    return NextResponse.json({
+      patients: data ?? [],
+    });
   } catch (error) {
-    console.error(
-      "Fetch patient error:",
-      error
-    );
+    const message = error instanceof Error ? error.message : "";
 
-    if (
-      error instanceof Error &&
-      error.message === "UNAUTHENTICATED"
-    ) {
+    if (message === "UNAUTHENTICATED") {
       return NextResponse.json(
-        {
-          error: "Authentication required.",
-        },
+        { error: "Authentication required." },
         { status: 401 }
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "FORBIDDEN"
-    ) {
+    if (message === "FORBIDDEN") {
       return NextResponse.json(
-        {
-          error:
-            "You do not have permission to view this patient record.",
-        },
+        { error: "You are not authorized to view patients." },
         { status: 403 }
       );
     }
 
+    console.error("Fetch patients error:", error);
+
     return NextResponse.json(
-      {
-        error: "Failed to load patient record.",
-      },
+      { error: "Failed to load patients." },
       { status: 500 }
     );
   }
 }
 
-export async function PATCH(
-  request: Request,
-  {
-    params,
-  }: {
-    params: Promise<{ code: string }>;
-  }
-) {
+export async function POST(request: NextRequest) {
   try {
-    const staff = await requireRole([
-      ...PATIENT_UPDATE_ROLES,
-    ]);
-
-    const { code } = await params;
-
-    if (!code?.trim()) {
-      return NextResponse.json(
-        {
-          error: "Patient code is required.",
-        },
-        { status: 400 }
-      );
-    }
+    const staff = await requireRole([...PATIENT_CREATE_ROLES]);
 
     const body = await request.json();
 
     const {
       fullName,
+      coveragePlan,
       age,
       gender,
       phone,
-      coveragePlan,
-      isWalkIn,
+      allergies,
       status,
-    } = body;
+      isWalkIn,
+    } = body ?? {};
 
-    const patch: Record<string, unknown> = {};
-
-    if (fullName !== undefined) {
-      if (
-        typeof fullName !== "string" ||
-        !fullName.trim()
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Full name must be a non-empty string.",
-          },
-          { status: 400 }
-        );
-      }
-
-      patch.full_name = fullName.trim();
-    }
-
-    if (age !== undefined) {
-      patch.age = age;
-    }
-
-    if (gender !== undefined) {
-      patch.gender = gender;
-    }
-
-    if (phone !== undefined) {
-      patch.phone = phone;
-    }
-
-    if (coveragePlan !== undefined) {
-      patch.coverage_plan = coveragePlan;
-    }
-
-    if (isWalkIn !== undefined) {
-      patch.is_walk_in = isWalkIn;
-    }
-
-    if (status !== undefined) {
-      patch.status = status;
-    }
-
-    if (Object.keys(patch).length === 0) {
+    if (typeof fullName !== "string" || !fullName.trim()) {
       return NextResponse.json(
-        {
-          error: "No fields to update.",
-        },
+        { error: "Full name is required." },
         { status: 400 }
       );
     }
 
-    const {
-      data,
-      error,
-    } = await supabaseServer
-      .from("patients")
-      .update(patch)
-      .eq("patient_code", code.trim())
-      .select("*")
-      .maybeSingle();
+    let normalizedAge: number | undefined;
 
-    if (error) {
-      throw error;
+    if (age !== undefined && age !== null && age !== "") {
+      const numericAge = Number(age);
+
+      if (
+        !Number.isInteger(numericAge) ||
+        numericAge < 0 ||
+        numericAge > 150
+      ) {
+        return NextResponse.json(
+          { error: "Age must be a valid number between 0 and 150." },
+          { status: 400 }
+        );
+      }
+
+      normalizedAge = numericAge;
     }
 
-    if (!data) {
+    if (
+      gender !== undefined &&
+      gender !== null &&
+      typeof gender !== "string"
+    ) {
       return NextResponse.json(
-        {
-          error: "Patient not found.",
-        },
-        { status: 404 }
+        { error: "Gender must be a string." },
+        { status: 400 }
       );
     }
 
-    await logActivity({
-      module: "Admin",
-      category: "ADMIN",
-      action: `Patient record updated: ${data.full_name} (${data.patient_code})`,
-      performedBy: staff.name,
-      staffId: staff.id,
-      patientId: data.id,
-      details: `Patient record updated by ${staff.name} (${staff.staffId}).`,
-    });
-
-    return NextResponse.json({
-      patient: {
-        patientId: data.patient_code,
-        fullName: data.full_name,
-        coveragePlan: data.coverage_plan,
-        age: data.age,
-        gender: data.gender,
-        phone: data.phone,
-        allergies: data.allergies,
-        status: data.status,
-        isWalkIn: data.is_walk_in,
-        lastVisitAt: data.last_visit_at,
-      },
-    });
-  } catch (error) {
-    console.error(
-      "Update patient error:",
-      error
-    );
-
     if (
-      error instanceof Error &&
-      error.message === "UNAUTHENTICATED"
+      phone !== undefined &&
+      phone !== null &&
+      typeof phone !== "string"
     ) {
       return NextResponse.json(
-        {
-          error: "Authentication required.",
+        { error: "Phone must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      coveragePlan !== undefined &&
+      coveragePlan !== null &&
+      typeof coveragePlan !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Coverage plan must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      allergies !== undefined &&
+      allergies !== null &&
+      typeof allergies !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Allergies must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      isWalkIn !== undefined &&
+      typeof isWalkIn !== "boolean"
+    ) {
+      return NextResponse.json(
+        { error: "isWalkIn must be a boolean." },
+        { status: 400 }
+      );
+    }
+
+    const allowedStatuses = [
+      "waiting_triage",
+      "in_consultation",
+      "completed_today",
+    ] as const;
+
+    if (
+      status !== undefined &&
+      (
+        typeof status !== "string" ||
+        !allowedStatuses.includes(
+          status as (typeof allowedStatuses)[number]
+        )
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Invalid patient status." },
+        { status: 400 }
+      );
+    }
+
+    const patient = await registerPatient({
+      fullName: fullName.trim(),
+      coveragePlan:
+        typeof coveragePlan === "string"
+          ? coveragePlan.trim()
+          : undefined,
+      age: normalizedAge,
+      gender:
+        typeof gender === "string"
+          ? gender.trim()
+          : undefined,
+      phone:
+        typeof phone === "string"
+          ? phone.trim()
+          : undefined,
+      allergies:
+        typeof allergies === "string"
+          ? allergies.trim()
+          : undefined,
+      status:
+        typeof status === "string"
+          ? (status as
+              | "waiting_triage"
+              | "in_consultation"
+              | "completed_today")
+          : undefined,
+      isWalkIn,
+    });
+
+    await logActivity({
+      patientId: patient.id,
+      module: "Patients",
+      category: "CLINICAL",
+      action: `Patient registered: ${patient.full_name} (${patient.patient_code})`,
+      performedBy: staff.name,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        patient: {
+          id: patient.id,
+          patientId: patient.patient_code,
+          fullName: patient.full_name,
+          coveragePlan: patient.coverage_plan,
+          age: patient.age,
+          gender: patient.gender,
+          phone: patient.phone,
+          allergies: patient.allergies,
+          status: patient.status,
+          isWalkIn: patient.is_walk_in,
+          lastVisitAt: patient.last_visit_at,
         },
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return NextResponse.json(
+        { error: "Authentication required." },
         { status: 401 }
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "FORBIDDEN"
-    ) {
+    if (message === "FORBIDDEN") {
       return NextResponse.json(
-        {
-          error:
-            "You do not have permission to update patient records.",
-        },
+        { error: "You are not authorized to register patients." },
         { status: 403 }
       );
     }
 
+    console.error("Register patient error:", error);
+
     return NextResponse.json(
-      {
-        error: "Failed to update patient.",
-      },
+      { error: "Failed to register patient." },
       { status: 500 }
     );
   }

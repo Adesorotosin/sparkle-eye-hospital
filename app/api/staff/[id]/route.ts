@@ -12,8 +12,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser =
-      await requireRole(["IT_ADMIN"]);
+    const currentUser = await requireRole(["IT_ADMIN"]);
 
     const { id } = await params;
 
@@ -43,8 +42,7 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         {
-          error:
-            "'isActive' must be a boolean.",
+          error: "'isActive' must be a boolean.",
         },
         { status: 400 }
       );
@@ -60,8 +58,7 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         {
-          error:
-            "'permissions' must be an object.",
+          error: "'permissions' must be an object.",
         },
         { status: 400 }
       );
@@ -91,17 +88,28 @@ export async function PATCH(
     if (!existing) {
       return NextResponse.json(
         {
-          error:
-            `Staff member with id "${id}" not found`,
+          error: `Staff member with id "${id}" not found`,
         },
         { status: 404 }
       );
     }
 
-    const updates: Record<
-      string,
-      unknown
-    > = {};
+    // Prevent an IT admin from suspending or reactivating their own account.
+    // Permission changes to their own account are still allowed.
+    if (
+      isActive !== undefined &&
+      existing.id === currentUser.id
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "You cannot suspend or reactivate your own account.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const updates: Record<string, unknown> = {};
 
     if (isActive !== undefined) {
       updates.is_active = isActive;
@@ -112,8 +120,7 @@ export async function PATCH(
     }
 
     if (permissions !== undefined) {
-      updates.permissions =
-        permissions;
+      updates.permissions = permissions;
     }
 
     const {
@@ -165,10 +172,8 @@ export async function PATCH(
         module: "Admin",
         category: "ADMIN",
         action: `Staff ${messageParts.join(", ")}: ${existing.name}`,
-        performedBy:
-          currentUser.name,
-        staffId:
-          currentUser.id,
+        performedBy: currentUser.name,
+        staffId: currentUser.id,
       });
     } catch (logError) {
       console.warn(
@@ -196,8 +201,7 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         {
-          error:
-            "Authentication required.",
+          error: "Authentication required.",
         },
         { status: 401 }
       );
@@ -218,8 +222,7 @@ export async function PATCH(
 
     return NextResponse.json(
       {
-        error:
-          "Failed to update staff record.",
+        error: "Failed to update staff record.",
       },
       { status: 500 }
     );
@@ -232,8 +235,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser =
-      await requireRole(["IT_ADMIN"]);
+    const currentUser = await requireRole(["IT_ADMIN"]);
 
     const { id } = await params;
 
@@ -267,6 +269,17 @@ export async function DELETE(
       );
     }
 
+    // Prevent an IT admin from deleting/deactivating their own account.
+    if (existing.id === currentUser.id) {
+      return NextResponse.json(
+        {
+          error:
+            "You cannot delete or deactivate your own account.",
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       data: updatedStaff,
       error: updateError,
@@ -274,8 +287,7 @@ export async function DELETE(
       .from("staff")
       .update({
         is_active: false,
-        deleted_at:
-          new Date().toISOString(),
+        deleted_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select(`
@@ -304,10 +316,8 @@ export async function DELETE(
         module: "Admin",
         category: "ADMIN",
         action: `Staff soft-deleted: ${existing.name}`,
-        performedBy:
-          currentUser.name,
-        staffId:
-          currentUser.id,
+        performedBy: currentUser.name,
+        staffId: currentUser.id,
       });
     } catch (logError) {
       console.warn(
@@ -336,8 +346,7 @@ export async function DELETE(
     ) {
       return NextResponse.json(
         {
-          error:
-            "Authentication required.",
+          error: "Authentication required.",
         },
         { status: 401 }
       );
