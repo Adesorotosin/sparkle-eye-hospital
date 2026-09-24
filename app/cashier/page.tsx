@@ -181,7 +181,7 @@ export default function CashierDashboard() {
   const handleSelectPatient =
     (patientId: string) => {
       router.push(
-        `/cashier/checkout?patientId=${encodeURIComponent(
+        `/billing?patientId=${encodeURIComponent(
           patientId
         )}`
       );
