@@ -470,7 +470,9 @@ export async function getPatientRecord(
         status:
           diagnostic.status === "completed"
             ? "completed"
-            : "ordered",
+            : diagnostic.status === "ready_for_test"
+              ? "ready_for_test"
+              : "ordered",
       })
     );
 
