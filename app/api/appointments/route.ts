@@ -96,6 +96,76 @@ export async function GET(request: Request) {
   }
 }
 
+
+export async function PATCH(request: Request) {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    const body = await request.json();
+    const id = typeof body?.id === "string" ? body.id.trim() : "";
+    const status = typeof body?.status === "string" ? body.status.trim() : "";
+
+    const allowedStatuses = ["scheduled", "checked_in", "completed", "cancelled", "no_show"];
+
+    if (!id || !status || !allowedStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: "A valid appointment id and status are required." },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabaseServer
+      .from("appointments")
+      .update({ status })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("Appointment update database error:", error);
+      return NextResponse.json({ error: "Failed to update appointment" }, { status: 500 });
+    }
+
+    await logActivity({
+      module: "Scheduling",
+      category: "ADMIN",
+      action: `Appointment status updated: ${data.patient_name} → ${status}`,
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: `Appointment ${data.id} was changed to ${status}.`,
+    });
+
+    return NextResponse.json({
+      success: true,
+      appointment: {
+        id: data.id,
+        patientName: data.patient_name,
+        physician: data.physician,
+        startTime: data.start_time,
+        endTime: data.end_time,
+        status: data.status,
+        notes: data.notes,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message === "UNAUTHENTICATED") {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    if (message === "FORBIDDEN") {
+      return NextResponse.json({ error: "You do not have permission to update appointments." }, { status: 403 });
+    }
+
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid JSON request body." }, { status: 400 });
+    }
+
+    console.error("Appointment update error:", error);
+    return NextResponse.json({ error: "Failed to update appointment" }, { status: 500 });
+  }
+}
+
 // --- POST: Book a new appointment ---
 export async function POST(request: Request) {
   try {
