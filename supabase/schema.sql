@@ -222,6 +222,107 @@ create index idx_appointments_time on appointments(start_time);
 create index idx_notifications_created on notifications(created_at);
 
 -- ============================================================
+-- PHARMACY DISPENSING
+-- Atomically dispenses all paid/ready prescriptions for a patient.
+-- Stock is deducted only when sufficient pharmacy inventory exists.
+-- ============================================================
+
+create or replace function public.dispense_patient_prescriptions(
+  p_patient_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  prescription_record record;
+  inventory_record record;
+  dispensed_count integer := 0;
+  total_quantity integer := 0;
+  prescription_ids uuid[] := '{}';
+begin
+  if p_patient_id is null then
+    raise exception 'Patient ID is required.';
+  end if;
+
+  /*
+   * Only prescriptions that have been unlocked by payment
+   * can be dispensed.
+   */
+  if not exists (
+    select 1
+    from prescriptions
+    where patient_id = p_patient_id
+      and status = 'ready_for_dispensing'
+  ) then
+    raise exception 'No prescriptions are ready for dispensing.';
+  end if;
+
+  /*
+   * Lock the patient's ready prescriptions and process them
+   * in creation order. The row locks prevent two concurrent
+   * dispensing attempts from consuming the same prescription.
+   */
+  for prescription_record in
+    select id, drug_name, quantity
+    from prescriptions
+    where patient_id = p_patient_id
+      and status = 'ready_for_dispensing'
+    order by created_at asc
+    for update
+  loop
+    /*
+     * Match the prescribed drug to pharmacy inventory.
+     * Matching is case-insensitive and ignores surrounding whitespace.
+     */
+    select id, name, stock
+    into inventory_record
+    from inventory_items
+    where domain = 'pharmacy'
+      and lower(trim(name)) = lower(trim(prescription_record.drug_name))
+    order by created_at asc
+    limit 1
+    for update;
+
+    if not found then
+      raise exception 'Pharmacy stock item not found for medication: %',
+        prescription_record.drug_name;
+    end if;
+
+    if inventory_record.stock < prescription_record.quantity then
+      raise exception 'Insufficient stock for %: % available, % required.',
+        inventory_record.name,
+        inventory_record.stock,
+        prescription_record.quantity;
+    end if;
+
+    update inventory_items
+    set stock = stock - prescription_record.quantity,
+        updated_at = now()
+    where id = inventory_record.id;
+
+    update prescriptions
+    set status = 'dispensed'
+    where id = prescription_record.id;
+
+    prescription_ids := array_append(
+      prescription_ids,
+      prescription_record.id
+    );
+    dispensed_count := dispensed_count + 1;
+    total_quantity := total_quantity + prescription_record.quantity;
+  end loop;
+
+  return jsonb_build_object(
+    'dispensed_count', dispensed_count,
+    'total_quantity', total_quantity,
+    'prescription_ids', prescription_ids
+  );
+end;
+$$;
+
+-- ============================================================
 -- Row Level Security
 -- All access in this app goes through server-side API routes using the
 -- Supabase SERVICE ROLE key (which bypasses RLS by design), so RLS here
