@@ -65,7 +65,7 @@ export default function LoginPage() {
         <div className="flex items-center gap-3.5">
           <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
             <Image
-              src="/logo.png"
+              src="/Logo.png"
               alt="Sparkle Eye Specialist Hospital Logo"
               width={48}
               height={48}
