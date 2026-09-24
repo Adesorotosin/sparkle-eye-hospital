@@ -596,11 +596,31 @@ function PharmacyContent() {
    * --------------------------------------------------
    */
 
-  const handleDispenseAndSend =
+  const handleDispense =
     async () => {
       if (!patientId) {
         setActionError(
           "No patient is currently selected."
+        );
+        return;
+      }
+
+      const readyPrescriptions =
+        activePrescriptions.filter(
+          (rx) =>
+            rx.status ===
+            "ready_for_dispensing"
+        );
+
+      if (readyPrescriptions.length === 0) {
+        setActionError(
+          activePrescriptions.some(
+            (rx) =>
+              rx.status ===
+              "pending_payment"
+          )
+            ? "This medication is waiting for Cashier payment before it can be dispensed."
+            : "No prescription is ready for dispensing."
         );
         return;
       }
@@ -623,11 +643,6 @@ function PharmacyContent() {
         }
 
         setDispenseSuccess(true);
-
-        /*
-         * Reload from Supabase so the displayed
-         * status is the actual database status.
-         */
 
         await loadPatient(patientId);
         await loadQueue();
@@ -1969,10 +1984,15 @@ function PharmacyContent() {
                           "ready_for_dispensing"
                       )
                       ? "Ready for Dispensing"
-                      : activePrescriptions.length >
-                          0
-                        ? "Prescription Pending"
-                        : "No Prescription"}
+                      : activePrescriptions.some(
+                          (rx) =>
+                            rx.status ===
+                            "pending_payment"
+                        )
+                        ? "Awaiting Cashier Payment"
+                        : activePrescriptions.length > 0
+                          ? "Prescription Pending"
+                          : "No Prescription"}
                 </span>
 
               </div>
@@ -2268,13 +2288,16 @@ function PharmacyContent() {
 
             <button
               onClick={
-                handleDispenseAndSend
+                handleDispense
               }
               disabled={
                 isDispensing ||
                 dispenseSuccess ||
-                activePrescriptions.length ===
-                  0
+                !activePrescriptions.some(
+                  (rx) =>
+                    rx.status ===
+                    "ready_for_dispensing"
+                )
               }
               type="button"
               className={`px-5 py-2.5 font-extrabold rounded-xl text-xs transition shadow-md flex items-center gap-2 ${
@@ -2294,10 +2317,19 @@ function PharmacyContent() {
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Dispensing...
                 </>
+              ) : activePrescriptions.some(
+                  (rx) =>
+                    rx.status ===
+                    "pending_payment"
+                ) ? (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  Awaiting Cashier Payment
+                </>
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4" />
-                  Dispense & Send to Cashier
+                  Dispense Medication
                 </>
               )}
 
