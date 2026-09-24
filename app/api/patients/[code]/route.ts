@@ -4,6 +4,8 @@ import { getPatientRecord } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
 
+export const dynamic = "force-dynamic";
+
 const PATIENT_READ_ROLES = [
   "IT_ADMIN",
   "OPHTHALMOLOGIST",
@@ -19,6 +21,7 @@ const PATIENT_UPDATE_ROLES = [
   "DOCTOR",
   "NURSE",
   "RECEPTIONIST",
+  "PHARMACIST",
 ] as const;
 
 export async function GET(
@@ -28,8 +31,8 @@ export async function GET(
   try {
     await requireRole([...PATIENT_READ_ROLES]);
 
-    const { code } = await params;
-    const patientCode = code?.trim();
+    const resolvedParams = await params;
+    const patientCode = resolvedParams?.code?.trim();
 
     if (!patientCode) {
       return NextResponse.json(
@@ -81,8 +84,8 @@ export async function PATCH(
   try {
     const staff = await requireRole([...PATIENT_UPDATE_ROLES]);
 
-    const { code } = await params;
-    const patientCode = code?.trim();
+    const resolvedParams = await params;
+    const patientCode = resolvedParams?.code?.trim();
 
     if (!patientCode) {
       return NextResponse.json(

@@ -155,10 +155,9 @@ export async function getPharmacyPatient(
           status:
             rx.status === "dispensed"
               ? "dispensed"
-              : rx.status ===
-                  "ready_for_dispensing"
-                ? "ready_for_dispensing"
-                : "pending_payment",
+              : rx.status === "pending_payment"
+                ? "pending_payment"
+                : "ready_for_dispensing",
         })
       ),
     };
@@ -494,7 +493,7 @@ export async function createPharmacyPrescription(
           quantity,
           price_per_unit: pricePerUnit,
           total_price: totalPrice,
-          status: "pending_payment",
+          status: "ready_for_dispensing", // Updated default status to make items ready for dispensing
         })
         .select("id")
         .single();
@@ -639,21 +638,21 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       .eq("patient_code", code)
       .maybeSingle();
 
-   if (patientError) {
-  console.error("Patient lookup failed:", patientError);
+    if (patientError) {
+      console.error("Patient lookup failed:", patientError);
 
-  return {
-    success: false,
-    message: "Failed to load patient.",
-  };
-}
+      return {
+        success: false,
+        message: "Failed to load patient.",
+      };
+    }
 
-if (!patient) {
-  return {
-    success: false,
-    message: `Patient ${code} was not found.`,
-  };
-}
+    if (!patient) {
+      return {
+        success: false,
+        message: `Patient ${code} was not found.`,
+      };
+    }
 
     const { data, error } = await supabaseServer.rpc(
       "dispense_patient_prescriptions",
