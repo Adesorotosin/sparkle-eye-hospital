@@ -1,70 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  "/admin": ["IT_ADMIN"],
-  "/audit": ["IT_ADMIN"],
+import {
+  ROUTE_PERMISSIONS,
+  type UserRole,
+} from "@/lib/rbac-config";
 
-  "/emr": [
-    "IT_ADMIN",
-    "OPHTHALMOLOGIST",
-    "DOCTOR",
-    "NURSE",
-  ],
-
-  "/doctor": [
-    "IT_ADMIN",
-    "OPHTHALMOLOGIST",
-    "DOCTOR",
-    "NURSE",
-  ],
-
-  "/consultation": [
-    "IT_ADMIN",
-    "OPHTHALMOLOGIST",
-    "DOCTOR",
-    "NURSE",
-  ],
-
-  "/pharmacy": [
-    "IT_ADMIN",
-    "PHARMACIST",
-    "NURSE",
-    "DOCTOR",
-  ],
-
-  "/cashier": [
-    "IT_ADMIN",
-    "CASHIER",
-  ],
-
-  "/billing": [
-    "IT_ADMIN",
-    "CASHIER",
-    "NURSE",
-    "DOCTOR",
-  ],
-
-  "/nurse": [
-    "IT_ADMIN",
-    "NURSE",
-    "DOCTOR",
-  ],
-
-  "/receptionist": [
-    "IT_ADMIN",
-    "RECEPTIONIST",
-  ],
-
-  "/laboratory": [
-    "IT_ADMIN",
-    "DOCTOR",
-    "OPHTHALMOLOGIST",
-    "NURSE",
-  ],
-};
-
-const ROLE_DASHBOARD_MAP: Record<string, string> = {
+const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
   IT_ADMIN: "/admin",
   OPHTHALMOLOGIST: "/doctor",
   DOCTOR: "/doctor",
@@ -74,15 +16,15 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
   RECEPTIONIST: "/receptionist",
 };
 
-function normalizeRole(role: unknown) {
+function normalizeRole(role: unknown): string {
   return String(role ?? "")
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, "_");
 }
 
-function isProtectedPage(pathname: string) {
-  return Object.keys(ROLE_PERMISSIONS).some(
+function getProtectedRoute(pathname: string) {
+  return Object.keys(ROUTE_PERMISSIONS).find(
     (route) =>
       pathname === route ||
       pathname.startsWith(`${route}/`)
@@ -101,9 +43,7 @@ async function getAuthenticatedUser(request: NextRequest) {
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        cookie,
-      },
+      headers: { cookie },
       cache: "no-store",
     });
 
@@ -144,48 +84,30 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Only protected application pages need authentication.
-  if (!isProtectedPage(pathname)) {
+  // Route permissions are defined centrally in lib/rbac-config.ts.
+  const protectedRoute = getProtectedRoute(pathname);
+
+  if (!protectedRoute) {
     return NextResponse.next();
   }
 
-  // The database-backed session is now the source of truth.
   const user = await getAuthenticatedUser(request);
 
   if (!user) {
     const loginUrl = new URL("/", request.url);
-
-    // Preserve the page the user originally requested.
-    loginUrl.searchParams.set(
-      "redirect",
-      pathname
-    );
+    loginUrl.searchParams.set("redirect", pathname);
 
     return NextResponse.redirect(loginUrl);
   }
 
-  const userRole = normalizeRole(user.role);
+  const userRole = normalizeRole(user.role) as UserRole;
+  const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
 
-  const protectedRoute = Object.keys(
-    ROLE_PERMISSIONS
-  ).find(
-    (route) =>
-      pathname === route ||
-      pathname.startsWith(`${route}/`)
-  );
-
-  if (protectedRoute) {
-    const allowedRoles =
-      ROLE_PERMISSIONS[protectedRoute];
-
-    if (!allowedRoles.includes(userRole)) {
-      const fallbackTarget =
-        ROLE_DASHBOARD_MAP[userRole] || "/";
-
-      return NextResponse.redirect(
-        new URL(fallbackTarget, request.url)
-      );
-    }
+  if (!allowedRoles.includes(userRole)) {
+    const fallbackTarget = ROLE_DASHBOARD_MAP[userRole] || "/";
+    return NextResponse.redirect(
+      new URL(fallbackTarget, request.url)
+    );
   }
 
   return NextResponse.next();
@@ -196,14 +118,18 @@ export const config = {
     "/",
     "/admin/:path*",
     "/audit/:path*",
-    "/emr/:path*",
     "/doctor/:path*",
+    "/emr/:path*",
     "/consultation/:path*",
     "/pharmacy/:path*",
     "/cashier/:path*",
     "/billing/:path*",
     "/nurse/:path*",
+    "/reception/:path*",
     "/receptionist/:path*",
-    "/laboratory/:path*",
+    "/triage/:path*",
+    "/diagnostics/:path*",
+    "/appointments/:path*",
+    "/inventory/:path*",
   ],
 };
