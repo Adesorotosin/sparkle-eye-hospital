@@ -48,7 +48,7 @@ export interface DiagnosticOrder {
   id: string;
   name: string;
   price: number;
-  status: "ordered" | "completed";
+  status: "ordered" | "ready_for_test" | "completed";
 }
 
 export interface Prescription {
