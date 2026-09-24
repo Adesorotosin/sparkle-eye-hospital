@@ -320,7 +320,16 @@ begin
     'prescription_ids', prescription_ids
   );
 end;
-$$;
+$;
+
+-- This function is intentionally callable only by the server-side
+-- Supabase service role. It must not be directly executable by
+-- browser clients.
+revoke execute on function public.dispense_patient_prescriptions(uuid)
+from public, anon, authenticated;
+
+grant execute on function public.dispense_patient_prescriptions(uuid)
+to service_role;
 
 -- ============================================================
 -- Row Level Security
