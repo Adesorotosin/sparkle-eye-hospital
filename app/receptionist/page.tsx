@@ -297,7 +297,14 @@ export default function ReceptionistPage() {
               Refresh
             </button>
             <button
-              onClick={() => router.push("/")}
+              onClick={async () => {
+                try {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                } finally {
+                  localStorage.removeItem("sparkle_staff_token");
+                  window.location.href = "/";
+                }
+              }}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
             >
               <LogOut className="h-4 w-4" />
@@ -458,12 +465,20 @@ export default function ReceptionistPage() {
                           <p className="mt-1 text-[11px] font-bold text-purple-600">{patient.patientId}</p>
                           <p className="mt-1 text-[11px] text-slate-400">{patient.phone || "No phone"} · {patient.coveragePlan || "Self-Pay"}</p>
                         </div>
-                        <button
-                          onClick={() => openAppointmentForPatient(patient)}
-                          className="shrink-0 rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-[10px] font-extrabold text-purple-700 hover:bg-purple-100"
-                        >
-                          Book
-                        </button>
+                        <div className="flex shrink-0 flex-col gap-1.5">
+                          <button
+                            onClick={() => openAppointmentForPatient(patient)}
+                            className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-[10px] font-extrabold text-purple-700 hover:bg-purple-100"
+                          >
+                            Book
+                          </button>
+                          <button
+                            onClick={() => router.push(`/triage?patientId=${encodeURIComponent(patient.patientId)}`)}
+                            className="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[10px] font-extrabold text-white hover:bg-slate-800"
+                          >
+                            Triage
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
