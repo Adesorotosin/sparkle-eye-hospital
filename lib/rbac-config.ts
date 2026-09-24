@@ -28,7 +28,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/billing": ["CASHIER", "IT_ADMIN"],
   "/cashier": ["CASHIER", "IT_ADMIN"],
   "/nurse": ["NURSE", "IT_ADMIN", "DOCTOR"],
-  "/reception": ["RECEPTIONIST", "CASHIER", "IT_ADMIN"],
+  "/receptionist": ["RECEPTIONIST", "IT_ADMIN"],
   "/triage": ["NURSE", "DOCTOR", "OPHTHALMOLOGIST", "IT_ADMIN"],
   "/diagnostics": ["DOCTOR", "OPHTHALMOLOGIST", "NURSE", "IT_ADMIN"],
   "/appointments": ["RECEPTIONIST", "NURSE", "DOCTOR", "OPHTHALMOLOGIST", "CASHIER", "IT_ADMIN"],
