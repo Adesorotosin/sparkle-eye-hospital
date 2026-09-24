@@ -292,7 +292,7 @@ export default function NurseDashboard() {
         <div className="flex items-center gap-3">
           <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[#6B21A8]/5 border border-[#6B21A8]/10 shadow-xs">
             <Image
-              src="/logo.png"
+              src="/Logo.png"
               alt="Sparkle Eye Specialist Hospital Logo"
               width={36}
               height={36}
