@@ -1148,6 +1148,60 @@ export default function OphthalmologyConsultation() {
 
               {/* TRIAGE SUMMARY */}
               <TriageSummary vitals={patient.vitals} />
+              
+              {/* DIAGNOSTIC RESULTS */}
+              {patient.diagnostics.length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600">Diagnostics</p>
+                      <h3 className="text-sm font-bold text-slate-900 mt-1">Investigation Results</h3>
+                      <p className="text-[10px] text-slate-400 mt-1">Results recorded after payment and investigation.</p>
+                    </div>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                      {patient.diagnostics.length} {patient.diagnostics.length === 1 ? "TEST" : "TESTS"}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {patient.diagnostics.map((diagnostic) => (
+                      <div key={diagnostic.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{diagnostic.name}</p>
+                            <p className="text-[10px] text-slate-400 mt-1">₦{diagnostic.price.toLocaleString()}</p>
+                          </div>
+                          <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
+                            diagnostic.status === "completed"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : diagnostic.status === "ready_for_test"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-slate-100 text-slate-600"
+                          }`}>
+                            {diagnostic.status === "completed" ? "COMPLETED" : diagnostic.status === "ready_for_test" ? "READY FOR TEST" : "ORDERED"}
+                          </span>
+                        </div>
+                        {diagnostic.status === "completed" ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                            <div className="rounded-lg bg-white border border-slate-200 p-3">
+                              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Findings</p>
+                              <p className="text-xs text-slate-700 leading-relaxed mt-1 whitespace-pre-wrap">{diagnostic.findings || "No findings recorded."}</p>
+                            </div>
+                            <div className="rounded-lg bg-white border border-slate-200 p-3">
+                              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Interpretation</p>
+                              <p className="text-xs text-slate-700 leading-relaxed mt-1 whitespace-pre-wrap">{diagnostic.interpretation || "No interpretation recorded."}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-500 mt-3">
+                            {diagnostic.status === "ready_for_test" ? "Payment completed. Investigation is ready to be performed." : "Diagnostic order created. Awaiting Cashier payment."}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
 
               {/* SLIT LAMP */}
               {activeTab === "slit-lamp" && (
