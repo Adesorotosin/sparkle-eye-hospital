@@ -17,11 +17,7 @@ export interface UserSession {
   token: string;
 }
 
-// Define route access policies
-// NOTE: this is the ONLY place route permissions are defined. proxy.ts
-// imports this directly instead of keeping its own copy, to avoid the two
-// configs drifting out of sync (which is what caused most routes to end up
-// unprotected before).
+// Central route access policy used by middleware and server-side checks.
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/admin": ["IT_ADMIN"],
   "/audit": ["IT_ADMIN"],
