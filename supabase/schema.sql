@@ -73,8 +73,12 @@ create table diagnostic_orders (
   patient_id uuid not null references patients(id) on delete cascade,
   name text not null,
   price numeric not null,
-  status text not null default 'ordered' check (status in ('ordered','completed')),
+  status text not null default 'ordered' check (status in ('ordered','ready_for_test','completed')),
   ordered_by uuid references staff(id),
+  completed_by uuid references staff(id),
+  findings text,
+  interpretation text,
+  completed_at timestamptz,
   created_at timestamptz not null default now()
 );
 
