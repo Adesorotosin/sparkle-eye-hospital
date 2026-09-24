@@ -135,6 +135,7 @@ export async function saveConsultationEncounter(
           diagnosis: formData.diagnosis.trim() || null,
 
           status: formData.status,
+          recorded_by: staff.id,
         })
         .select("id")
         .single();
