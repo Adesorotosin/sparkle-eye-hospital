@@ -675,7 +675,7 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       patientId: patient.id,
       module: "Pharmacy",
       category: "CLINICAL",
-      action: "Patient prescriptions dispensed and sent to cashier.",
+      action: "Patient prescriptions dispensed.",
       performedBy: staff.name,
     });
 
@@ -683,7 +683,7 @@ export async function dispensePatientPrescriptions(patientCode: string) {
 
     return {
       success: true,
-      message: "Prescriptions dispensed successfully.",
+      message: "Prescriptions dispensed successfully and inventory was updated.",
       result: data,
     };
   } catch (error) {
