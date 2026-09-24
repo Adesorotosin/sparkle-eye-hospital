@@ -776,7 +776,7 @@ export async function processBillingPayment(input: {
           "id, name, price, status, created_at"
         )
         .eq("patient_id", patient.id)
-        .eq("status", "ordered")
+         .eq("status", "ordered")
         .order("created_at", {
           ascending: true,
         });
@@ -878,7 +878,7 @@ export async function processBillingPayment(input: {
         } = await supabaseServer
           .from("diagnostic_orders")
           .update({
-            status: "completed",
+            status: "ready_for_test",
           })
           .in(
             "id",
@@ -992,7 +992,7 @@ export async function processBillingPayment(input: {
           )
           .eq(
             "status",
-            "completed"
+            "ready_for_test"
           );
       }
 
