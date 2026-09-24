@@ -125,6 +125,26 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Failed to update appointment" }, { status: 500 });
     }
 
+    if (status === "checked_in") {
+      const patientCodeMatch = /\\(([^()]+)\\)\\s*$/.exec(data.patient_name);
+      const patientCode = patientCodeMatch?.[1]?.trim();
+
+      if (patientCode) {
+        const { error: patientUpdateError } = await supabaseServer
+          .from("patients")
+          .update({ status: "waiting_triage" })
+          .eq("patient_code", patientCode);
+
+        if (patientUpdateError) {
+          console.error("Failed to move checked-in patient to triage queue:", patientUpdateError);
+          return NextResponse.json(
+            { error: "Appointment was checked in, but the patient could not be moved to the triage queue." },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
     await logActivity({
       module: "Scheduling",
       category: "ADMIN",
