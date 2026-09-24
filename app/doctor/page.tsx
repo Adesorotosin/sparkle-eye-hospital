@@ -62,21 +62,39 @@ export default function DoctorDashboard() {
         const { patients } = await res.json();
         if (cancelled) return;
 
+        /*
+         * The doctor queue starts after triage.
+         * Patients registered at Reception remain in waiting_triage and
+         * must not be opened directly by the doctor.
+         *
+         * completed_today remains visible so doctors can review today's
+         * completed encounters.
+         */
         setDoctorQueue(
-          patients.map((p: any) => ({
-            id: p.patientId,
-            fullName: p.fullName,
-            age: p.age,
-            gender: p.gender,
-            triageNote: p.primaryComplaint || "No triage notes recorded yet.",
-            // No real priority tracking exists yet — defaulting to Normal
-            // rather than fabricating urgency that isn't there.
-            priority: "Normal",
-            status: STATUS_TO_QUEUE[p.status] || "waiting",
-            timeInQueue: p.lastVisitAt
-              ? new Date(p.lastVisitAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-              : "—",
-          }))
+          patients
+            .filter(
+              (p: any) =>
+                p.status === "in_consultation" ||
+                p.status === "completed_today"
+            )
+            .map((p: any) => ({
+              id: p.patientId,
+              fullName: p.fullName,
+              age: p.age,
+              gender: p.gender,
+              triageNote:
+                p.primaryComplaint || "No triage notes recorded yet.",
+              // No real priority tracking exists yet — defaulting to Normal
+              // rather than fabricating urgency that isn't there.
+              priority: "Normal",
+              status: STATUS_TO_QUEUE[p.status] || "waiting",
+              timeInQueue: p.lastVisitAt
+                ? new Date(p.lastVisitAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "—",
+            }))
         );
       } catch (err) {
         console.error(err);
