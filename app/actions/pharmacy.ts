@@ -493,7 +493,7 @@ export async function createPharmacyPrescription(
           quantity,
           price_per_unit: pricePerUnit,
           total_price: totalPrice,
-          status: "ready_for_dispensing", // Updated default status to make items ready for dispensing
+          status: "pending_payment",
         })
         .select("id")
         .single();
