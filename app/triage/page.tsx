@@ -139,11 +139,11 @@ function TriageVitalsContent() {
         throw new Error(result?.error || "Failed to save patient vitals.");
       }
 
-      setSaveMessage("Vitals saved successfully.");
+      setSaveMessage("Vitals saved successfully. Patient sent to the doctor queue.");
 
       setTimeout(() => {
-        router.push(`/doctor/patients/${encodeURIComponent(patientId)}/encounter`);
-      }, 500);
+        router.push("/nurse");
+      }, 700);
     } catch (error) {
       console.error("Save vitals error:", error);
 
@@ -599,7 +599,7 @@ function TriageVitalsContent() {
                     </>
                   ) : (
                     <>
-                      <span>Save Vitals & Proceed to Exam</span>
+                      <span>Save Vitals & Send to Doctor</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
