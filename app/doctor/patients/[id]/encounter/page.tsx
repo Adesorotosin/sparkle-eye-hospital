@@ -57,6 +57,16 @@ type PatientEncounter = {
   createdAt: string;
 };
 
+type PatientDiagnostic = {
+  id: string;
+  name: string;
+  price: number;
+  status: "ordered" | "ready_for_test" | "completed";
+  findings?: string;
+  interpretation?: string;
+  completedAt?: string;
+};
+
 type PatientRecord = {
   id: string;
   name: string;
@@ -66,6 +76,7 @@ type PatientRecord = {
   allergies: string[];
 
   vitals?: PatientVitals;
+  diagnostics: PatientDiagnostic[];
 
   history: {
     date: string;
@@ -189,6 +200,23 @@ function mapApiPatientToRecord(apiPatient: any): PatientRecord {
       }
     : undefined;
 
+  const diagnostics: PatientDiagnostic[] = Array.isArray(apiPatient?.diagnostics)
+    ? apiPatient.diagnostics.map((diagnostic: any) => ({
+        id: diagnostic.id,
+        name: diagnostic.name ?? "",
+        price: Number(diagnostic.price ?? 0),
+        status:
+          diagnostic.status === "completed"
+            ? "completed"
+            : diagnostic.status === "ready_for_test"
+              ? "ready_for_test"
+              : "ordered",
+        findings: diagnostic.findings ?? undefined,
+        interpretation: diagnostic.interpretation ?? undefined,
+        completedAt: diagnostic.completedAt ?? undefined,
+      }))
+    : [];
+
   const history = encounters.map((encounter: PatientEncounter) => {
     const details = [
       encounter.diagnosis
@@ -289,6 +317,7 @@ history.sort(
           ? apiPatient.allergies
           : [],
     vitals: apiPatient.vitals,
+    diagnostics,
     history,
     imaging: [],
     slitLamp: currentSlitLamp,
