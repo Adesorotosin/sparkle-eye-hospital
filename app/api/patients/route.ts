@@ -53,9 +53,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      patients: data ?? [],
-    });
+    const patients = (data ?? []).map((patient) => ({
+      id: patient.id,
+      patientId: patient.patient_code,
+      fullName: patient.full_name,
+      coveragePlan: patient.coverage_plan,
+      age: patient.age,
+      gender: patient.gender,
+      phone: patient.phone,
+      allergies: patient.allergies,
+      status: patient.status,
+      isWalkIn: patient.is_walk_in,
+      lastVisitAt: patient.last_visit_at,
+      primaryComplaint: patient.primary_complaint ?? null,
+    }));
+
+    return NextResponse.json({ patients });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
 
