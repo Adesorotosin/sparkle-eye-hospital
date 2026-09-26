@@ -16,6 +16,10 @@ import {
   UserX,
   UserCheck,
   Loader2,
+  KeyRound,
+  Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface StaffMember {
@@ -394,6 +398,18 @@ export default function AccessControlPage() {
   const [processingStaffId, setProcessingStaffId] =
     useState<string | null>(null);
 
+  const [resettingPassword, setResettingPassword] =
+    useState(false);
+
+  const [resetPassword, setResetPassword] =
+    useState<string | null>(null);
+
+  const [showResetPassword, setShowResetPassword] =
+    useState(false);
+
+  const [resetPasswordCopied, setResetPasswordCopied] =
+    useState(false);
+
   const selectedStaff = useMemo(
     () =>
       staffList.find(
@@ -744,6 +760,108 @@ export default function AccessControlPage() {
       );
     } finally {
       setProcessingStaffId(null);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!selectedStaff) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Reset the password for ${selectedStaff.name}?\n\n` +
+        "This will invalidate the staff member's existing sessions."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setResettingPassword(true);
+    setResetPassword(null);
+    setShowResetPassword(false);
+    setResetPasswordCopied(false);
+    setNotification(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/staff/${selectedStaff.id}/reset-password`,
+        {
+          method: "POST",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to reset staff password."
+        );
+      }
+
+      if (!data?.temporaryPassword) {
+        throw new Error(
+          "The server did not return the new temporary password."
+        );
+      }
+
+      setResetPassword(
+        data.temporaryPassword
+      );
+
+      setShowResetPassword(true);
+
+      setNotification(
+        `Password reset successfully for ${selectedStaff.name}.`
+      );
+    } catch (error) {
+      console.error(
+        "Password reset failed:",
+        error
+      );
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to reset staff password."
+      );
+    } finally {
+      setResettingPassword(false);
+    }
+  }
+
+  function closeResetPasswordModal() {
+    setResetPassword(null);
+    setShowResetPassword(false);
+    setResetPasswordCopied(false);
+  }
+
+  async function copyResetPassword() {
+    if (!resetPassword) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        resetPassword
+      );
+
+      setResetPasswordCopied(true);
+
+      setTimeout(() => {
+        setResetPasswordCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error(
+        "Failed to copy password:",
+        error
+      );
+
+      setErrorMessage(
+        "Could not copy the password automatically. Please select and copy it manually."
+      );
     }
   }
 
@@ -1288,6 +1406,32 @@ export default function AccessControlPage() {
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-3">
+                      {/* RESET PASSWORD */}
+                      <button
+                        type="button"
+                        onClick={
+                          handleResetPassword
+                        }
+                        disabled={
+                          resettingPassword ||
+                          processingStaffId ===
+                            selectedStaff.id ||
+                          !selectedStaff.is_active
+                        }
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {resettingPassword ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <KeyRound className="w-4 h-4" />
+                        )}
+
+                        {resettingPassword
+                          ? "Resetting..."
+                          : "Reset Password"}
+                      </button>
+
+                      {/* SUSPEND / REACTIVATE */}
                       <button
                         type="button"
                         onClick={() =>
@@ -1319,6 +1463,7 @@ export default function AccessControlPage() {
                           : "Reactivate Account"}
                       </button>
 
+                      {/* DEACTIVATE */}
                       <button
                         type="button"
                         onClick={() =>
@@ -1410,6 +1555,130 @@ export default function AccessControlPage() {
                   )}
 
                   Deactivate Staff
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* RESET PASSWORD MODAL */}
+      {resetPassword &&
+        selectedStaff && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <button
+              type="button"
+              aria-label="Close password reset dialog"
+              onClick={
+                closeResetPasswordModal
+              }
+              className="absolute inset-0 bg-slate-900/40"
+            />
+
+            <div className="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-[#E2E8F0] p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+
+                <div className="min-w-0">
+                  <h2 className="font-bold text-lg">
+                    Password reset successfully
+                  </h2>
+
+                  <p className="text-sm text-[#64748B] mt-2">
+                    A new temporary password has
+                    been generated for{" "}
+                    <strong>
+                      {selectedStaff.name}
+                    </strong>
+                    .
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <label className="block text-xs font-semibold text-[#475569] mb-2">
+                  Temporary Password
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 rounded-lg border border-[#CBD5E1] bg-slate-50 px-3 py-3 font-mono text-sm break-all">
+                    {showResetPassword
+                      ? resetPassword
+                      : "••••••••••••••••"}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowResetPassword(
+                        (previous) =>
+                          !previous
+                      )
+                    }
+                    className="w-10 h-10 shrink-0 rounded-lg border border-[#E2E8F0] flex items-center justify-center hover:bg-slate-50"
+                    aria-label={
+                      showResetPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                  >
+                    {showResetPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={
+                      copyResetPassword
+                    }
+                    className="w-10 h-10 shrink-0 rounded-lg border border-[#E2E8F0] flex items-center justify-center hover:bg-slate-50"
+                    aria-label="Copy temporary password"
+                  >
+                    {resetPasswordCopied ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-xs leading-5 text-amber-800">
+                  <strong>Important:</strong> This
+                  password is shown only because it
+                  was just generated. Save or copy it
+                  before closing this window. The
+                  system stores only the encrypted
+                  password.
+                </p>
+              </div>
+
+              <div className="mt-5 rounded-lg bg-slate-50 border border-[#E2E8F0] p-4">
+                <p className="text-xs text-[#64748B]">
+                  <strong>Username:</strong>{" "}
+                  {selectedStaff.username}
+                </p>
+
+                <p className="text-xs text-[#64748B] mt-1">
+                  <strong>Staff ID:</strong>{" "}
+                  {selectedStaff.staff_id}
+                </p>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <button
+                  type="button"
+                  onClick={
+                    closeResetPasswordModal
+                  }
+                  className="px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold"
+                >
+                  Done
                 </button>
               </div>
             </div>

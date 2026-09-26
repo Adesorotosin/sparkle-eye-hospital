@@ -89,6 +89,8 @@ function BillingContent() {
 
       if (result.patient.invoice.discountAmount > 0) {
         setDiscountInput(String(result.patient.invoice.discountAmount));
+      } else {
+        setDiscountInput("");
       }
     } catch (err) {
       console.error("Billing page load error:", err);
@@ -156,8 +158,12 @@ function BillingContent() {
   }, [patientCodeFromUrl]);
 
   const invoice = patient?.invoice;
+
   const amountRendered = Number(amountRenderedInput) || 0;
   const grandTotal = Number(invoice?.grandTotal ?? 0);
+
+  const vatRate = Number(invoice?.vatRate ?? 0);
+  const vatAmount = Number(invoice?.vatAmount ?? 0);
 
   const isUnderpaid =
     selectedPayment === "cash" && amountRendered < grandTotal;
@@ -550,8 +556,16 @@ function BillingContent() {
             )}
 
             <div className="flex justify-between text-slate-600">
-              <span>VAT</span>
-              <span>₦0.00</span>
+              <span>
+                VAT ({vatRate.toLocaleString()}%)
+              </span>
+
+              <span className="font-semibold">
+                ₦{vatAmount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
             </div>
 
             <div className="pt-3 border-t border-slate-200 flex justify-between items-center text-sm font-bold text-slate-900">
@@ -581,7 +595,11 @@ function BillingContent() {
               </div>
 
               <span className="text-base text-[#5E35B1] font-extrabold">
-                ₦{grandTotal.toLocaleString()}
+                ₦
+                {grandTotal.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </span>
             </div>
           </div>
@@ -754,7 +772,11 @@ function BillingContent() {
                   <span>Amount Due</span>
 
                   <span className="text-base text-[#5E35B1]">
-                    ₦{grandTotal.toLocaleString()}
+                    ₦
+                    {grandTotal.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
 
@@ -827,7 +849,11 @@ function BillingContent() {
                     </span>
 
                     <span className="text-sm font-bold text-emerald-800">
-                      ₦{changeDue.toLocaleString()}
+                      ₦
+                      {changeDue.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
 
@@ -847,7 +873,10 @@ function BillingContent() {
                       {isUnderpaid
                         ? (
                             grandTotal - amountRendered
-                          ).toLocaleString()
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
                         : "0.00"}
                     </span>
                   </div>

@@ -38,7 +38,11 @@ export async function GET(
   request: Request
 ) {
   try {
-    await requireRole(["IT_ADMIN"]);
+   await requireRole([
+  "IT_ADMIN",
+  "DOCTOR",
+  "OPHTHALMOLOGIST",
+]);
 
     const { searchParams } =
       new URL(request.url);

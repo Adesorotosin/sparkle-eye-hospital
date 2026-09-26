@@ -307,25 +307,56 @@ function generateStaffId() {
 }
 
 function generateTemporaryPassword() {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const special = "!@#$%";
 
-  const values =
-    typeof crypto !== "undefined" && "getRandomValues" in crypto
-      ? crypto.getRandomValues(new Uint32Array(16))
-      : null;
+  const allChars =
+    uppercase + lowercase + numbers + special;
 
-  let password = "";
+  const getRandomIndex = (max: number) => {
+    if (
+      typeof crypto !== "undefined" &&
+      "getRandomValues" in crypto
+    ) {
+      const values = new Uint32Array(1);
+      crypto.getRandomValues(values);
+      return values[0] % max;
+    }
 
-  for (let i = 0; i < 16; i += 1) {
-    const index = values
-      ? values[i] % chars.length
-      : Math.floor(Math.random() * chars.length);
+    return Math.floor(Math.random() * max);
+  };
 
-    password += chars[index];
+  const pick = (chars: string) =>
+    chars[getRandomIndex(chars.length)];
+
+  const passwordCharacters = [
+    pick(uppercase),
+    pick(lowercase),
+    pick(numbers),
+    pick(special),
+  ];
+
+  while (passwordCharacters.length < 16) {
+    passwordCharacters.push(pick(allChars));
   }
 
-  return password;
+  // Fisher-Yates shuffle
+  for (
+    let i = passwordCharacters.length - 1;
+    i > 0;
+    i -= 1
+  ) {
+    const j = getRandomIndex(i + 1);
+
+    [passwordCharacters[i], passwordCharacters[j]] = [
+      passwordCharacters[j],
+      passwordCharacters[i],
+    ];
+  }
+
+  return passwordCharacters.join("");
 }
 
 function createPermissions(role: StaffRole): Record<string, boolean> {

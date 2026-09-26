@@ -1,201 +1,529 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Siren,
   Plus,
   Sliders,
   Radio,
-  XCircle,
   Bell,
   Search,
   X,
   AlertTriangle,
   Megaphone,
   Filter,
+  ShieldCheck,
+  Clock3,
+  UserCircle,
+  Info,
 } from "lucide-react";
 
+interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  triggeredBy?: string | null;
+  target?: string | null;
+  category: string;
+  createdAt?: string | null;
+}
+
+interface AuthenticatedUser {
+  name?: string;
+  staffId?: string;
+  role?: string;
+  title?: string;
+  department?: string;
+}
+
+type TabName =
+  | "All"
+  | "Announcements"
+  | "Clinical Escalations"
+  | "Finance"
+  | "Security";
+
 export default function NotificationsAlertCenterPage() {
-  const [activeTab, setActiveTab] = useState("All");
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] =
+    useState<TabName>("All");
 
-  // Modal State Controls
-  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
-  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] =
+    useState("");
 
-  // Active Feed Items State — persisted broadcasts + live-derived system
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+  const [error, setError] =
+    useState<string | null>(null);
 
-  const loadNotifications = async () => {
-    try {
-      setIsLoadingNotifications(true);
-      const res = await fetch("/api/notifications");
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null);
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `Request failed with status ${res.status}`);
-      }
+  const [isLoadingNotifications, setIsLoadingNotifications] =
+    useState(true);
 
-      const { notifications: fetched } = await res.json();
-      setNotifications(fetched || []);
-    } catch (err: any) {
-      console.error("Failed to load notifications:", err.message);
-      setError(err.message);
-    } finally {
-      setIsLoadingNotifications(false);
-    }
-  };
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
+  const [notifications, setNotifications] =
+    useState<NotificationItem[]>([]);
 
-  // Filter helper logic to route items to tabs accurately
-  const isCategoryMatch = (itemCategory: string, tabName: string) => {
-    if (tabName === "All") return true;
-    if (tabName === "Announcements")
-      return itemCategory === "Announcements" || itemCategory === "Announcement";
-    if (tabName === "Clinical Escalations")
-      return itemCategory === "Clinical Escalations" || itemCategory === "Clinical";
-    if (tabName === "Security")
-      return (
-        itemCategory === "Security" ||
-        itemCategory === "Emergency" ||
-        itemCategory === "Finance"
-      );
-    return true;
-  };
+  const [currentUser, setCurrentUser] =
+    useState<AuthenticatedUser | null>(null);
 
-  const filteredNotifications = notifications.filter((item) =>
-    isCategoryMatch(item.category, activeTab)
-  );
+  const [
+    isEmergencyModalOpen,
+    setIsEmergencyModalOpen,
+  ] = useState(false);
 
-  // Emergency Form State
-  const [emergencyData, setEmergencyData] = useState({
+  const [
+    isAnnouncementModalOpen,
+    setIsAnnouncementModalOpen,
+  ] = useState(false);
+
+  const [
+    emergencyData,
+    setEmergencyData,
+  ] = useState({
     codeType: "Code Blue (Cardiac Arrest)",
-    location: "Surgical Theater 2",
+    location: "",
     targetRoles: "All Surgical Staff",
     instructions: "",
   });
 
-  // Announcement Form State
-  const [announcementData, setAnnouncementData] = useState({
+  const [
+    announcementData,
+    setAnnouncementData,
+  ] = useState({
     title: "",
     category: "Announcements",
     targetDept: "All Hospital Staff",
     message: "",
   });
 
-  // Automated Alert Rules Toggles State
-  const [alertRules, setAlertRules] = useState({
-    triageScore: true,
-    failedLogin: true,
-    drugExpiry: true,
-  });
-
-  const toggleRule = (key: keyof typeof alertRules) => {
-    setAlertRules((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // Delivery Channels Checkboxes State
-  const [channels, setChannels] = useState({
-    inAppBanners: true,
-    desktopPush: true,
-    smsBroadcast: true,
-    emailDigests: false,
-  });
-
-  const toggleChannel = (key: keyof typeof channels) => {
-    setChannels((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // Handle Dispatch Emergency Alert
-  const handleTriggerEmergency = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ----------------------------------------------------------
+  // Load authenticated user
+  // ----------------------------------------------------------
+  const loadCurrentUser = async () => {
     try {
-      const res = await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "Emergency",
-          title: `${emergencyData.codeType} — ${emergencyData.location}`,
-          message:
-            emergencyData.instructions ||
-            "Immediate response required. Please follow standard emergency response protocols.",
-          target: emergencyData.targetRoles,
-          category: "Security",
-          triggeredBy: "Dr. Sarah Jenkins",
-        }),
-      });
-      if (res.ok) {
-        const { notification } = await res.json();
-        setNotifications([notification, ...notifications]);
+      const response = await fetch(
+        "/api/auth/me",
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data?.user) {
+        setCurrentUser(data.user);
       }
     } catch (err) {
-      console.error("Failed to broadcast emergency alert:", err);
+      console.error(
+        "Failed to load authenticated user:",
+        err
+      );
     }
-
-    setIsEmergencyModalOpen(false);
-    setEmergencyData({
-      codeType: "Code Blue (Cardiac Arrest)",
-      location: "",
-      targetRoles: "All Surgical Staff",
-      instructions: "",
-    });
   };
 
-  // Handle Dispatch Announcement
-  const handleCreateAnnouncement = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!announcementData.title || !announcementData.message) return;
+  // ----------------------------------------------------------
+  // Load notifications
+  // ----------------------------------------------------------
+  const loadNotifications = async () => {
+    try {
+      setIsLoadingNotifications(true);
+      setError(null);
 
-    const category =
-      announcementData.category === "Clinical"
-        ? "Clinical Escalations"
-        : announcementData.category === "Finance"
-        ? "Security"
-        : "Announcements";
+      const response = await fetch(
+        "/api/notifications",
+        {
+          cache: "no-store",
+        }
+      );
+
+      const data = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            `Unable to load notifications (${response.status}).`
+        );
+      }
+
+      setNotifications(
+        Array.isArray(data.notifications)
+          ? data.notifications
+          : []
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to load notifications.";
+
+      console.error(
+        "Failed to load notifications:",
+        err
+      );
+
+      setError(message);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCurrentUser();
+    loadNotifications();
+  }, []);
+
+  // ----------------------------------------------------------
+  // Helpers
+  // ----------------------------------------------------------
+  const isCategoryMatch = (
+    category: string,
+    tab: TabName
+  ) => {
+    if (tab === "All") {
+      return true;
+    }
+
+    return category === tab;
+  };
+
+  const filteredNotifications =
+    useMemo(() => {
+      const normalizedSearch =
+        searchQuery
+          .trim()
+          .toLowerCase();
+
+      return notifications.filter(
+        (item) => {
+          const categoryMatches =
+            isCategoryMatch(
+              item.category,
+              activeTab
+            );
+
+          if (!categoryMatches) {
+            return false;
+          }
+
+          if (!normalizedSearch) {
+            return true;
+          }
+
+          return [
+            item.title,
+            item.message,
+            item.type,
+            item.category,
+            item.target ?? "",
+            item.triggeredBy ?? "",
+          ]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalizedSearch);
+        }
+      );
+    }, [
+      notifications,
+      activeTab,
+      searchQuery,
+    ]);
+
+  const countForTab = (
+    tab: TabName
+  ) => {
+    return notifications.filter((item) =>
+      isCategoryMatch(
+        item.category,
+        tab
+      )
+    ).length;
+  };
+
+  const displayName =
+    currentUser?.name ||
+    currentUser?.staffId ||
+    "Authenticated Administrator";
+
+  const displayTitle =
+    currentUser?.title ||
+    currentUser?.department ||
+    "IT Administrator";
+
+  // ----------------------------------------------------------
+  // Broadcast Emergency Alert
+  // ----------------------------------------------------------
+  const handleTriggerEmergency = async (
+    event: React.FormEvent
+  ) => {
+    event.preventDefault();
+
+    if (
+      !emergencyData.location.trim()
+    ) {
+      setError(
+        "Please provide the emergency location."
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    setSuccessMessage(null);
 
     try {
-      const res = await fetch("/api/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: announcementData.category,
-          title: announcementData.title,
-          message: announcementData.message,
-          target: announcementData.targetDept,
-          category,
-        }),
-      });
-      if (res.ok) {
-        const { notification } = await res.json();
-        setNotifications([notification, ...notifications]);
-      }
-    } catch (err) {
-      console.error("Failed to broadcast announcement:", err);
-    }
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            type: "Emergency",
+            title: `${emergencyData.codeType} — ${emergencyData.location.trim()}`,
+            message:
+              emergencyData.instructions.trim() ||
+              "Immediate response required. Please follow standard emergency response protocols.",
+            target:
+              emergencyData.targetRoles,
+            category: "Security",
+          }),
+        }
+      );
 
-    setIsAnnouncementModalOpen(false);
-    setAnnouncementData({
-      title: "",
-      category: "Announcements",
-      targetDept: "All Hospital Staff",
-      message: "",
-    });
+      const data = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+            "Failed to broadcast emergency alert."
+        );
+      }
+
+      if (data.notification) {
+        setNotifications(
+          (previous) => [
+            data.notification,
+            ...previous,
+          ]
+        );
+      }
+
+      setIsEmergencyModalOpen(false);
+
+      setEmergencyData({
+        codeType:
+          "Code Blue (Cardiac Arrest)",
+        location: "",
+        targetRoles:
+          "All Surgical Staff",
+        instructions: "",
+      });
+
+      setSuccessMessage(
+        "Emergency alert was recorded successfully and added to the Admin notification feed."
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to broadcast emergency alert.";
+
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  // ----------------------------------------------------------
+  // Create Announcement
+  // ----------------------------------------------------------
+  const handleCreateAnnouncement =
+    async (
+      event: React.FormEvent
+    ) => {
+      event.preventDefault();
+
+      if (
+        !announcementData.title.trim() ||
+        !announcementData.message.trim()
+      ) {
+        setError(
+          "Announcement title and message are required."
+        );
+        return;
+      }
+
+      const category =
+        announcementData.category ===
+        "Clinical"
+          ? "Clinical Escalations"
+          : announcementData.category ===
+            "Finance"
+          ? "Finance"
+          : "Announcements";
+
+      const type =
+        announcementData.category ===
+        "Clinical"
+          ? "Clinical"
+          : announcementData.category ===
+            "Finance"
+          ? "Finance"
+          : "Announcement";
+
+      setIsSubmitting(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      try {
+        const response = await fetch(
+          "/api/notifications",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              type,
+              title:
+                announcementData.title.trim(),
+              message:
+                announcementData.message.trim(),
+              target:
+                announcementData.targetDept.trim() ||
+                "All Hospital Staff",
+              category,
+            }),
+          }
+        );
+
+        const data = await response
+          .json()
+          .catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(
+            data?.error ||
+              "Failed to publish announcement."
+          );
+        }
+
+        if (data.notification) {
+          setNotifications(
+            (previous) => [
+              data.notification,
+              ...previous,
+            ]
+          );
+        }
+
+        setIsAnnouncementModalOpen(false);
+
+        setAnnouncementData({
+          title: "",
+          category: "Announcements",
+          targetDept:
+            "All Hospital Staff",
+          message: "",
+        });
+
+        setSuccessMessage(
+          "Announcement published successfully and recorded in the audit trail."
+        );
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to publish announcement.";
+
+        setError(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
+
+  const getTypeStyles = (
+    type: string
+  ) => {
+    switch (type) {
+      case "Emergency":
+        return {
+          border:
+            "bg-[#DC2626]",
+          badge:
+            "bg-[#FEE2E2] text-[#991B1B]",
+        };
+
+      case "Clinical":
+        return {
+          border:
+            "bg-[#10B981]",
+          badge:
+            "bg-[#ECFDF5] text-[#059669]",
+        };
+
+      case "Finance":
+        return {
+          border:
+            "bg-[#D97706]",
+          badge:
+            "bg-[#FEF3C7] text-[#B45309]",
+        };
+
+      default:
+        return {
+          border:
+            "bg-[#4F46E5]",
+          badge:
+            "bg-[#EEF2FF] text-[#4F46E5]",
+        };
+    }
+  };
+
+  const tabs: TabName[] = [
+    "All",
+    "Announcements",
+    "Clinical Escalations",
+    "Finance",
+    "Security",
+  ];
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-sans pb-12">
-      {/* 1. TOP GLOBAL NAVIGATION */}
+      {/* GLOBAL HEADER */}
       <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 max-w-md">
             <div className="relative w-full">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+
               <input
-                type="text"
+                type="search"
+                value={searchQuery}
+                onChange={(event) =>
+                  setSearchQuery(
+                    event.target.value
+                  )
+                }
                 placeholder="Search alerts, announcements, or staff..."
                 className="w-full pl-9 pr-4 py-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#4F46E5] focus:bg-white transition-all"
               />
@@ -203,25 +531,25 @@ export default function NotificationsAlertCenterPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              title="Emergency Alarm Status"
-              className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9] rounded-full transition-all relative"
-            >
-              <XCircle className="w-5 h-5 text-[#EF4444]" />
-            </button>
-            <div className="h-8 w-[1px] bg-[#E2E8F0]" />
-            <div className="flex items-center gap-3 cursor-pointer">
-              <img
-                src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=100&auto=format&fit=crop&q=80"
-                alt="Dr. Sarah Jenkins"
-                className="w-9 h-9 rounded-full object-cover border border-[#E2E8F0]"
-              />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0]">
+              <ShieldCheck className="w-4 h-4 text-[#16A34A]" />
+              <span className="text-xs font-semibold text-[#475569]">
+                Admin session active
+              </span>
+            </div>
+
+            <div className="h-8 w-px bg-[#E2E8F0]" />
+
+            <div className="flex items-center gap-3">
+              <UserCircle className="w-9 h-9 text-[#64748B]" />
+
               <div className="text-left hidden sm:block">
                 <p className="text-xs font-semibold leading-tight text-[#0F172A]">
-                  Dr. Sarah Jenkins
+                  {displayName}
                 </p>
+
                 <p className="text-[11px] text-[#64748B]">
-                  Chief Medical Officer
+                  {displayTitle}
                 </p>
               </div>
             </div>
@@ -229,407 +557,532 @@ export default function NotificationsAlertCenterPage() {
         </div>
       </header>
 
-      {/* MAIN CONTAINER */}
       <main className="max-w-7xl mx-auto px-6 pt-8">
+        {/* ERROR */}
         {error && (
-          <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
-            {error}
+          <div className="mb-4 flex items-start justify-between gap-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+            <span>{error}</span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setError(null)
+              }
+              className="text-rose-500 hover:text-rose-700"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
-        {/* PAGE HEADER & ACTIONS */}
+        {/* SUCCESS */}
+        {successMessage && (
+          <div className="mb-4 flex items-start justify-between gap-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-xs font-semibold">
+            <span>
+              {successMessage}
+            </span>
+
+            <button
+              type="button"
+              onClick={() =>
+                setSuccessMessage(null)
+              }
+              className="text-emerald-500 hover:text-emerald-700"
+              aria-label="Dismiss success message"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* PAGE HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-[#0F172A]">
               Notifications & Emergency Alert Center
             </h2>
+
             <p className="text-sm text-[#64748B] mt-1">
-              Manage hospital-wide announcements, critical alarms, and system-wide escalation drills
+              Manage hospital announcements,
+              administrative alerts, and
+              recorded emergency broadcasts.
             </p>
           </div>
+
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setIsEmergencyModalOpen(true)}
+              type="button"
+              onClick={() =>
+                setIsEmergencyModalOpen(
+                  true
+                )
+              }
               className="px-4 py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-sm font-semibold transition-all shadow-sm flex items-center gap-2 active:scale-95"
             >
-              <Siren className="w-4 h-4 animate-pulse" /> Broadcast Emergency Alert
+              <Siren className="w-4 h-4" />
+              Broadcast Emergency Alert
             </button>
+
             <button
-              onClick={() => setIsAnnouncementModalOpen(true)}
+              type="button"
+              onClick={() =>
+                setIsAnnouncementModalOpen(
+                  true
+                )
+              }
               className="px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold transition-all shadow-sm flex items-center gap-2 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Create Announcement
+              <Plus className="w-4 h-4" />
+              Create Announcement
             </button>
           </div>
         </div>
 
-        {/* SUB NAVIGATION TABS */}
-        <div className="border-b border-[#E2E8F0] mb-6">
-          <div className="flex gap-8">
-            {[
-              {
-                name: "All",
-                count: notifications.length,
-              },
-              {
-                name: "Announcements",
-                count: notifications.filter((n) => isCategoryMatch(n.category, "Announcements")).length,
-              },
-              {
-                name: "Clinical Escalations",
-                count: notifications.filter((n) => isCategoryMatch(n.category, "Clinical Escalations")).length,
-              },
-              {
-                name: "Security",
-                count: notifications.filter((n) => isCategoryMatch(n.category, "Security")).length,
-              },
-            ].map((tab) => (
-              <button
-                key={tab.name}
-                onClick={() => setActiveTab(tab.name)}
-                className={`pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${
-                  activeTab === tab.name
-                    ? "text-[#4F46E5] font-semibold"
-                    : "text-[#64748B] hover:text-[#0F172A]"
-                }`}
-              >
-                <span>{tab.name}</span>
-                <span
-                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    activeTab === tab.name
-                      ? "bg-[#EEF2FF] text-[#4F46E5]"
-                      : "bg-[#F1F5F9] text-[#64748B]"
+        {/* TABS */}
+        <div className="border-b border-[#E2E8F0] mb-6 overflow-x-auto">
+          <div className="flex gap-7 min-w-max">
+            {tabs.map((tab) => {
+              const isActive =
+                activeTab === tab;
+
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() =>
+                    setActiveTab(tab)
+                  }
+                  className={`pb-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${
+                    isActive
+                      ? "text-[#4F46E5] font-semibold"
+                      : "text-[#64748B] hover:text-[#0F172A]"
                   }`}
                 >
-                  {tab.count}
-                </span>
-                {activeTab === tab.name && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4F46E5] rounded-t-md" />
-                )}
-              </button>
-            ))}
+                  <span>{tab}</span>
+
+                  <span
+                    className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      isActive
+                        ? "bg-[#EEF2FF] text-[#4F46E5]"
+                        : "bg-[#F1F5F9] text-[#64748B]"
+                    }`}
+                  >
+                    {countForTab(tab)}
+                  </span>
+
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#4F46E5] rounded-t-md" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* 2-COLUMN MAIN CONTENT GRID */}
+        {/* CONTENT */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* LEFT COLUMN: NOTIFICATION LIST */}
+          {/* FEED */}
           <div className="lg:col-span-2 space-y-4">
-            {/* FEED HEADER BAR */}
             <div className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-[#4F46E5]" />
+
                 <span className="text-xs font-bold text-[#0F172A]">
-                  Active Feed — {activeTab} ({filteredNotifications.length})
+                  Active Feed —{" "}
+                  {activeTab} (
+                  {
+                    filteredNotifications.length
+                  }
+                  )
                 </span>
               </div>
+
               <div className="flex items-center gap-1.5 text-xs text-[#64748B] font-medium bg-[#F8FAFC] px-2.5 py-1 rounded-md border border-[#E2E8F0]">
                 <Filter className="w-3.5 h-3.5 text-[#4F46E5]" />
-                <span>Filtered by tab</span>
+                <span>
+                  {searchQuery
+                    ? "Search + tab filter"
+                    : "Filtered by tab"}
+                </span>
               </div>
             </div>
 
-            {/* DYNAMIC NOTIFICATIONS FEED */}
             {isLoadingNotifications ? (
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <p className="text-sm text-[#64748B]">Loading notifications…</p>
+                <div className="inline-flex items-center gap-2 text-sm text-[#64748B]">
+                  <Clock3 className="w-4 h-4 animate-pulse" />
+                  Loading notifications…
+                </div>
               </div>
-            ) : filteredNotifications.length === 0 ? (
+            ) : filteredNotifications.length ===
+              0 ? (
               <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <p className="text-sm font-semibold text-[#0F172A]">No notifications found</p>
-                <p className="text-xs text-[#64748B] mt-1">There are no items currently listed under {activeTab}.</p>
+                <Bell className="w-8 h-8 text-[#CBD5E1] mx-auto mb-3" />
+
+                <p className="text-sm font-semibold text-[#0F172A]">
+                  No notifications found
+                </p>
+
+                <p className="text-xs text-[#64748B] mt-1">
+                  {searchQuery
+                    ? "Try a different search term."
+                    : `There are no items currently listed under ${activeTab}.`}
+                </p>
               </div>
             ) : (
-              filteredNotifications.map((item) => {
-                if (item.type === "Emergency") {
+              filteredNotifications.map(
+                (item) => {
+                  const styles =
+                    getTypeStyles(
+                      item.type
+                    );
+
+                  if (
+                    item.type ===
+                    "Emergency"
+                  ) {
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-[#FEF2F2] rounded-xl border border-[#FCA5A5] p-6 shadow-sm relative overflow-hidden"
+                      >
+                        <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#DC2626]" />
+
+                        <div className="flex items-center justify-between mb-3 gap-4">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold tracking-wider text-[#DC2626] uppercase">
+                            <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
+                            Emergency
+                          </span>
+
+                          <span className="text-xs text-[#64748B] text-right">
+                            {item.timestamp}
+                            {item.triggeredBy
+                              ? ` · ${item.triggeredBy}`
+                              : ""}
+                          </span>
+                        </div>
+
+                        <h3 className="text-lg font-bold text-[#0F172A] mb-2">
+                          {item.title}
+                        </h3>
+
+                        <p className="text-xs text-[#475569] leading-relaxed mb-4">
+                          {item.message}
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                          <span className="inline-block bg-[#FEE2E2] text-[#991B1B] text-[11px] font-bold px-3 py-1 rounded-md">
+                            Target:{" "}
+                            {item.target ||
+                              "Unspecified"}
+                          </span>
+
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#64748B]">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" />
+                            Recorded
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div
                       key={item.id}
-                      className="bg-[#FEF2F2] rounded-xl border border-[#FCA5A5] p-6 shadow-sm relative overflow-hidden transition-all"
+                      className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm relative overflow-hidden"
                     >
-                      <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#DC2626]" />
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold tracking-wider text-[#DC2626] uppercase">
-                          <span className="w-2 h-2 rounded-full bg-[#DC2626] animate-pulse" />
-                          Emergency
+                      <div
+                        className={`absolute top-0 left-0 bottom-0 w-1.5 ${styles.border}`}
+                      />
+
+                      <div className="flex items-center justify-between mb-3 gap-4">
+                        <span
+                          className={`inline-block text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded ${styles.badge}`}
+                        >
+                          {item.type}
                         </span>
+
                         <span className="text-xs text-[#64748B]">
-                          {item.timestamp} {item.triggeredBy ? `· ${item.triggeredBy} triggered` : ""}
+                          {item.timestamp}
                         </span>
                       </div>
 
-                      <h3 className="text-lg font-bold text-[#0F172A] mb-2">
+                      <h3 className="text-base font-bold text-[#0F172A] mb-2">
                         {item.title}
                       </h3>
-                      <p className="text-xs text-[#475569] leading-relaxed mb-4">
+
+                      <p className="text-xs text-[#64748B] leading-relaxed mb-4">
                         {item.message}
                       </p>
 
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="inline-block bg-[#FEE2E2] text-[#991B1B] text-[11px] font-bold px-3 py-1 rounded-md">
-                          Target: {item.target}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#F1F5F9]">
+                        <span className="text-[11px] font-semibold text-[#64748B]">
+                          Target:{" "}
+                          {item.target ||
+                            "Unspecified"}
                         </span>
-                        <button className="px-4 py-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-semibold rounded-lg transition-all shadow-sm">
-                          Acknowledge Alert
-                        </button>
+
+                        {item.triggeredBy && (
+                          <span className="text-[11px] text-[#94A3B8]">
+                            By{" "}
+                            {item.triggeredBy}
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
                 }
-
-                // Standard Cards Layout (Announcements, Clinical, Finance)
-                const borderColors: Record<string, string> = {
-                  Announcement: "bg-[#4F46E5]",
-                  Announcements: "bg-[#4F46E5]",
-                  Clinical: "bg-[#10B981]",
-                  "Clinical Escalations": "bg-[#10B981]",
-                  Finance: "bg-[#D97706]",
-                };
-
-                const badgeColors: Record<string, string> = {
-                  Announcement: "bg-[#EEF2FF] text-[#4F46E5]",
-                  Announcements: "bg-[#EEF2FF] text-[#4F46E5]",
-                  Clinical: "bg-[#ECFDF5] text-[#059669]",
-                  "Clinical Escalations": "bg-[#ECFDF5] text-[#059669]",
-                  Finance: "bg-[#FEF3C7] text-[#D97706]",
-                };
-
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm relative overflow-hidden transition-all"
-                  >
-                    <div
-                      className={`absolute top-0 left-0 bottom-0 w-1.5 ${
-                        borderColors[item.type] || "bg-[#4F46E5]"
-                      }`}
-                    />
-                    <div className="flex items-center justify-between mb-3">
-                      <span
-                        className={`inline-block text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded ${
-                          badgeColors[item.type] || "bg-[#EEF2FF] text-[#4F46E5]"
-                        }`}
-                      >
-                        {item.type}
-                      </span>
-                      <span className="text-xs text-[#64748B]">{item.timestamp}</span>
-                    </div>
-
-                    <h3 className="text-base font-bold text-[#0F172A] mb-2">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs text-[#64748B] leading-relaxed">
-                      {item.message}
-                    </p>
-                  </div>
-                );
-              })
+              )
             )}
           </div>
 
-          {/* RIGHT COLUMN: SETTINGS & RULES */}
+          {/* RIGHT COLUMN */}
           <div className="space-y-6">
-            {/* Card 1: Automated Alert Rules */}
+            {/* Automated rules */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Sliders className="w-5 h-5 text-[#4F46E5]" />
+
                 <h3 className="font-semibold text-base text-[#0F172A]">
                   Automated Alert Rules
                 </h3>
               </div>
 
-              <div className="space-y-5">
-                <div className="flex items-start justify-between">
-                  <div className="pr-4">
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      Triage Score Escalation Flag
-                    </p>
-                    <p className="text-[11px] text-[#64748B] mt-0.5 leading-tight">
-                      Auto-alert when patient triage score exceeds safe clinical limits
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleRule("triageScore")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors shrink-0 ${
-                      alertRules.triageScore ? "bg-[#4F46E5]" : "bg-[#E2E8F0]"
-                    }`}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                        alertRules.triageScore ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+              <div className="mb-5 p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] flex gap-2">
+                <Info className="w-4 h-4 text-[#64748B] shrink-0 mt-0.5" />
 
-                <div className="flex items-start justify-between">
-                  <div className="pr-4">
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      Failed Login Attempt Limit
-                    </p>
-                    <p className="text-[11px] text-[#64748B] mt-0.5 leading-tight">
-                      Lock account and notify IT admins after 5 consecutive failed logins
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleRule("failedLogin")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors shrink-0 ${
-                      alertRules.failedLogin ? "bg-[#4F46E5]" : "bg-[#E2E8F0]"
-                    }`}
-                  >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                        alertRules.failedLogin ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                <p className="text-[11px] text-[#64748B] leading-relaxed">
+                  These rules are currently
+                  configuration placeholders.
+                  They are not connected to
+                  automated backend jobs yet.
+                </p>
+              </div>
 
-                <div className="flex items-start justify-between">
-                  <div className="pr-4">
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      Drug Expiry Warning
-                    </p>
-                    <p className="text-[11px] text-[#64748B] mt-0.5 leading-tight">
-                      Alert hospital pharmacy unit 30 days before medication batch expiry
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleRule("drugExpiry")}
-                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors shrink-0 ${
-                      alertRules.drugExpiry ? "bg-[#4F46E5]" : "bg-[#E2E8F0]"
-                    }`}
+              <div className="space-y-4">
+                {[
+                  {
+                    title:
+                      "Triage Score Escalation",
+                    description:
+                      "Future automation for clinical triage thresholds.",
+                  },
+                  {
+                    title:
+                      "Failed Login Attempt Limit",
+                    description:
+                      "Security logging currently records failed login events; automatic account locking is separate.",
+                  },
+                  {
+                    title:
+                      "Drug Expiry Warning",
+                    description:
+                      "Future automation for medication expiry monitoring.",
+                  },
+                ].map((rule) => (
+                  <div
+                    key={rule.title}
+                    className="flex items-start justify-between gap-4"
                   >
-                    <div
-                      className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-                        alertRules.drugExpiry ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
+                    <div>
+                      <p className="text-xs font-bold text-[#0F172A]">
+                        {rule.title}
+                      </p>
+
+                      <p className="text-[11px] text-[#64748B] mt-1 leading-relaxed">
+                        {rule.description}
+                      </p>
+                    </div>
+
+                    <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md bg-[#F1F5F9] text-[#64748B]">
+                      Not connected
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Card 2: Delivery Channels */}
+            {/* Delivery channels */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-6">
+              <div className="flex items-center gap-2 mb-4">
                 <Radio className="w-5 h-5 text-[#4F46E5]" />
+
                 <h3 className="font-semibold text-base text-[#0F172A]">
                   Delivery Channels
                 </h3>
               </div>
 
-              <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={channels.inAppBanners}
-                    onChange={() => toggleChannel("inAppBanners")}
-                    className="w-4 h-4 text-[#4F46E5] rounded border-[#CBD5E1] focus:ring-[#4F46E5] mt-0.5"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      In-App Banners
-                    </p>
-                    <p className="text-[11px] text-[#64748B]">
-                      Show critical notices as sticky headers in user active dashboards
-                    </p>
-                  </div>
-                </label>
+              <div className="mb-5 p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0]">
+                <p className="text-[11px] text-[#64748B] leading-relaxed">
+                  The current implementation
+                  records notifications in the
+                  hospital system. External
+                  delivery channels require
+                  additional infrastructure.
+                </p>
+              </div>
 
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={channels.desktopPush}
-                    onChange={() => toggleChannel("desktopPush")}
-                    className="w-4 h-4 text-[#4F46E5] rounded border-[#CBD5E1] focus:ring-[#4F46E5] mt-0.5"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      Desktop Push Notifications
-                    </p>
-                    <p className="text-[11px] text-[#64748B]">
-                      Direct browser notifications for immediate surgical escalations
-                    </p>
-                  </div>
-                </label>
+              <div className="space-y-3">
+                {[
+                  {
+                    name: "In-App Notifications",
+                    status:
+                      "Database feed active",
+                  },
+                  {
+                    name: "Desktop Push",
+                    status:
+                      "Not connected",
+                  },
+                  {
+                    name: "SMS Broadcast",
+                    status:
+                      "Not connected",
+                  },
+                  {
+                    name: "Email Digests",
+                    status:
+                      "Not connected",
+                  },
+                ].map((channel) => (
+                  <div
+                    key={channel.name}
+                    className="flex items-center justify-between gap-3 p-3 rounded-lg border border-[#F1F5F9]"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-[#0F172A]">
+                        {channel.name}
+                      </p>
 
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={channels.smsBroadcast}
-                    onChange={() => toggleChannel("smsBroadcast")}
-                    className="w-4 h-4 text-[#4F46E5] rounded border-[#CBD5E1] focus:ring-[#4F46E5] mt-0.5"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      SMS Broadcast
-                    </p>
-                    <p className="text-[11px] text-[#64748B]">
-                      Emergency alerts forwarded to registered nurse and physician mobile plans
-                    </p>
-                  </div>
-                </label>
+                      <p className="text-[10px] text-[#64748B] mt-0.5">
+                        {channel.status}
+                      </p>
+                    </div>
 
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={channels.emailDigests}
-                    onChange={() => toggleChannel("emailDigests")}
-                    className="w-4 h-4 text-[#4F46E5] rounded border-[#CBD5E1] focus:ring-[#4F46E5] mt-0.5"
-                  />
-                  <div>
-                    <p className="text-xs font-bold text-[#0F172A]">
-                      Email Digests
-                    </p>
-                    <p className="text-[11px] text-[#64748B]">
-                      Consolidated non-urgent medical updates sent daily to staff inboxes
-                    </p>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md ${
+                        channel.status ===
+                        "Database feed active"
+                          ? "bg-[#DCFCE7] text-[#15803D]"
+                          : "bg-[#F1F5F9] text-[#64748B]"
+                      }`}
+                    >
+                      {channel.status ===
+                      "Database feed active"
+                        ? "Active"
+                        : "Pending"}
+                    </span>
                   </div>
-                </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Current scope */}
+            <div className="bg-[#EEF2FF] border border-[#C7D2FE] rounded-xl p-5">
+              <div className="flex items-start gap-3">
+                <ShieldCheck className="w-5 h-5 text-[#4F46E5] shrink-0 mt-0.5" />
+
+                <div>
+                  <h3 className="text-sm font-bold text-[#312E81]">
+                    Current notification scope
+                  </h3>
+
+                  <p className="text-[11px] text-[#4338CA] mt-1 leading-relaxed">
+                    Notifications created here
+                    are stored in the hospital
+                    database and recorded in
+                    the Admin audit trail.
+                    External SMS, email, browser
+                    push, and real-time staff
+                    delivery are not yet enabled.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </main>
 
-      {/* EMERGENCY MODAL */}
+      {/* ----------------------------------------------------
+          EMERGENCY MODAL
+      ----------------------------------------------------- */}
       {isEmergencyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#FCA5A5] shadow-2xl overflow-hidden">
             <div className="bg-[#DC2626] px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5" />
-                <h3 className="font-bold text-base">Broadcast Emergency Alert</h3>
+
+                <h3 className="font-bold text-base">
+                  Broadcast Emergency Alert
+                </h3>
               </div>
+
               <button
-                onClick={() => setIsEmergencyModalOpen(false)}
-                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-colors"
+                type="button"
+                onClick={() =>
+                  setIsEmergencyModalOpen(
+                    false
+                  )
+                }
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg"
+                aria-label="Close emergency dialog"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleTriggerEmergency} className="p-6 space-y-4">
+            <form
+              onSubmit={
+                handleTriggerEmergency
+              }
+              className="p-6 space-y-4"
+            >
               <div className="bg-[#FEF2F2] border border-[#FCA5A5] rounded-lg p-3 text-xs text-[#991B1B]">
-                <strong>Note:</strong> This alert is saved and appears here in Admin. It does not yet push live to other staff members' screens — that requires a separate real-time delivery feature.
+                <strong>Important:</strong>{" "}
+                This currently records the
+                emergency alert in the Admin
+                system. It does not automatically
+                send SMS, browser push, or
+                real-time alerts to other staff.
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Emergency Code / Type
                 </label>
+
                 <select
-                  value={emergencyData.codeType}
-                  onChange={(e) =>
-                    setEmergencyData({ ...emergencyData, codeType: e.target.value })
+                  value={
+                    emergencyData.codeType
+                  }
+                  onChange={(event) =>
+                    setEmergencyData(
+                      (previous) => ({
+                        ...previous,
+                        codeType:
+                          event.target.value,
+                      })
+                    )
                   }
                   className="w-full text-xs font-medium border border-[#CBD5E1] rounded-lg px-3 py-2 bg-white text-[#0F172A] focus:ring-2 focus:ring-[#DC2626] focus:outline-none"
                 >
-                  <option>Code Blue (Cardiac Arrest)</option>
-                  <option>Code Red (Fire / Evacuation)</option>
-                  <option>Code Black (Security Incident / Lockout)</option>
-                  <option>Code Pink (Pediatric Emergency)</option>
+                  <option>
+                    Code Blue (Cardiac Arrest)
+                  </option>
+
+                  <option>
+                    Code Red (Fire / Evacuation)
+                  </option>
+
+                  <option>
+                    Code Black (Security Incident / Lockout)
+                  </option>
+
+                  <option>
+                    Code Pink (Pediatric Emergency)
+                  </option>
                 </select>
               </div>
 
@@ -637,14 +1090,23 @@ export default function NotificationsAlertCenterPage() {
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Ward / Location
                 </label>
+
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Surgical Theater 2, ER Ward B"
-                  value={emergencyData.location}
-                  onChange={(e) =>
-                    setEmergencyData({ ...emergencyData, location: e.target.value })
+                  value={
+                    emergencyData.location
                   }
+                  onChange={(event) =>
+                    setEmergencyData(
+                      (previous) => ({
+                        ...previous,
+                        location:
+                          event.target.value,
+                      })
+                    )
+                  }
+                  placeholder="e.g. Surgical Theater 2, ER Ward B"
                   className="w-full text-xs border border-[#CBD5E1] rounded-lg px-3 py-2 text-[#0F172A] focus:ring-2 focus:ring-[#DC2626] focus:outline-none"
                 />
               </div>
@@ -653,17 +1115,37 @@ export default function NotificationsAlertCenterPage() {
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Target Response Team
                 </label>
+
                 <select
-                  value={emergencyData.targetRoles}
-                  onChange={(e) =>
-                    setEmergencyData({ ...emergencyData, targetRoles: e.target.value })
+                  value={
+                    emergencyData.targetRoles
+                  }
+                  onChange={(event) =>
+                    setEmergencyData(
+                      (previous) => ({
+                        ...previous,
+                        targetRoles:
+                          event.target.value,
+                      })
+                    )
                   }
                   className="w-full text-xs font-medium border border-[#CBD5E1] rounded-lg px-3 py-2 bg-white text-[#0F172A] focus:ring-2 focus:ring-[#DC2626] focus:outline-none"
                 >
-                  <option>All Surgical Staff</option>
-                  <option>On-Duty Doctors & Nurses</option>
-                  <option>Security & Administrative Personnel</option>
-                  <option>Hospital-Wide Broadcast</option>
+                  <option>
+                    All Surgical Staff
+                  </option>
+
+                  <option>
+                    On-Duty Doctors & Nurses
+                  </option>
+
+                  <option>
+                    Security & Administrative Personnel
+                  </option>
+
+                  <option>
+                    Hospital-Wide Broadcast
+                  </option>
                 </select>
               </div>
 
@@ -671,13 +1153,22 @@ export default function NotificationsAlertCenterPage() {
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Clinical Instructions / Notes
                 </label>
+
                 <textarea
-                  rows={3}
-                  placeholder="Provide immediate action steps or escalation details..."
-                  value={emergencyData.instructions}
-                  onChange={(e) =>
-                    setEmergencyData({ ...emergencyData, instructions: e.target.value })
+                  rows={4}
+                  value={
+                    emergencyData.instructions
                   }
+                  onChange={(event) =>
+                    setEmergencyData(
+                      (previous) => ({
+                        ...previous,
+                        instructions:
+                          event.target.value,
+                      })
+                    )
+                  }
+                  placeholder="Provide immediate action steps or escalation details..."
                   className="w-full text-xs border border-[#CBD5E1] rounded-lg p-3 text-[#0F172A] focus:ring-2 focus:ring-[#DC2626] focus:outline-none"
                 />
               </div>
@@ -685,16 +1176,26 @@ export default function NotificationsAlertCenterPage() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
                 <button
                   type="button"
-                  onClick={() => setIsEmergencyModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors"
+                  onClick={() =>
+                    setIsEmergencyModalOpen(
+                      false
+                    )
+                  }
+                  className="px-4 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A]"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <Siren className="w-4 h-4" /> Trigger Emergency Broadcast
+                  <Siren className="w-4 h-4" />
+
+                  {isSubmitting
+                    ? "Recording..."
+                    : "Trigger Emergency Broadcast"}
                 </button>
               </div>
             </form>
@@ -702,36 +1203,62 @@ export default function NotificationsAlertCenterPage() {
         </div>
       )}
 
-      {/* ANNOUNCEMENT MODAL */}
+      {/* ----------------------------------------------------
+          ANNOUNCEMENT MODAL
+      ----------------------------------------------------- */}
       {isAnnouncementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E2E8F0] shadow-2xl overflow-hidden">
             <div className="bg-[#4F46E5] px-6 py-4 flex items-center justify-between text-white">
               <div className="flex items-center gap-2">
                 <Megaphone className="w-5 h-5" />
-                <h3 className="font-bold text-base">Create Hospital Announcement</h3>
+
+                <h3 className="font-bold text-base">
+                  Create Hospital Announcement
+                </h3>
               </div>
+
               <button
-                onClick={() => setIsAnnouncementModalOpen(false)}
-                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg transition-colors"
+                type="button"
+                onClick={() =>
+                  setIsAnnouncementModalOpen(
+                    false
+                  )
+                }
+                className="text-white/80 hover:text-white hover:bg-white/10 p-1 rounded-lg"
+                aria-label="Close announcement dialog"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAnnouncement} className="p-6 space-y-4">
+            <form
+              onSubmit={
+                handleCreateAnnouncement
+              }
+              className="p-6 space-y-4"
+            >
               <div>
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Announcement Title
                 </label>
+
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Scheduled System Downtime or New Policy Update"
-                  value={announcementData.title}
-                  onChange={(e) =>
-                    setAnnouncementData({ ...announcementData, title: e.target.value })
+                  value={
+                    announcementData.title
                   }
+                  onChange={(event) =>
+                    setAnnouncementData(
+                      (previous) => ({
+                        ...previous,
+                        title:
+                          event.target.value,
+                      })
+                    )
+                  }
+                  placeholder="e.g. Scheduled System Downtime"
                   className="w-full text-xs border border-[#CBD5E1] rounded-lg px-3 py-2 text-[#0F172A] focus:ring-2 focus:ring-[#4F46E5] focus:outline-none"
                 />
               </div>
@@ -739,21 +1266,35 @@ export default function NotificationsAlertCenterPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#0F172A] mb-1">
-                    Category Tag
+                    Category
                   </label>
+
                   <select
-                    value={announcementData.category}
-                    onChange={(e) =>
-                      setAnnouncementData({
-                        ...announcementData,
-                        category: e.target.value,
-                      })
+                    value={
+                      announcementData.category
+                    }
+                    onChange={(event) =>
+                      setAnnouncementData(
+                        (previous) => ({
+                          ...previous,
+                          category:
+                            event.target.value,
+                        })
+                      )
                     }
                     className="w-full text-xs font-medium border border-[#CBD5E1] rounded-lg px-3 py-2 bg-white text-[#0F172A] focus:ring-2 focus:ring-[#4F46E5] focus:outline-none"
                   >
-                    <option value="Announcements">Announcements</option>
-                    <option value="Clinical">Clinical Escalations</option>
-                    <option value="Finance">Security</option>
+                    <option value="Announcements">
+                      Announcements
+                    </option>
+
+                    <option value="Clinical">
+                      Clinical Escalations
+                    </option>
+
+                    <option value="Finance">
+                      Finance
+                    </option>
                   </select>
                 </div>
 
@@ -761,16 +1302,22 @@ export default function NotificationsAlertCenterPage() {
                   <label className="block text-xs font-bold text-[#0F172A] mb-1">
                     Target Department
                   </label>
+
                   <input
                     type="text"
-                    placeholder="e.g. Ophthalmology or All Staff"
-                    value={announcementData.targetDept}
-                    onChange={(e) =>
-                      setAnnouncementData({
-                        ...announcementData,
-                        targetDept: e.target.value,
-                      })
+                    value={
+                      announcementData.targetDept
                     }
+                    onChange={(event) =>
+                      setAnnouncementData(
+                        (previous) => ({
+                          ...previous,
+                          targetDept:
+                            event.target.value,
+                        })
+                      )
+                    }
+                    placeholder="e.g. Ophthalmology"
                     className="w-full text-xs border border-[#CBD5E1] rounded-lg px-3 py-2 text-[#0F172A] focus:ring-2 focus:ring-[#4F46E5] focus:outline-none"
                   />
                 </div>
@@ -780,17 +1327,23 @@ export default function NotificationsAlertCenterPage() {
                 <label className="block text-xs font-bold text-[#0F172A] mb-1">
                   Announcement Message
                 </label>
+
                 <textarea
-                  rows={4}
+                  rows={5}
                   required
-                  placeholder="Type the full message details here..."
-                  value={announcementData.message}
-                  onChange={(e) =>
-                    setAnnouncementData({
-                      ...announcementData,
-                      message: e.target.value,
-                    })
+                  value={
+                    announcementData.message
                   }
+                  onChange={(event) =>
+                    setAnnouncementData(
+                      (previous) => ({
+                        ...previous,
+                        message:
+                          event.target.value,
+                      })
+                    )
+                  }
+                  placeholder="Type the full message details here..."
                   className="w-full text-xs border border-[#CBD5E1] rounded-lg p-3 text-[#0F172A] focus:ring-2 focus:ring-[#4F46E5] focus:outline-none"
                 />
               </div>
@@ -798,16 +1351,26 @@ export default function NotificationsAlertCenterPage() {
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
                 <button
                   type="button"
-                  onClick={() => setIsAnnouncementModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A] transition-colors"
+                  onClick={() =>
+                    setIsAnnouncementModalOpen(
+                      false
+                    )
+                  }
+                  className="px-4 py-2 text-xs font-semibold text-[#64748B] hover:text-[#0F172A]"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] disabled:opacity-60 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <Plus className="w-4 h-4" /> Publish Announcement
+                  <Plus className="w-4 h-4" />
+
+                  {isSubmitting
+                    ? "Publishing..."
+                    : "Publish Announcement"}
                 </button>
               </div>
             </form>

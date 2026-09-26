@@ -1,7 +1,15 @@
-// types/hospital.ts
+export type InvoiceStatus =
+  | "draft"
+  | "pending"
+  | "paid"
+  | "cancelled";
 
-export type InvoiceStatus = "draft" | "pending" | "paid" | "cancelled";
-export type PaymentMethod = "cash" | "pos" | "transfer" | "card" | "hmo";
+export type PaymentMethod =
+  | "cash"
+  | "pos"
+  | "transfer"
+  | "card"
+  | "hmo";
 
 export interface InvoiceItem {
   id: string;
@@ -18,17 +26,21 @@ export interface Invoice {
   subtotal: number;
   tax: number;
   totalAmount: number;
-  status: "unpaid" | "paid" | "pending" | "partially_paid";
+  status:
+    | "unpaid"
+    | "paid"
+    | "pending"
+    | "partially_paid";
   createdAt: string;
   dueDate?: string;
 }
 
 export interface TriageVitals {
-  visualAcuityOD: string; // Right eye
-  visualAcuityOS: string; // Left eye
-  visualAcuityOU?: string; // Both eyes
+  visualAcuityOD: string;
+  visualAcuityOS: string;
+  visualAcuityOU?: string;
   withCorrection?: boolean;
-  iop: number; // kept for backward compatibility; prefer iopOD/iopOS
+  iop: number;
   iopOD?: number;
   iopOS?: number;
   iopInstrument?: string;
@@ -48,7 +60,10 @@ export interface DiagnosticOrder {
   id: string;
   name: string;
   price: number;
-  status: "ordered" | "ready_for_test" | "completed";
+  status:
+    | "ordered"
+    | "ready_for_test"
+    | "completed";
   findings?: string;
   interpretation?: string;
   completedAt?: string;
@@ -61,12 +76,19 @@ export interface Prescription {
   quantity: number;
   pricePerUnit: number;
   totalPrice: number;
-  status: "pending_payment" | "ready_for_dispensing" | "dispensed";
+  status:
+    | "pending_payment"
+    | "ready_for_dispensing"
+    | "dispensed";
 }
 
 export interface LineItem {
   id: string;
-  category: "consultation" | "diagnostic" | "pharmacy" | "consumable";
+  category:
+    | "consultation"
+    | "diagnostic"
+    | "pharmacy"
+    | "consumable";
   name: string;
   quantity: number;
   unitPrice: number;
@@ -80,18 +102,46 @@ export interface PatientInvoice {
   coveragePlan: string;
   status: InvoiceStatus;
   items: LineItem[];
+
   subtotal: number;
+
+  /**
+   * VAT percentage captured on this invoice
+   * at the time the invoice was calculated.
+   *
+   * Example:
+   * 5 means 5%.
+   */
+  vatRate: number;
+
+  /**
+   * Actual VAT amount charged on the invoice.
+   *
+   * Example:
+   * ₦228.35
+   */
+  vatAmount: number;
+
   discountAmount: number;
   discountReason?: string;
   approvedByPin?: string;
+
   grandTotal: number;
+
   createdAt: string;
 }
 
 export type ActivityLog = {
   id: string;
   timestamp: string;
-  module: "Billing" | "Pharmacy" | "Diagnostics" | "Triage" | "Admin" | "Scheduling" | "Consultation";
+  module:
+    | "Billing"
+    | "Pharmacy"
+    | "Diagnostics"
+    | "Triage"
+    | "Admin"
+    | "Scheduling"
+    | "Consultation";
   action: string;
   performedBy: string;
 };
@@ -100,8 +150,16 @@ export type Encounter = {
   id: string;
   slitLampOD?: string;
   slitLampOS?: string;
-  refractionOD?: { sphere: string; cylinder: string; axis: string };
-  refractionOS?: { sphere: string; cylinder: string; axis: string };
+  refractionOD?: {
+    sphere: string;
+    cylinder: string;
+    axis: string;
+  };
+  refractionOS?: {
+    sphere: string;
+    cylinder: string;
+    axis: string;
+  };
   diagnosis?: string;
   status: "draft" | "completed";
   createdAt: string;
@@ -115,10 +173,16 @@ export interface PatientRecord {
   gender?: string;
   phone?: string;
   allergies?: string;
+
   vitals?: TriageVitals;
+
   diagnostics: DiagnosticOrder[];
+
   prescriptions: Prescription[];
+
   invoice: PatientInvoice;
+
   activityLogs?: ActivityLog[];
+
   encounters?: Encounter[];
 }

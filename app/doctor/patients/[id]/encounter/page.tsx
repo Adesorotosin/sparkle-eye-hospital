@@ -67,6 +67,12 @@ type PatientDiagnostic = {
   completedAt?: string;
 };
 
+type PatientHistoryItem = {
+  date: string;
+  title: string;
+  details: string;
+};
+
 type PatientRecord = {
   id: string;
   name: string;
@@ -78,11 +84,7 @@ type PatientRecord = {
   vitals?: PatientVitals;
   diagnostics: PatientDiagnostic[];
 
-  history: {
-    date: string;
-    title: string;
-    details: string;
-  }[];
+  history: PatientHistoryItem[];
 
   imaging: {
     id: string;
@@ -147,9 +149,7 @@ const SURGERY_OPTIONS = [
 ];
 
 function formatEncounterDate(value?: string | null): string {
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
 
   const date = new Date(value);
 
@@ -174,10 +174,13 @@ function safeRefraction(
   };
 }
 
-function mapApiPatientToRecord(apiPatient: any): PatientRecord {
-  const encounters = Array.isArray(apiPatient?.encounters)
-    ? apiPatient.encounters
-    : [];
+function mapApiPatientToRecord(
+  apiPatient: any
+): PatientRecord {
+  const encounters: PatientEncounter[] =
+    Array.isArray(apiPatient?.encounters)
+      ? apiPatient.encounters
+      : [];
 
   const latestEncounter = encounters[0];
   const previousEncounter = encounters[1];
@@ -188,76 +191,119 @@ function mapApiPatientToRecord(apiPatient: any): PatientRecord {
   };
 
   const currentRefraction = {
-    od: safeRefraction(latestEncounter?.refractionOD),
-    os: safeRefraction(latestEncounter?.refractionOS),
+    od: safeRefraction(
+      latestEncounter?.refractionOD
+    ),
+    os: safeRefraction(
+      latestEncounter?.refractionOS
+    ),
   };
 
   const previousRefraction = previousEncounter
     ? {
-        date: formatEncounterDate(previousEncounter.createdAt),
-        od: safeRefraction(previousEncounter.refractionOD),
-        os: safeRefraction(previousEncounter.refractionOS),
+        date: formatEncounterDate(
+          previousEncounter.createdAt
+        ),
+        od: safeRefraction(
+          previousEncounter.refractionOD
+        ),
+        os: safeRefraction(
+          previousEncounter.refractionOS
+        ),
       }
     : undefined;
 
-  const diagnostics: PatientDiagnostic[] = Array.isArray(apiPatient?.diagnostics)
-    ? apiPatient.diagnostics.map((diagnostic: any) => ({
-        id: diagnostic.id,
-        name: diagnostic.name ?? "",
-        price: Number(diagnostic.price ?? 0),
-        status:
-          diagnostic.status === "completed"
-            ? "completed"
-            : diagnostic.status === "ready_for_test"
-              ? "ready_for_test"
-              : "ordered",
-        findings: diagnostic.findings ?? undefined,
-        interpretation: diagnostic.interpretation ?? undefined,
-        completedAt: diagnostic.completedAt ?? undefined,
-      }))
-    : [];
+  const diagnostics: PatientDiagnostic[] =
+    Array.isArray(apiPatient?.diagnostics)
+      ? apiPatient.diagnostics.map(
+          (
+            diagnostic: any
+          ): PatientDiagnostic => ({
+            id: diagnostic.id,
+            name: diagnostic.name ?? "",
+            price: Number(
+              diagnostic.price ?? 0
+            ),
+            status:
+              diagnostic.status ===
+              "completed"
+                ? "completed"
+                : diagnostic.status ===
+                  "ready_for_test"
+                ? "ready_for_test"
+                : "ordered",
+            findings:
+              diagnostic.findings ??
+              undefined,
+            interpretation:
+              diagnostic.interpretation ??
+              undefined,
+            completedAt:
+              diagnostic.completedAt ??
+              undefined,
+          })
+        )
+      : [];
 
-  const history = encounters.map((encounter: PatientEncounter) => {
-    const details = [
-      encounter.diagnosis
-        ? `Diagnosis: ${encounter.diagnosis}`
-        : "No diagnosis recorded.",
+  const history: PatientHistoryItem[] =
+    encounters.map(
+      (
+        encounter: PatientEncounter
+      ): PatientHistoryItem => {
+        const details = [
+          encounter.diagnosis
+            ? `Diagnosis: ${encounter.diagnosis}`
+            : "No diagnosis recorded.",
 
-      encounter.slitLampOD || encounter.slitLampOS
-        ? "Slit lamp findings recorded."
-        : null,
+          encounter.slitLampOD ||
+          encounter.slitLampOS
+            ? "Slit lamp findings recorded."
+            : null,
 
-      encounter.refractionOD || encounter.refractionOS
-        ? "Refraction recorded."
-        : null,
-    ]
-      .filter(Boolean)
-      .join(" ");
+          encounter.refractionOD ||
+          encounter.refractionOS
+            ? "Refraction recorded."
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" ");
 
-    return {
-      date: formatEncounterDate(encounter.createdAt),
-      title:
-        encounter.status === "completed"
-          ? "Completed Consultation"
-          : "Consultation Draft",
-      details: details || "Consultation record saved.",
-    };
-  });
+        return {
+          date: formatEncounterDate(
+            encounter.createdAt
+          ),
+          title:
+            encounter.status ===
+            "completed"
+              ? "Completed Consultation"
+              : "Consultation Draft",
+          details:
+            details ||
+            "Consultation record saved.",
+        };
+      }
+    );
 
   if (apiPatient?.vitals) {
-    const vitals = apiPatient.vitals as PatientVitals;
+    const vitals =
+      apiPatient.vitals as PatientVitals;
 
     const triageDetails = [
       vitals.primaryComplaint
         ? `Complaint: ${vitals.primaryComplaint}`
         : null,
 
-      `VA: OD ${vitals.visualAcuityOD || "—"}, OS ${
+      `VA: OD ${
+        vitals.visualAcuityOD || "—"
+      }, OS ${
         vitals.visualAcuityOS || "—"
       }`,
 
-      vitals.iopOD !== undefined || vitals.iopOS !== undefined
-        ? `IOP: OD ${vitals.iopOD ?? "—"} / OS ${
+      vitals.iopOD !== undefined ||
+      vitals.iopOS !== undefined
+        ? `IOP: OD ${
+            vitals.iopOD ?? "—"
+          } / OS ${
             vitals.iopOS ?? "—"
           } mmHg`
         : null,
@@ -266,40 +312,52 @@ function mapApiPatientToRecord(apiPatient: any): PatientRecord {
       .join(" • ");
 
     history.push({
-      date: formatEncounterDate(vitals.recordedAt),
+      date: formatEncounterDate(
+        vitals.recordedAt
+      ),
       title: "Triage & Vitals",
-      details: triageDetails || "Triage information recorded.",
+      details:
+        triageDetails ||
+        "Triage information recorded.",
     });
   }
 
-history.sort(
-  (
-    a: {
-      date: string;
-      title: string;
-      details: string;
-    },
-    b: {
-      date: string;
-      title: string;
-      details: string;
+  history.sort(
+    (
+      a: PatientHistoryItem,
+      b: PatientHistoryItem
+    ) => {
+      const parseDate = (
+        value: string
+      ): number => {
+        const [day, month, year] = value
+          .split("/")
+          .map(Number);
+
+        if (!day || !month || !year) {
+          return Number.NaN;
+        }
+
+        return new Date(
+          year,
+          month - 1,
+          day
+        ).getTime();
+      };
+
+      const dateA = parseDate(a.date);
+      const dateB = parseDate(b.date);
+
+      if (
+        Number.isNaN(dateA) ||
+        Number.isNaN(dateB)
+      ) {
+        return 0;
+      }
+
+      return dateB - dateA;
     }
-  ) => {
-    const dateA = new Date(
-      a.date.split("/").reverse().join("-")
-    ).getTime();
-
-    const dateB = new Date(
-      b.date.split("/").reverse().join("-")
-    ).getTime();
-
-    if (Number.isNaN(dateA) || Number.isNaN(dateB)) {
-      return 0;
-    }
-
-    return dateB - dateA;
-  }
-);
+  );
 
   return {
     id: apiPatient.patientId,
@@ -307,23 +365,34 @@ history.sort(
     age: apiPatient.age ?? 0,
     gender: apiPatient.gender ?? "",
     mrn: apiPatient.patientId,
+
     allergies:
-      typeof apiPatient.allergies === "string"
+      typeof apiPatient.allergies ===
+      "string"
         ? apiPatient.allergies
             .split(",")
-            .map((item: string) => item.trim())
+            .map(
+              (item: string) =>
+                item.trim()
+            )
             .filter(Boolean)
-        : Array.isArray(apiPatient.allergies)
-          ? apiPatient.allergies
-          : [],
+        : Array.isArray(
+            apiPatient.allergies
+          )
+        ? apiPatient.allergies
+        : [],
+
     vitals: apiPatient.vitals,
     diagnostics,
     history,
     imaging: [],
+
     slitLamp: currentSlitLamp,
     refraction: currentRefraction,
     previousRefraction,
-    diagnosis: latestEncounter?.diagnosis ?? "",
+
+    diagnosis:
+      latestEncounter?.diagnosis ?? "",
   };
 }
 
@@ -334,192 +403,180 @@ function TriageSummary({
 }) {
   if (!vitals) {
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              Nurse Triage
-            </p>
-
-            <p className="text-sm font-semibold text-slate-700 mt-1">
-              No triage record available
-            </p>
-          </div>
-
-          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500">
-            NOT RECORDED
-          </span>
-        </div>
+      <div className="rounded-xl border bg-white p-4">
+        <p className="text-sm text-gray-500">
+          No triage information available.
+        </p>
       </div>
     );
   }
 
-  const symptoms = vitals.symptoms ?? [];
-
-  const vitalItems = [
-    {
-      label: "Visual Acuity",
-      value: `OD ${vitals.visualAcuityOD || "—"} • OS ${
-        vitals.visualAcuityOS || "—"
-      }`,
-    },
-    {
-      label: "IOP",
-      value:
-        vitals.iopOD !== undefined || vitals.iopOS !== undefined
-          ? `OD ${vitals.iopOD ?? "—"} • OS ${
-              vitals.iopOS ?? "—"
-            } mmHg`
-          : "—",
-    },
-    {
-      label: "Blood Pressure",
-      value:
-        vitals.bpSystolic !== undefined ||
-        vitals.bpDiastolic !== undefined
-          ? `${vitals.bpSystolic ?? "—"} / ${
-              vitals.bpDiastolic ?? "—"
-            } mmHg`
-          : "—",
-    },
-    {
-      label: "Pulse",
-      value:
-        vitals.pulse !== undefined ? `${vitals.pulse} bpm` : "—",
-    },
-    {
-      label: "Temperature",
-      value:
-        vitals.temperature !== undefined
-          ? `${vitals.temperature} °C`
-          : "—",
-    },
-    {
-      label: "SpO₂",
-      value:
-        vitals.spo2 !== undefined ? `${vitals.spo2}%` : "—",
-    },
-  ];
-
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <div className="rounded-xl border bg-white p-4">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600">
-            Nurse Triage
-          </p>
-
-          <h3 className="text-sm font-bold text-slate-900 mt-1">
-            Initial Assessment
+          <h3 className="font-semibold text-gray-900">
+            Triage & Vitals
           </h3>
 
-          <p className="text-[10px] text-slate-400 mt-1">
+          <p className="text-xs text-gray-500">
             Recorded{" "}
-            {vitals.recordedAt
-              ? new Date(vitals.recordedAt).toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "—"}
-          </p>
-        </div>
-
-        {vitals.severity && (
-          <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-              vitals.severity === "Severe"
-                ? "bg-rose-100 text-rose-700"
-                : vitals.severity === "Moderate"
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-emerald-100 text-emerald-700"
-            }`}
-          >
-            {vitals.severity.toUpperCase()}
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {vitalItems.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-xl bg-slate-50 border border-slate-100 p-3"
-          >
-            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-              {item.label}
-            </p>
-
-            <p className="text-xs font-bold text-slate-800 mt-1">
-              {item.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-            Chief Complaint
-          </p>
-
-          <p className="text-xs font-semibold text-slate-800 mt-1">
-            {vitals.primaryComplaint || "Not recorded"}
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-slate-50 border border-slate-100 p-3">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-            Duration
-          </p>
-
-          <p className="text-xs font-semibold text-slate-800 mt-1">
-            {vitals.durationText || "Not recorded"}
+            {formatEncounterDate(
+              vitals.recordedAt
+            )}
           </p>
         </div>
       </div>
 
-      {symptoms.length > 0 && (
-        <div className="mt-3">
-          <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400 mb-2">
-            Reported Symptoms
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">
+            Visual Acuity OD
           </p>
 
-          <div className="flex flex-wrap gap-2">
-            {symptoms.map((symptom) => (
-              <span
-                key={symptom}
-                className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 border border-purple-100"
-              >
-                {symptom}
-              </span>
-            ))}
-          </div>
+          <p className="mt-1 font-medium">
+            {vitals.visualAcuityOD || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">
+            Visual Acuity OS
+          </p>
+
+          <p className="mt-1 font-medium">
+            {vitals.visualAcuityOS || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">
+            IOP OD
+          </p>
+
+          <p className="mt-1 font-medium">
+            {vitals.iopOD ?? "—"} mmHg
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-50 p-3">
+          <p className="text-xs text-gray-500">
+            IOP OS
+          </p>
+
+          <p className="mt-1 font-medium">
+            {vitals.iopOS ?? "—"} mmHg
+          </p>
+        </div>
+      </div>
+
+      {vitals.primaryComplaint && (
+        <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
+          <p className="text-xs font-medium text-blue-700">
+            Primary Complaint
+          </p>
+
+          <p className="mt-1 text-sm text-blue-900">
+            {vitals.primaryComplaint}
+          </p>
         </div>
       )}
+    </div>
+  );
+}
 
-      <div className="flex flex-wrap gap-x-5 gap-y-2 mt-3 pt-3 border-t border-slate-100">
-        <p className="text-[10px] text-slate-500">
-          Correction:{" "}
-          <span className="font-bold text-slate-700">
-            {vitals.withCorrection === undefined
-              ? "Not specified"
-              : vitals.withCorrection
-                ? "With correction"
-                : "Without correction"}
-          </span>
+function DiagnosticResults({
+  diagnostics,
+}: {
+  diagnostics: PatientDiagnostic[];
+}) {
+  if (!diagnostics.length) {
+    return (
+      <div className="rounded-xl border bg-white p-4">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-gray-400" />
+
+          <h3 className="font-semibold text-gray-900">
+            Diagnostic Results
+          </h3>
+        </div>
+
+        <p className="mt-3 text-sm text-gray-500">
+          No diagnostic tests have been
+          ordered.
         </p>
+      </div>
+    );
+  }
 
-        {vitals.iopInstrument && (
-          <p className="text-[10px] text-slate-500">
-            IOP Instrument:{" "}
-            <span className="font-bold text-slate-700">
-              {vitals.iopInstrument}
-            </span>
-          </p>
-        )}
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="flex items-center gap-2">
+        <ClipboardList className="h-5 w-5 text-gray-500" />
+
+        <h3 className="font-semibold text-gray-900">
+          Diagnostic Results
+        </h3>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {diagnostics.map((diagnostic) => (
+          <div
+            key={diagnostic.id}
+            className="rounded-lg border p-3"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium text-gray-900">
+                  {diagnostic.name}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  ₦
+                  {diagnostic.price.toLocaleString()}
+                </p>
+              </div>
+
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  diagnostic.status ===
+                  "completed"
+                    ? "bg-green-100 text-green-700"
+                    : diagnostic.status ===
+                      "ready_for_test"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
+                {diagnostic.status ===
+                "ready_for_test"
+                  ? "Ready for Test"
+                  : diagnostic.status
+                      .charAt(0)
+                      .toUpperCase() +
+                    diagnostic.status.slice(1)}
+              </span>
+            </div>
+
+            {diagnostic.findings && (
+              <p className="mt-3 text-sm text-gray-700">
+                <strong>
+                  Findings:
+                </strong>{" "}
+                {diagnostic.findings}
+              </p>
+            )}
+
+            {diagnostic.interpretation && (
+              <p className="mt-2 text-sm text-gray-700">
+                <strong>
+                  Interpretation:
+                </strong>{" "}
+                {diagnostic.interpretation}
+              </p>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -528,1434 +585,1533 @@ function TriageSummary({
 export default function OphthalmologyConsultation() {
   const params = useParams();
 
-  const id = Array.isArray(params?.id)
-    ? params.id[0]
-    : params?.id;
+  const patientId =
+    typeof params?.id === "string"
+      ? params.id
+      : Array.isArray(params?.id)
+      ? params.id[0]
+      : "";
 
-  const [patient, setPatient] = useState<PatientRecord | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [patient, setPatient] =
+    useState<PatientRecord | null>(null);
 
-  const [activeTab, setActiveTab] = useState<
-    "slit-lamp" | "refraction" | "diagnosis"
-  >("refraction");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [slitLampOD, setSlitLampOD] = useState("");
-  const [slitLampOS, setSlitLampOS] = useState("");
+  const [activeTab, setActiveTab] =
+    useState<
+      "slitLamp" | "refraction" | "diagnosis"
+    >("slitLamp");
 
-  const [refractionOD, setRefractionOD] = useState<Refraction>({
-    sphere: "",
-    cylinder: "",
-    axis: "",
-  });
+  const [slitLampOD, setSlitLampOD] =
+    useState("");
 
-  const [refractionOS, setRefractionOS] = useState<Refraction>({
-    sphere: "",
-    cylinder: "",
-    axis: "",
-  });
+  const [slitLampOS, setSlitLampOS] =
+    useState("");
 
-  const [diagnosis, setDiagnosis] = useState("");
+  const [refractionOD, setRefractionOD] =
+    useState<Refraction>({
+      sphere: "",
+      cylinder: "",
+      axis: "",
+    });
 
-  const [showHistoryOverlay, setShowHistoryOverlay] = useState(false);
+  const [refractionOS, setRefractionOS] =
+    useState<Refraction>({
+      sphere: "",
+      cylinder: "",
+      axis: "",
+    });
 
-  const [activeModal, setActiveModal] = useState<
-    "diagnostics" | "surgery" | "prescription" | null
-  >(null);
+  const [diagnosis, setDiagnosis] =
+    useState("");
 
-  const [selectedDiagnostics, setSelectedDiagnostics] = useState<string[]>(
-    []
-  );
+  const [showHistory, setShowHistory] =
+    useState(false);
 
-  const [surgeryDetails, setSurgeryDetails] = useState({
-    procedure: SURGERY_OPTIONS[0],
-    date: "",
-    notes: "",
-  });
+  const [activeModal, setActiveModal] =
+    useState<
+      | "diagnostics"
+      | "surgery"
+      | "prescription"
+      | null
+    >(null);
 
-  const [prescriptionDetails, setPrescriptionDetails] = useState({
-    medication: "",
-    dosage: "",
-    frequency: "",
-    duration: "",
-    quantity: "1",
-    pricePerUnit: "",
-  });
+  const [
+    selectedDiagnostics,
+    setSelectedDiagnostics,
+  ] = useState<string[]>([]);
 
-  const [isPending, startTransition] = useTransition();
+  const [surgeryType, setSurgeryType] =
+    useState("");
 
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(
-    null
-  );
+  const [surgeryNotes, setSurgeryNotes] =
+    useState("");
 
-  const [feedbackType, setFeedbackType] = useState<
-    "success" | "error" | "info"
-  >("success");
+  const [medication, setMedication] =
+    useState("");
 
-  const showFeedback = (
-    message: string,
-    type: "success" | "error" | "info" = "success"
-  ) => {
-    setFeedbackMessage(message);
-    setFeedbackType(type);
+  const [dosage, setDosage] =
+    useState("");
 
-    window.setTimeout(() => {
-      setFeedbackMessage(null);
-    }, 4000);
-  };
+  const [frequency, setFrequency] =
+    useState("");
+
+  const [duration, setDuration] =
+    useState("");
+
+  const [quantity, setQuantity] =
+    useState("");
+
+  const [pricePerUnit, setPricePerUnit] =
+    useState("");
+
+  const [isPending, startTransition] =
+    useTransition();
+
+  const [feedback, setFeedback] =
+    useState("");
 
   useEffect(() => {
+    if (!patientId) return;
+
     let cancelled = false;
 
- async function loadPatientData() {
-  if (!id) {
-    setLoading(false);
-    return;
-  }
+    async function loadPatient() {
+      try {
+        setLoading(true);
 
-  try {
-    const response = await fetch(
-      `/api/patients/${encodeURIComponent(id)}`,
-      {
-        method: "GET",
-        cache: "no-store",
-      }
-    );
-
-    if (cancelled) {
-      return;
-    }
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error(
-          "Your session has expired. Please sign in again."
+        const response = await fetch(
+          `/api/patients/${encodeURIComponent(
+            patientId
+          )}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
         );
-      }
 
-      if (response.status === 403) {
-        throw new Error(
-          "You are not authorized to view this patient."
+        if (response.status === 401) {
+          throw new Error(
+            "You are not authorized to view this patient."
+          );
+        }
+
+        if (response.status === 403) {
+          throw new Error(
+            "You do not have permission to view this patient."
+          );
+        }
+
+        if (response.status === 404) {
+          throw new Error(
+            "Patient record was not found."
+          );
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            "Failed to load patient record."
+          );
+        }
+
+        const result =
+          await response.json();
+
+        if (!result?.patient) {
+          throw new Error(
+            "Patient record was not returned."
+          );
+        }
+
+        const mappedPatient =
+          mapApiPatientToRecord(
+            result.patient
+          );
+
+        if (cancelled) return;
+
+        setPatient(mappedPatient);
+
+        setSlitLampOD(
+          mappedPatient.slitLamp.od
         );
+
+        setSlitLampOS(
+          mappedPatient.slitLamp.os
+        );
+
+        setRefractionOD(
+          mappedPatient.refraction.od
+        );
+
+        setRefractionOS(
+          mappedPatient.refraction.os
+        );
+
+        setDiagnosis(
+          mappedPatient.diagnosis
+        );
+      } catch (error) {
+        console.error(
+          "Failed to load patient:",
+          error
+        );
+
+        if (!cancelled) {
+          setPatient(null);
+
+          setFeedback(
+            error instanceof Error
+              ? error.message
+              : "Failed to load patient."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-
-      if (response.status === 404) {
-        throw new Error("Patient record not found.");
-      }
-
-      throw new Error("Unable to load this patient record.");
     }
 
-    const result = await response.json();
-
-    if (!result?.patient) {
-      throw new Error("Patient record not found.");
-    }
-
-    const data = mapApiPatientToRecord(result.patient);
-
-    if (cancelled) {
-      return;
-    }
-
-    setPatient(data);
-
-    setSlitLampOD(data.slitLamp?.od ?? "");
-    setSlitLampOS(data.slitLamp?.os ?? "");
-
-    setRefractionOD({
-      sphere: data.refraction?.od?.sphere ?? "",
-      cylinder: data.refraction?.od?.cylinder ?? "",
-      axis: data.refraction?.od?.axis ?? "",
-    });
-
-    setRefractionOS({
-      sphere: data.refraction?.os?.sphere ?? "",
-      cylinder: data.refraction?.os?.cylinder ?? "",
-      axis: data.refraction?.os?.axis ?? "",
-    });
-
-    setDiagnosis(data.diagnosis ?? "");
-  } catch (error) {
-    console.error("Failed to load patient record:", error);
-
-    if (!cancelled) {
-      showFeedback(
-        error instanceof Error
-          ? error.message
-          : "Unable to load this patient record. Please try again.",
-        "error"
-      );
-    }
-  } finally {
-    if (!cancelled) {
-      setLoading(false);
-    }
-  }
-}
-
-    loadPatientData();
+    loadPatient();
 
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [patientId]);
 
-  const snapToQuarter = (value: string): string => {
-    const cleaned = value.trim();
+  function snapToQuarter(
+    value: string
+  ): string {
+    if (!value.trim()) return "";
 
-    if (!cleaned || Number.isNaN(Number(cleaned))) {
-      return cleaned;
+    const numeric = Number(value);
+
+    if (Number.isNaN(numeric)) {
+      return value;
     }
 
-    const num = Number(cleaned);
-    const snapped = Math.round(num * 4) / 4;
+    const snapped =
+      Math.round(numeric * 4) / 4;
 
-    return `${snapped > 0 ? "+" : ""}${snapped.toFixed(2)}`;
-  };
+    return snapped.toFixed(2);
+  }
 
-  const validateAndFormatAxis = (value: string): string => {
-    const cleaned = value.trim();
+  function validateAndFormatAxis(
+    value: string
+  ): string {
+    if (!value.trim()) return "";
 
-    if (!cleaned || Number.isNaN(Number(cleaned))) {
-      return cleaned;
+    const numeric = Number(value);
+
+    if (
+      Number.isNaN(numeric) ||
+      numeric < 0 ||
+      numeric > 180
+    ) {
+      return value;
     }
 
-    let num = Number.parseInt(cleaned, 10);
+    return String(Math.round(numeric));
+  }
 
-    if (num < 0) {
-      num = 0;
-    }
-
-    if (num > 180) {
-      num = 180;
-    }
-
-    return num.toString();
-  };
-
-  const handleRefractionBlur = (
-    eye: "od" | "os",
+  function handleRefractionBlur(
+    eye: "OD" | "OS",
     field: keyof Refraction
-  ) => {
-    if (eye === "od") {
-      setRefractionOD((previous) => ({
-        ...previous,
-        [field]:
-          field === "axis"
-            ? validateAndFormatAxis(previous[field])
-            : snapToQuarter(previous[field]),
-      }));
+  ) {
+    const setter =
+      eye === "OD"
+        ? setRefractionOD
+        : setRefractionOS;
 
-      return;
+    const current =
+      eye === "OD"
+        ? refractionOD
+        : refractionOS;
+
+    const value = current[field];
+
+    let formatted = value;
+
+    if (field === "axis") {
+      formatted =
+        validateAndFormatAxis(value);
+    } else {
+      formatted = snapToQuarter(value);
     }
 
-    setRefractionOS((previous) => ({
-      ...previous,
-      [field]:
-        field === "axis"
-          ? validateAndFormatAxis(previous[field])
-          : snapToQuarter(previous[field]),
-    }));
-  };
-
-  const handleSave = (status: "draft" | "completed") => {
-    if (!id) {
-      showFeedback("Patient ID is missing.", "error");
-      return;
-    }
-
-    if (status === "completed" && !diagnosis.trim()) {
-      showFeedback(
-        "Please enter a diagnosis before completing the encounter.",
-        "error"
-      );
-
-      setActiveTab("diagnosis");
-      return;
-    }
-
-    startTransition(async () => {
-      try {
-        const result = await saveConsultationEncounter({
-          patientId: id,
-          slitLampOD,
-          slitLampOS,
-          refractionOD,
-          refractionOS,
-          diagnosis,
-          status,
-        });
-
-        showFeedback(
-          result.message,
-          result.success ? "success" : "error"
-        );
-      } catch (error) {
-        console.error("Failed to save consultation:", error);
-
-        showFeedback(
-          "Failed to save the consultation. Please try again.",
-          "error"
-        );
-      }
+    setter({
+      ...current,
+      [field]: formatted,
     });
-  };
+  }
 
-  const toggleDiagnostic = (
-    testName: string,
-    checked: boolean
-  ) => {
-    setSelectedDiagnostics((previous) => {
-      if (checked) {
-        return previous.includes(testName)
-          ? previous
-          : [...previous, testName];
-      }
+  function handleSave(
+    status: "draft" | "completed"
+  ) {
+    if (!patientId) return;
 
-      return previous.filter((test) => test !== testName);
-    });
-  };
-
-  const handleSubmitDiagnostics = () => {
-    if (!id) {
-      showFeedback("Patient ID is missing.", "error");
-      return;
-    }
-
-    if (selectedDiagnostics.length === 0) {
-      showFeedback(
-        "Select at least one diagnostic test before submitting.",
-        "error"
+    if (
+      status === "completed" &&
+      !diagnosis.trim()
+    ) {
+      setFeedback(
+        "Please enter a diagnosis before completing the encounter."
       );
       return;
     }
 
     startTransition(async () => {
       try {
-        const selectedTests = DIAGNOSTIC_TESTS.filter((test) =>
-          selectedDiagnostics.includes(test.name)
-        );
-
-        for (const test of selectedTests) {
-          const result = await createDiagnosticOrder({
-            patientCode: id,
-            name: test.name,
-            price: test.price,
+        const result =
+          await saveConsultationEncounter({
+            patientId,
+            slitLampOD,
+            slitLampOS,
+            refractionOD,
+            refractionOS,
+            diagnosis,
+            status,
           });
 
-          if (!result.success) {
-            throw new Error(result.message);
+        if (
+          result &&
+          typeof result === "object" &&
+          "error" in result &&
+          result.error
+        ) {
+          throw new Error(
+            String(result.error)
+          );
+        }
+
+        setFeedback(
+          status === "completed"
+            ? "Consultation completed successfully."
+            : "Consultation draft saved successfully."
+        );
+      } catch (error) {
+        console.error(
+          "Failed to save consultation:",
+          error
+        );
+
+        setFeedback(
+          error instanceof Error
+            ? error.message
+            : "Failed to save consultation."
+        );
+      }
+    });
+  }
+
+  function toggleDiagnostic(
+    name: string
+  ) {
+    setSelectedDiagnostics((current) =>
+      current.includes(name)
+        ? current.filter(
+            (item) => item !== name
+          )
+        : [...current, name]
+    );
+  }
+
+  function handleSubmitDiagnostics() {
+    if (!patientId) return;
+
+    if (!selectedDiagnostics.length) {
+      setFeedback(
+        "Please select at least one diagnostic test."
+      );
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        for (const testName of selectedDiagnostics) {
+          const test =
+            DIAGNOSTIC_TESTS.find(
+              (item) =>
+                item.name === testName
+            );
+
+          if (!test) continue;
+
+          const result =
+            await createDiagnosticOrder({
+              patientCode: patientId,
+              name: test.name,
+              price: test.price,
+            });
+
+          if (
+            result &&
+            typeof result === "object" &&
+            "error" in result &&
+            result.error
+          ) {
+            throw new Error(
+              String(result.error)
+            );
           }
         }
 
-        showFeedback(
-          `${selectedTests.length} diagnostic ${
-            selectedTests.length === 1 ? "order" : "orders"
-          } added to the patient's bill.`,
-          "success"
+        setFeedback(
+          "Diagnostic orders created successfully."
         );
 
         setSelectedDiagnostics([]);
         setActiveModal(null);
       } catch (error) {
-        console.error("Failed to add diagnostic orders:", error);
+        console.error(
+          "Failed to create diagnostic orders:",
+          error
+        );
 
-        showFeedback(
+        setFeedback(
           error instanceof Error
             ? error.message
-            : "Unable to add the diagnostic orders. Please try again.",
-          "error"
+            : "Failed to create diagnostic orders."
         );
       }
     });
-  };
+  }
 
-  const handleSavePrescription = () => {
-    if (!id) {
-      showFeedback("Patient ID is missing.", "error");
-      return;
-    }
+  function handleSavePrescription() {
+    if (!patientId) return;
 
-    const medication = prescriptionDetails.medication.trim();
-    const dosage = prescriptionDetails.dosage.trim();
-    const frequency = prescriptionDetails.frequency.trim();
-    const duration = prescriptionDetails.duration.trim();
-
-    const quantity = Number(prescriptionDetails.quantity);
-    const pricePerUnit = Number(
-      prescriptionDetails.pricePerUnit
-    );
-
-    if (!medication) {
-      showFeedback("Enter the medication name.", "error");
-      return;
-    }
-
-    if (!dosage) {
-      showFeedback("Enter the dosage/instructions.", "error");
-      return;
-    }
-
-    if (!frequency) {
-      showFeedback("Enter the medication frequency.", "error");
-      return;
-    }
-
-    if (!duration) {
-      showFeedback(
-        "Enter the duration of treatment.",
-        "error"
+    if (!medication.trim()) {
+      setFeedback(
+        "Please enter the medication name."
       );
       return;
     }
 
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      showFeedback(
-        "Quantity must be a whole number greater than zero.",
-        "error"
+    if (!dosage.trim()) {
+      setFeedback(
+        "Please enter the dosage."
+      );
+      return;
+    }
+
+    if (!frequency.trim()) {
+      setFeedback(
+        "Please enter the frequency."
+      );
+      return;
+    }
+
+    if (!duration.trim()) {
+      setFeedback(
+        "Please enter the duration."
+      );
+      return;
+    }
+
+    if (!quantity.trim()) {
+      setFeedback(
+        "Please enter the quantity."
+      );
+      return;
+    }
+
+    if (!pricePerUnit.trim()) {
+      setFeedback(
+        "Please enter the price per unit."
+      );
+      return;
+    }
+
+    const parsedQuantity =
+      Number(quantity);
+
+    const parsedPrice =
+      Number(pricePerUnit);
+
+    if (
+      Number.isNaN(parsedQuantity) ||
+      parsedQuantity <= 0
+    ) {
+      setFeedback(
+        "Quantity must be a valid number."
       );
       return;
     }
 
     if (
-      !Number.isFinite(pricePerUnit) ||
-      pricePerUnit < 0
+      Number.isNaN(parsedPrice) ||
+      parsedPrice < 0
     ) {
-      showFeedback(
-        "Enter a valid price per unit.",
-        "error"
+      setFeedback(
+        "Price per unit must be a valid number."
       );
       return;
     }
 
     startTransition(async () => {
       try {
-        const fullDosage = [
-          dosage,
-          frequency,
-          duration,
-        ]
-          .filter(Boolean)
-          .join(", ");
+        const result =
+          await createPrescription({
+            patientCode: patientId,
+            drugName: medication,
+            dosage: `${dosage} • ${frequency} • ${duration}`,
+            quantity: parsedQuantity,
+            pricePerUnit: parsedPrice,
+          });
 
-        const result = await createPrescription({
-          patientCode: id,
-          drugName: medication,
-          dosage: fullDosage,
-          quantity,
-          pricePerUnit,
-        });
-
-        if (!result.success) {
-          throw new Error(result.message);
+        if (
+          result &&
+          typeof result === "object" &&
+          "error" in result &&
+          result.error
+        ) {
+          throw new Error(
+            String(result.error)
+          );
         }
 
-        showFeedback(
-          `${medication} has been added to the patient's prescription and bill.`,
-          "success"
+        setFeedback(
+          "Prescription issued successfully."
         );
 
-        setPrescriptionDetails({
-          medication: "",
-          dosage: "",
-          frequency: "",
-          duration: "",
-          quantity: "1",
-          pricePerUnit: "",
-        });
+        setMedication("");
+        setDosage("");
+        setFrequency("");
+        setDuration("");
+        setQuantity("");
+        setPricePerUnit("");
 
         setActiveModal(null);
       } catch (error) {
-        console.error("Failed to save prescription:", error);
+        console.error(
+          "Failed to create prescription:",
+          error
+        );
 
-        showFeedback(
+        setFeedback(
           error instanceof Error
             ? error.message
-            : "Unable to save the prescription. Please try again.",
-          "error"
+            : "Failed to issue prescription."
         );
       }
     });
-  };
+  }
 
-  const handleScheduleSurgery = () => {
-    if (!surgeryDetails.date) {
-      showFeedback(
-        "Select a preferred surgery date and time.",
-        "error"
-      );
-      return;
-    }
-
-    showFeedback(
-      "Surgery scheduling is not connected to the hospital scheduling system yet. No appointment was created.",
-      "info"
+  function handleScheduleSurgery() {
+    setFeedback(
+      "Surgery scheduling is not connected yet. No appointment was created."
     );
-
-    setActiveModal(null);
-  };
+  }
 
   if (loading) {
     return (
-      <div className="p-8 text-xs text-slate-500 bg-[#F4F6FB] min-h-screen">
-        Loading patient record...
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600" />
+
+          <p className="mt-3 text-sm text-gray-500">
+            Loading patient record...
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!patient) {
     return (
-      <div className="p-8 text-xs text-rose-500 font-bold bg-[#F4F6FB] min-h-screen">
-        Patient record not found for ID: {id}
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+        <div className="w-full max-w-md rounded-2xl border bg-white p-6 text-center shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Patient unavailable
+          </h2>
+
+          <p className="mt-2 text-sm text-gray-500">
+            {feedback ||
+              "The patient record could not be loaded."}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#F4F6FB] selection:bg-purple-100 selection:text-purple-900 relative">
-      <div className="flex-1 flex flex-col overflow-y-auto">
-        <div className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-[1500px] w-full mx-auto">
-          {/* LEFT COLUMN */}
-          <div className="xl:col-span-5 space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-              <div className="mb-4">
-                <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
-                  Patient History
-                </h2>
+    <div className="min-h-screen bg-gray-50 pb-28">
+      <header className="sticky top-0 z-30 border-b bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-gray-900">
+                Ophthalmology Consultation
+              </h1>
 
-                <p className="text-[11px] text-slate-400 font-medium">
-                  {patient.name} — MRN: {patient.mrn}
-                </p>
-              </div>
-
-              <div className="space-y-4 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                {patient.history.map((hist, idx) => (
-                  <div
-                    key={idx}
-                    className="relative pl-6"
-                  >
-                    <div className="absolute left-0 top-1 w-4 h-4 rounded-full bg-purple-50 border-2 border-[#6B21A8] flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#6B21A8]" />
-                    </div>
-
-                    <div className="text-[11px]">
-                      <span className="font-bold text-[#6B21A8] block">
-                        {hist.date}
-                      </span>
-
-                      <h3 className="font-bold text-slate-900 text-xs mt-0.5">
-                        {hist.title}
-                      </h3>
-
-                      <p className="text-slate-600 leading-relaxed mt-1">
-                        {hist.details}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                {patient.mrn}
+              </span>
             </div>
 
-            {/* IMAGING */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs">
-              <div className="mb-4">
-                <h2 className="font-extrabold text-sm text-slate-900 tracking-tight">
-                  Recent Imaging
-                </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {patient.name} • {patient.age}{" "}
+              years • {patient.gender}
+            </p>
+          </div>
 
-                <p className="text-[11px] text-slate-400 font-medium">
-                  OCT Scans & Diagnostic Imaging
-                </p>
-              </div>
+          <button
+            type="button"
+            onClick={() =>
+              setShowHistory(true)
+            }
+            className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <History className="h-4 w-4" />
+            History
+          </button>
+        </div>
+      </header>
 
-              <div className="grid grid-cols-2 gap-3">
-                {patient.imaging.map((img) => (
-                  <div
-                    key={img.id}
-                    className="border border-slate-200/80 rounded-xl p-2.5 bg-slate-50/50 hover:border-slate-300 transition cursor-pointer group"
-                  >
-                    <div className="aspect-video bg-[#0A0E1A] rounded-lg overflow-hidden relative border border-slate-800 flex items-center justify-center">
-                      <span className="absolute top-1.5 left-1.5 text-[9px] font-bold text-slate-300 bg-slate-900/80 px-1.5 py-0.5 rounded">
-                        OCT SCAN
-                      </span>
+      <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 md:px-6">
+        <TriageSummary
+          vitals={patient.vitals}
+        />
 
-                      <svg
-                        className={`w-full h-full p-2 ${img.color} opacity-80`}
-                        viewBox="0 0 100 50"
-                      >
-                        <path
-                          d={img.path}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                        />
-                      </svg>
-                    </div>
+        <DiagnosticResults
+          diagnostics={patient.diagnostics}
+        />
 
-                    <div className="mt-2 text-left">
-                      <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#6B21A8]">
-                        {img.type}
-                      </strong>
+        <section className="overflow-hidden rounded-xl border bg-white">
+          <div className="border-b px-4">
+            <div className="flex gap-6">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab("slitLamp")
+                }
+                className={`border-b-2 py-4 text-sm font-medium ${
+                  activeTab === "slitLamp"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500"
+                }`}
+              >
+                Slit Lamp
+              </button>
 
-                      <span className="text-[10px] text-slate-400 font-medium block">
-                        {img.date}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab("refraction")
+                }
+                className={`border-b-2 py-4 text-sm font-medium ${
+                  activeTab === "refraction"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500"
+                }`}
+              >
+                Refraction
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveTab("diagnosis")
+                }
+                className={`border-b-2 py-4 text-sm font-medium ${
+                  activeTab === "diagnosis"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500"
+                }`}
+              >
+                Diagnosis & Plan
+              </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN */}
-          <div className="xl:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs flex flex-col justify-between">
-            <div>
-              {/* TABS */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-6">
-                <div className="flex items-center gap-8">
-                  <button
-                    onClick={() =>
-                      setActiveTab("slit-lamp")
-                    }
-                    className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
-                      activeTab === "slit-lamp"
-                        ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    Slit Lamp Exam
-                  </button>
+          <div className="p-5">
+            {activeTab === "slitLamp" && (
+              <div className="grid gap-5 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Right Eye (OD)
+                  </label>
 
-                  <button
-                    onClick={() =>
-                      setActiveTab("refraction")
-                    }
-                    className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
-                      activeTab === "refraction"
-                        ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    Refraction & Prescription
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      setActiveTab("diagnosis")
-                    }
-                    className={`font-bold text-sm transition relative pb-2 -mb-3.5 ${
-                      activeTab === "diagnosis"
-                        ? "text-[#6B21A8] border-b-2 border-[#6B21A8]"
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    Diagnosis & Assessment
-                  </button>
-                </div>
-
-                {activeTab === "refraction" && (
-                  <button
-                    onClick={() =>
-                      setShowHistoryOverlay(
-                        (previous) => !previous
+                  <textarea
+                    value={slitLampOD}
+                    onChange={(event) =>
+                      setSlitLampOD(
+                        event.target.value
                       )
                     }
-                    className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer ${
-                      showHistoryOverlay
-                        ? "bg-purple-100 border-purple-300 text-purple-900"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <History className="w-3.5 h-3.5 text-[#6B21A8]" />
-
-                    {showHistoryOverlay
-                      ? "Hide Previous Exam"
-                      : "Compare Previous Exam"}
-                  </button>
-                )}
-              </div>
-
-              {/* TRIAGE SUMMARY */}
-              <TriageSummary vitals={patient.vitals} />
-              
-              {/* DIAGNOSTIC RESULTS */}
-              {patient.diagnostics.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-5">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-purple-600">Diagnostics</p>
-                      <h3 className="text-sm font-bold text-slate-900 mt-1">Investigation Results</h3>
-                      <p className="text-[10px] text-slate-400 mt-1">Results recorded after payment and investigation.</p>
-                    </div>
-                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                      {patient.diagnostics.length} {patient.diagnostics.length === 1 ? "TEST" : "TESTS"}
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {patient.diagnostics.map((diagnostic) => (
-                      <div key={diagnostic.id} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{diagnostic.name}</p>
-                            <p className="text-[10px] text-slate-400 mt-1">₦{diagnostic.price.toLocaleString()}</p>
-                          </div>
-                          <span className={`text-[9px] font-bold px-2 py-1 rounded-full ${
-                            diagnostic.status === "completed"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : diagnostic.status === "ready_for_test"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-slate-100 text-slate-600"
-                          }`}>
-                            {diagnostic.status === "completed" ? "COMPLETED" : diagnostic.status === "ready_for_test" ? "READY FOR TEST" : "ORDERED"}
-                          </span>
-                        </div>
-                        {diagnostic.status === "completed" ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                            <div className="rounded-lg bg-white border border-slate-200 p-3">
-                              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Findings</p>
-                              <p className="text-xs text-slate-700 leading-relaxed mt-1 whitespace-pre-wrap">{diagnostic.findings || "No findings recorded."}</p>
-                            </div>
-                            <div className="rounded-lg bg-white border border-slate-200 p-3">
-                              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Interpretation</p>
-                              <p className="text-xs text-slate-700 leading-relaxed mt-1 whitespace-pre-wrap">{diagnostic.interpretation || "No interpretation recorded."}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-slate-500 mt-3">
-                            {diagnostic.status === "ready_for_test" ? "Payment completed. Investigation is ready to be performed." : "Diagnostic order created. Awaiting Cashier payment."}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                    rows={8}
+                    className="w-full rounded-xl border border-gray-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter right eye slit lamp findings..."
+                  />
                 </div>
-              )}
 
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Left Eye (OS)
+                  </label>
 
-              {/* SLIT LAMP */}
-              {activeTab === "slit-lamp" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <textarea
+                    value={slitLampOS}
+                    onChange={(event) =>
+                      setSlitLampOS(
+                        event.target.value
+                      )
+                    }
+                    rows={8}
+                    className="w-full rounded-xl border border-gray-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    placeholder="Enter left eye slit lamp findings..."
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "refraction" && (
+              <div className="space-y-5">
+                <div className="grid gap-5 md:grid-cols-2">
                   {[
                     {
-                      eye: "OD",
-                      label: "Right Eye",
-                      value: slitLampOD,
-                      setValue: setSlitLampOD,
+                      eye: "OD" as const,
+                      value: refractionOD,
+                      setValue: setRefractionOD,
                     },
                     {
-                      eye: "OS",
-                      label: "Left Eye",
-                      value: slitLampOS,
-                      setValue: setSlitLampOS,
+                      eye: "OS" as const,
+                      value: refractionOS,
+                      setValue: setRefractionOS,
                     },
-                  ].map((eye) => (
-                    <div
-                      key={eye.eye}
-                      className="border border-slate-200/80 rounded-2xl p-5 space-y-4"
-                    >
-                      <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                        <span className="w-2 h-2 rounded-full bg-purple-700" />
-
-                        <h3 className="font-extrabold text-sm text-slate-900">
-                          {eye.eye} ({eye.label})
-                        </h3>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-bold text-slate-700 block">
-                          Cornea & Lens Observations
-                        </label>
-
-                        <textarea
-                          rows={4}
-                          value={eye.value}
-                          onChange={(event) =>
-                            eye.setValue(event.target.value)
-                          }
-                          className="w-full bg-slate-50/80 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* REFRACTION */}
-              {activeTab === "refraction" && (
-                <div className="space-y-6">
-                  {showHistoryOverlay &&
-                    patient.previousRefraction && (
-                      <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 border border-slate-800 space-y-3 animate-in fade-in duration-200 shadow-sm">
-                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                          <div className="flex items-center gap-2">
-                            <History className="w-4 h-4 text-purple-400" />
-
-                            <h4 className="font-bold text-xs tracking-wide">
-                              Previous Record (
-                              {patient.previousRefraction.date})
-                            </h4>
-                          </div>
-
-                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full font-mono">
-                            Verified Baseline
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-                          <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
-                            <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
-                              OD (Right Eye)
-                            </span>
-
-                            Sphere:{" "}
-                            {
-                              patient.previousRefraction.od
-                                .sphere
-                            }{" "}
-                            | Cyl:{" "}
-                            {
-                              patient.previousRefraction.od
-                                .cylinder
-                            }{" "}
-                            | Axis:{" "}
-                            {
-                              patient.previousRefraction.od
-                                .axis
-                            }
-                            °
-                          </div>
-
-                          <div className="bg-slate-800/50 p-2.5 rounded-xl border border-slate-800">
-                            <span className="text-[10px] font-sans font-bold text-purple-300 block mb-1">
-                              OS (Left Eye)
-                            </span>
-
-                            Sphere:{" "}
-                            {
-                              patient.previousRefraction.os
-                                .sphere
-                            }{" "}
-                            | Cyl:{" "}
-                            {
-                              patient.previousRefraction.os
-                                .cylinder
-                            }{" "}
-                            | Axis:{" "}
-                            {
-                              patient.previousRefraction.os
-                                .axis
-                            }
-                            °
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {[
-                      {
-                        eye: "OD",
-                        label: "Right Eye",
-                        value: refractionOD,
-                        setValue: setRefractionOD,
-                      },
-                      {
-                        eye: "OS",
-                        label: "Left Eye",
-                        value: refractionOS,
-                        setValue: setRefractionOS,
-                      },
-                    ].map((eye) => (
+                  ].map(
+                    ({
+                      eye,
+                      value,
+                      setValue,
+                    }) => (
                       <div
-                        key={eye.eye}
-                        className="border border-slate-200/80 rounded-2xl p-5 space-y-4"
+                        key={eye}
+                        className="rounded-xl border p-4"
                       >
-                        <h3 className="font-extrabold text-sm text-slate-900 border-b pb-2">
-                          {eye.eye} Refraction ({eye.label})
+                        <h3 className="mb-4 font-semibold text-gray-900">
+                          {eye === "OD"
+                            ? "Right Eye (OD)"
+                            : "Left Eye (OS)"}
                         </h3>
 
                         <div className="grid grid-cols-3 gap-3">
-                          {(
-                            [
-                              [
-                                "sphere",
-                                "SPHERE (0.25)",
-                                "-2.00",
-                              ],
-                              [
-                                "cylinder",
-                                "CYLINDER",
-                                "-0.50",
-                              ],
-                              [
-                                "axis",
-                                "AXIS (0-180°)",
-                                "90",
-                              ],
-                            ] as const
-                          ).map(
-                            ([
-                              field,
-                              label,
-                              placeholder,
-                            ]) => (
-                              <div key={field}>
-                                <label className="text-[10px] font-bold text-slate-600 block mb-1">
-                                  {label}
-                                </label>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-500">
+                              Sphere
+                            </label>
 
-                                <input
-                                  type="text"
-                                  placeholder={
-                                    placeholder
-                                  }
-                                  value={
-                                    eye.value[field]
-                                  }
-                                  onChange={(event) =>
-                                    eye.setValue({
-                                      ...eye.value,
-                                      [field]:
-                                        event.target.value,
-                                    })
-                                  }
-                                  onBlur={() =>
-                                    handleRefractionBlur(
-                                      eye.eye === "OD"
-                                        ? "od"
-                                        : "os",
-                                      field
-                                    )
-                                  }
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-center font-mono focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                                />
-                              </div>
-                            )
-                          )}
+                            <input
+                              value={
+                                value.sphere
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setValue({
+                                  ...value,
+                                  sphere:
+                                    event.target
+                                      .value,
+                                })
+                              }
+                              onBlur={() =>
+                                handleRefractionBlur(
+                                  eye,
+                                  "sphere"
+                                )
+                              }
+                              className="w-full rounded-lg border px-3 py-2 text-sm"
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-500">
+                              Cylinder
+                            </label>
+
+                            <input
+                              value={
+                                value.cylinder
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setValue({
+                                  ...value,
+                                  cylinder:
+                                    event.target
+                                      .value,
+                                })
+                              }
+                              onBlur={() =>
+                                handleRefractionBlur(
+                                  eye,
+                                  "cylinder"
+                                )
+                              }
+                              className="w-full rounded-lg border px-3 py-2 text-sm"
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-gray-500">
+                              Axis
+                            </label>
+
+                            <input
+                              value={
+                                value.axis
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setValue({
+                                  ...value,
+                                  axis:
+                                    event.target
+                                      .value,
+                                })
+                              }
+                              onBlur={() =>
+                                handleRefractionBlur(
+                                  eye,
+                                  "axis"
+                                )
+                              }
+                              className="w-full rounded-lg border px-3 py-2 text-sm"
+                              placeholder="0"
+                            />
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )
+                  )}
                 </div>
-              )}
 
-              {/* DIAGNOSIS */}
-              {activeTab === "diagnosis" && (
-                <div className="border border-slate-200/80 rounded-2xl p-5 space-y-4">
-                  <h3 className="font-extrabold text-sm text-slate-900 border-b pb-2">
-                    Clinical Assessment & ICD-10 Coding
-                  </h3>
+                {patient.previousRefraction && (
+                  <div className="rounded-xl border bg-gray-50 p-4">
+                    <h3 className="font-semibold text-gray-900">
+                      Previous Refraction
+                    </h3>
 
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-700 block">
-                      Primary Impression
-                    </label>
-
-                    <textarea
-                      rows={6}
-                      value={diagnosis}
-                      onChange={(event) =>
-                        setDiagnosis(event.target.value)
+                    <p className="mt-1 text-xs text-gray-500">
+                      {
+                        patient
+                          .previousRefraction
+                          .date
                       }
-                      placeholder="Enter clinical diagnosis / primary impression..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                    />
+                    </p>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="mb-2 text-sm font-medium">
+                          Right Eye (OD)
+                        </p>
+
+                        <p className="text-sm text-gray-600">
+                          Sphere:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .od.sphere
+                          }{" "}
+                          • Cylinder:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .od.cylinder
+                          }{" "}
+                          • Axis:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .od.axis
+                          }
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="mb-2 text-sm font-medium">
+                          Left Eye (OS)
+                        </p>
+
+                        <p className="text-sm text-gray-600">
+                          Sphere:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .os.sphere
+                          }{" "}
+                          • Cylinder:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .os.cylinder
+                          }{" "}
+                          • Axis:{" "}
+                          {
+                            patient
+                              .previousRefraction
+                              .os.axis
+                          }
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "diagnosis" && (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Diagnosis
+                </label>
+
+                <textarea
+                  value={diagnosis}
+                  onChange={(event) =>
+                    setDiagnosis(
+                      event.target.value
+                    )
+                  }
+                  rows={8}
+                  className="w-full rounded-xl border border-gray-300 p-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  placeholder="Enter diagnosis and clinical plan..."
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="grid gap-5 md:grid-cols-2">
+          <div className="rounded-xl border bg-white p-5">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">
+                Recent History
+              </h3>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowHistory(true)
+                }
+                className="text-sm font-medium text-blue-600"
+              >
+                View all
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {patient.history
+                .slice(0, 3)
+                .map((item, index) => (
+                  <div
+                    key={`${item.date}-${item.title}-${index}`}
+                    className="rounded-lg bg-gray-50 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-gray-900">
+                        {item.title}
+                      </p>
+
+                      <span className="text-xs text-gray-500">
+                        {item.date}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-xs leading-5 text-gray-600">
+                      {item.details}
+                    </p>
+                  </div>
+                ))}
+
+              {!patient.history.length && (
+                <p className="text-sm text-gray-500">
+                  No history available.
+                </p>
               )}
             </div>
           </div>
-        </div>
 
-        {/* FOOTER */}
-        <footer className="bg-[#0B132B] text-white px-6 py-3 flex flex-wrap items-center justify-between border-t border-slate-800 sticky bottom-0 z-20 gap-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleSave("draft")}
-              disabled={isPending}
-              className="px-4 py-2 border border-slate-700 text-slate-200 hover:bg-slate-800 rounded-xl text-xs font-bold transition disabled:opacity-50 cursor-pointer"
-            >
-              {isPending ? "Saving..." : "Save Draft"}
-            </button>
+          <div className="rounded-xl border bg-white p-5">
+            <h3 className="font-semibold text-gray-900">
+              Allergies
+            </h3>
 
-            {feedbackMessage && (
-              <span
-                className={`text-[11px] font-semibold ${
-                  feedbackType === "success"
-                    ? "text-emerald-400"
-                    : feedbackType === "error"
-                      ? "text-rose-400"
-                      : "text-amber-300"
-                }`}
-              >
-                {feedbackMessage}
-              </span>
+            {patient.allergies.length ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {patient.allergies.map(
+                  (allergy) => (
+                    <span
+                      key={allergy}
+                      className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700"
+                    >
+                      {allergy}
+                    </span>
+                  )
+                )}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-gray-500">
+                No known allergies recorded.
+              </p>
             )}
-          </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-900">
+                Diagnostic Status
+              </h4>
+
+              <p className="mt-2 text-sm text-gray-500">
+                {patient.diagnostics.length
+                  ? `${
+                      patient.diagnostics.length
+                    } diagnostic order${
+                      patient.diagnostics
+                        .length === 1
+                        ? ""
+                        : "s"
+                    } on record.`
+                  : "No diagnostic orders on record."}
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {feedback && (
+        <div className="fixed bottom-24 left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2">
+          <div className="flex items-start justify-between gap-4 rounded-xl border bg-white p-4 shadow-lg">
+            <p className="text-sm text-gray-700">
+              {feedback}
+            </p>
+
             <button
+              type="button"
               onClick={() =>
-                setActiveModal("diagnostics")
+                setFeedback("")
               }
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
+              className="text-gray-400 hover:text-gray-700"
             >
-              <ClipboardList className="w-3.5 h-3.5 text-slate-300" />
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 md:px-6">
+          <button
+            type="button"
+            onClick={() =>
+              handleSave("draft")
+            }
+            disabled={isPending}
+            className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Save Draft
+          </button>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setActiveModal(
+                  "diagnostics"
+                )
+              }
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <ClipboardList className="h-4 w-4" />
               Order Diagnostics
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 setActiveModal("surgery")
               }
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              <Calendar className="w-3.5 h-3.5 text-slate-300" />
+              <Calendar className="h-4 w-4" />
               Schedule Surgery
             </button>
 
             <button
+              type="button"
               onClick={() =>
-                setActiveModal("prescription")
+                setActiveModal(
+                  "prescription"
+                )
               }
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition flex items-center gap-2 border border-slate-700 cursor-pointer"
+              disabled={isPending}
+              className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              <Pill className="w-3.5 h-3.5 text-slate-300" />
+              <Pill className="h-4 w-4" />
               Issue Prescription
             </button>
 
             <button
-              onClick={() => handleSave("completed")}
+              type="button"
+              onClick={() =>
+                handleSave("completed")
+              }
               disabled={isPending}
-              className="px-5 py-2.5 bg-[#6B21A8] hover:bg-[#581c87] text-white font-extrabold rounded-xl text-xs transition shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Check className="w-4 h-4" />
-
-              {isPending
-                ? "Processing..."
-                : "Complete Encounter"}
+              <Check className="h-4 w-4" />
+              Complete Encounter
             </button>
           </div>
-        </footer>
+        </div>
       </div>
 
-      {/* MODALS */}
-      {activeModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget &&
-              !isPending
-            ) {
-              setActiveModal(null);
-            }
-          }}
-        >
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            {/* DIAGNOSTICS */}
-            {activeModal === "diagnostics" && (
-              <>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-slate-900">
-                      Order Diagnostic Scans & Tests
-                    </h3>
+      {showHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Patient History
+                </h2>
 
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Selected tests will be added to the patient&apos;s bill.
-                    </p>
-                  </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  {patient.name}
+                </p>
+              </div>
 
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
-                    }
-                    disabled={isPending}
-                    className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50"
-                  >
-                    ✕
-                  </button>
-                </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setShowHistory(false)
+                }
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+              >
+                ×
+              </button>
+            </div>
 
-                <div className="space-y-2.5">
-                  {DIAGNOSTIC_TESTS.map((test) => (
-                    <label
-                      key={test.name}
-                      className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer text-xs font-medium text-slate-700"
+            <div className="max-h-[65vh] overflow-y-auto p-5">
+              <div className="space-y-4">
+                {patient.history.map(
+                  (item, index) => (
+                    <div
+                      key={`${item.date}-${item.title}-${index}`}
+                      className="relative rounded-xl border p-4"
                     >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedDiagnostics.includes(
-                            test.name
-                          )}
-                          onChange={(event) =>
-                            toggleDiagnostic(
-                              test.name,
-                              event.target.checked
-                            )
-                          }
-                          disabled={isPending}
-                          className="rounded border-slate-300 text-[#6B21A8] focus:ring-purple-500"
-                        />
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {item.title}
+                          </h3>
 
-                        <span>{test.name}</span>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {item.date}
+                          </p>
+                        </div>
                       </div>
 
-                      <span className="text-[11px] font-bold text-slate-500">
-                        ₦{test.price.toLocaleString()}
-                      </span>
-                    </label>
-                  ))}
-                </div>
+                      <p className="mt-3 text-sm leading-6 text-gray-600">
+                        {item.details}
+                      </p>
+                    </div>
+                  )
+                )}
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
-                    }
-                    disabled={isPending}
-                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
+                {!patient.history.length && (
+                  <p className="py-8 text-center text-sm text-gray-500">
+                    No patient history available.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <button
-                    onClick={handleSubmitDiagnostics}
-                    disabled={isPending}
-                    className="px-4 py-2 bg-[#6B21A8] text-white rounded-xl text-xs font-bold hover:bg-[#581c87] cursor-pointer disabled:opacity-50"
-                  >
-                    {isPending
-                      ? "Submitting..."
-                      : `Submit ${
-                          selectedDiagnostics.length
-                            ? `(${selectedDiagnostics.length})`
-                            : ""
-                        }`}
-                  </button>
-                </div>
-              </>
-            )}
+      {activeModal === "diagnostics" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Order Diagnostics
+                </h2>
 
-            {/* SURGERY */}
-            {activeModal === "surgery" && (
-              <>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-slate-900">
-                      Schedule Surgical Procedure
-                    </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Select the tests required for this patient.
+                </p>
+              </div>
 
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Scheduling integration is not connected yet.
-                    </p>
-                  </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+              >
+                ×
+              </button>
+            </div>
 
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
-                    }
-                    className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
+            <div className="space-y-2 p-5">
+              {DIAGNOSTIC_TESTS.map(
+                (test) => {
+                  const selected =
+                    selectedDiagnostics.includes(
+                      test.name
+                    );
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      Procedure Type
-                    </label>
-
-                    <select
-                      value={
-                        surgeryDetails.procedure
-                      }
-                      onChange={(event) =>
-                        setSurgeryDetails(
-                          (previous) => ({
-                            ...previous,
-                            procedure:
-                              event.target.value,
-                          })
+                  return (
+                    <button
+                      key={test.name}
+                      type="button"
+                      onClick={() =>
+                        toggleDiagnostic(
+                          test.name
                         )
                       }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
+                      className={`flex w-full items-center justify-between rounded-xl border p-4 text-left ${
+                        selected
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
                     >
-                      {SURGERY_OPTIONS.map(
-                        (procedure) => (
-                          <option key={procedure}>
-                            {procedure}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {test.name}
+                        </p>
 
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      Preferred Date & Time
-                    </label>
+                        <p className="mt-1 text-xs text-gray-500">
+                          ₦
+                          {test.price.toLocaleString()}
+                        </p>
+                      </div>
 
-                    <input
-                      type="datetime-local"
-                      value={surgeryDetails.date}
-                      onChange={(event) =>
-                        setSurgeryDetails(
-                          (previous) => ({
-                            ...previous,
-                            date: event.target.value,
-                          })
-                        )
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                    />
-                  </div>
+                      <div
+                        className={`flex h-5 w-5 items-center justify-center rounded border ${
+                          selected
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-gray-300"
+                        }`}
+                      >
+                        {selected && (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                }
+              )}
+            </div>
 
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      Clinical Notes
-                    </label>
+            <div className="flex justify-end gap-2 border-t p-5">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
 
-                    <textarea
-                      rows={3}
-                      value={surgeryDetails.notes}
-                      onChange={(event) =>
-                        setSurgeryDetails(
-                          (previous) => ({
-                            ...previous,
-                            notes: event.target.value,
-                          })
-                        )
-                      }
-                      placeholder="Optional surgical notes..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                    />
-                  </div>
-                </div>
+              <button
+                type="button"
+                onClick={
+                  handleSubmitDiagnostics
+                }
+                disabled={
+                  isPending ||
+                  !selectedDiagnostics.length
+                }
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {isPending
+                  ? "Ordering..."
+                  : "Order Selected"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
+      {activeModal === "surgery" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Schedule Surgery
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Select the planned procedure.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Surgery Type
+                </label>
+
+                <select
+                  value={surgeryType}
+                  onChange={(event) =>
+                    setSurgeryType(
+                      event.target.value
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                >
+                  <option value="">
+                    Select surgery
+                  </option>
+
+                  {SURGERY_OPTIONS.map(
+                    (option) => (
+                      <option
+                        key={option}
+                        value={option}
+                      >
+                        {option}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Notes
+                </label>
+
+                <textarea
+                  value={surgeryNotes}
+                  onChange={(event) =>
+                    setSurgeryNotes(
+                      event.target.value
+                    )
+                  }
+                  rows={4}
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                  placeholder="Add surgery planning notes..."
+                />
+              </div>
+
+              <div className="rounded-lg bg-yellow-50 p-3 text-sm text-yellow-800">
+                Surgery scheduling is not connected to the appointment system yet.
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t p-5">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleScheduleSurgery();
+                  setActiveModal(null);
+                }}
+                disabled={!surgeryType}
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Save Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === "prescription" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Issue Prescription
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Enter the medication details.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid gap-4 p-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Medication
+                </label>
+
+                <input
+                  value={medication}
+                  onChange={(event) =>
+                    setMedication(
+                      event.target.value
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                  placeholder="e.g. Timolol Eye Drops"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Dosage
+                  </label>
+
+                  <input
+                    value={dosage}
+                    onChange={(event) =>
+                      setDosage(
+                        event.target.value
+                      )
                     }
-                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={handleScheduleSurgery}
-                    className="px-4 py-2 bg-[#6B21A8] text-white rounded-xl text-xs font-bold hover:bg-[#581c87] cursor-pointer"
-                  >
-                    Request Schedule
-                  </button>
+                    className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                    placeholder="e.g. 1 drop"
+                  />
                 </div>
-              </>
-            )}
 
-            {/* PRESCRIPTION */}
-            {activeModal === "prescription" && (
-              <>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-extrabold text-sm text-slate-900">
-                      Issue Medication Prescription
-                    </h3>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Frequency
+                  </label>
 
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Saved prescriptions are also added to the patient bill.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
+                  <input
+                    value={frequency}
+                    onChange={(event) =>
+                      setFrequency(
+                        event.target.value
+                      )
                     }
-                    disabled={isPending}
-                    className="text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer disabled:opacity-50"
-                  >
-                    ✕
-                  </button>
+                    className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                    placeholder="e.g. Twice daily"
+                  />
                 </div>
+              </div>
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      Eye Drop / Medication Name
-                    </label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Duration
+                  </label>
 
-                    <input
-                      type="text"
-                      placeholder="e.g. Latanoprost 0.005%"
-                      value={
-                        prescriptionDetails.medication
-                      }
-                      onChange={(event) =>
-                        setPrescriptionDetails(
-                          (previous) => ({
-                            ...previous,
-                            medication:
-                              event.target.value,
-                          })
-                        )
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Dosage / Instructions
-                      </label>
-
-                      <input
-                        type="text"
-                        placeholder="e.g. 1 drop"
-                        value={
-                          prescriptionDetails.dosage
-                        }
-                        onChange={(event) =>
-                          setPrescriptionDetails(
-                            (previous) => ({
-                              ...previous,
-                              dosage:
-                                event.target.value,
-                            })
-                          )
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Frequency
-                      </label>
-
-                      <input
-                        type="text"
-                        placeholder="e.g. Twice daily"
-                        value={
-                          prescriptionDetails.frequency
-                        }
-                        onChange={(event) =>
-                          setPrescriptionDetails(
-                            (previous) => ({
-                              ...previous,
-                              frequency:
-                                event.target.value,
-                            })
-                          )
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Duration
-                      </label>
-
-                      <input
-                        type="text"
-                        placeholder="e.g. 7 days"
-                        value={
-                          prescriptionDetails.duration
-                        }
-                        onChange={(event) =>
-                          setPrescriptionDetails(
-                            (previous) => ({
-                              ...previous,
-                              duration:
-                                event.target.value,
-                            })
-                          )
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Quantity
-                      </label>
-
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={
-                          prescriptionDetails.quantity
-                        }
-                        onChange={(event) =>
-                          setPrescriptionDetails(
-                            (previous) => ({
-                              ...previous,
-                              quantity:
-                                event.target.value,
-                            })
-                          )
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                      Price Per Unit (₦)
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      step="100"
-                      placeholder="e.g. 6200"
-                      value={
-                        prescriptionDetails.pricePerUnit
-                      }
-                      onChange={(event) =>
-                        setPrescriptionDetails(
-                          (previous) => ({
-                            ...previous,
-                            pricePerUnit:
-                              event.target.value,
-                          })
-                        )
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-[#6B21A8]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    onClick={() =>
-                      setActiveModal(null)
+                  <input
+                    value={duration}
+                    onChange={(event) =>
+                      setDuration(
+                        event.target.value
+                      )
                     }
-                    disabled={isPending}
-                    className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={handleSavePrescription}
-                    disabled={isPending}
-                    className="px-4 py-2 bg-[#6B21A8] text-white rounded-xl text-xs font-bold hover:bg-[#581c87] cursor-pointer disabled:opacity-50"
-                  >
-                    {isPending
-                      ? "Saving..."
-                      : "Save Prescription"}
-                  </button>
+                    className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                    placeholder="e.g. 7 days"
+                  />
                 </div>
-              </>
-            )}
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Quantity
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(event) =>
+                      setQuantity(
+                        event.target.value
+                      )
+                    }
+                    className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                    placeholder="1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Price per Unit
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  value={pricePerUnit}
+                  onChange={(event) =>
+                    setPricePerUnit(
+                      event.target.value
+                    )
+                  }
+                  className="w-full rounded-lg border px-3 py-2.5 text-sm"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t p-5">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleSavePrescription
+                }
+                disabled={isPending}
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {isPending
+                  ? "Saving..."
+                  : "Issue Prescription"}
+              </button>
+            </div>
           </div>
         </div>
       )}

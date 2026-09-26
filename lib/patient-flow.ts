@@ -135,6 +135,8 @@ export async function getOrCreateDraftInvoice(patientId: string) {
       invoice_no: invoiceNo,
       patient_id: patientId,
       status: "draft",
+      vat_rate: 0,
+      vat_amount: 0,
     })
     .select("*")
     .single();
@@ -147,9 +149,111 @@ export async function getOrCreateDraftInvoice(patientId: string) {
 }
 
 /**
+ * Rounds a monetary value to two decimal places.
+ *
+ * Keeping currency values at two decimal places prevents floating-point
+ * precision issues such as 228.349999999.
+ */
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Reads the currently configured VAT percentage from system settings.
+ *
+ * The Admin Settings page stores the billing configuration in:
+ * system_settings.billing
+ *
+ * Example:
+ * {
+ *   "vatRate": "5%",
+ *   "invoiceDueDays": "30 Days"
+ * }
+ *
+ * If the setting is missing or invalid, VAT defaults to 0%.
+ */
+async function getConfiguredVatRate(): Promise<number> {
+  const { data: settings, error } = await supabaseServer
+    .from("system_settings")
+    .select("billing")
+    .eq("id", "default")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load billing settings:", error);
+    throw error;
+  }
+
+  if (!settings) {
+    console.warn(
+      "Default system settings were not found. VAT will default to 0%."
+    );
+    return 0;
+  }
+
+  const billing = settings.billing;
+
+  if (
+    typeof billing !== "object" ||
+    billing === null ||
+    Array.isArray(billing)
+  ) {
+    console.warn(
+      "Billing settings are not stored as an object. VAT will default to 0%."
+    );
+    return 0;
+  }
+
+  const rawVatRate = (
+    billing as Record<string, unknown>
+  ).vatRate;
+
+  if (rawVatRate === undefined || rawVatRate === null) {
+    console.warn(
+      "vatRate was not found in billing settings. VAT will default to 0%."
+    );
+    return 0;
+  }
+
+  const normalizedVatRate = String(rawVatRate)
+    .trim()
+    .replace(/%/g, "");
+
+  const vatRate = Number(normalizedVatRate);
+
+  if (
+    !Number.isFinite(vatRate) ||
+    vatRate < 0 ||
+    vatRate > 100
+  ) {
+    console.warn(
+      `Invalid VAT rate "${String(rawVatRate)}". VAT will default to 0%.`
+    );
+    return 0;
+  }
+
+  return roundCurrency(vatRate);
+}
+
+/**
  * Recalculates an invoice from its line items.
+ *
+ * Calculation order:
+ *
+ * 1. Sum invoice line items -> subtotal
+ * 2. Apply existing discount
+ * 3. Read current Admin VAT setting
+ * 4. Calculate VAT on the discounted amount
+ * 5. Add VAT -> grand total
+ *
+ * VAT rate and VAT amount are persisted on the invoice so the
+ * invoice retains the actual tax information used during calculation.
  */
 export async function recalcInvoice(invoiceId: string) {
+  if (!invoiceId?.trim()) {
+    throw new Error("Invoice ID is required.");
+  }
+
   const { data: items, error: itemsError } = await supabaseServer
     .from("invoice_items")
     .select("total_price")
@@ -169,19 +273,48 @@ export async function recalcInvoice(invoiceId: string) {
     throw invoiceError;
   }
 
-  const subtotal = (items ?? []).reduce(
-    (sum, item) => sum + Number(item.total_price ?? 0),
-    0
+  const subtotal = roundCurrency(
+    (items ?? []).reduce(
+      (sum, item) =>
+        sum + Number(item.total_price ?? 0),
+      0
+    )
   );
 
-  const discountAmount = Number(invoice.discount_amount ?? 0);
+  const discountAmount = roundCurrency(
+    Math.min(
+      Math.max(
+        0,
+        Number(invoice.discount_amount ?? 0)
+      ),
+      subtotal
+    )
+  );
 
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  const taxableAmount = roundCurrency(
+    Math.max(
+      0,
+      subtotal - discountAmount
+    )
+  );
+
+  const vatRate = await getConfiguredVatRate();
+
+  const vatAmount = roundCurrency(
+    taxableAmount * (vatRate / 100)
+  );
+
+  const grandTotal = roundCurrency(
+    taxableAmount + vatAmount
+  );
 
   const { error: updateError } = await supabaseServer
     .from("invoices")
     .update({
       subtotal,
+      discount_amount: discountAmount,
+      vat_rate: vatRate,
+      vat_amount: vatAmount,
       grand_total: grandTotal,
     })
     .eq("id", invoiceId);
@@ -192,6 +325,10 @@ export async function recalcInvoice(invoiceId: string) {
 
   return {
     subtotal,
+    discountAmount,
+    taxableAmount,
+    vatRate,
+    vatAmount,
     grandTotal,
   };
 }
@@ -546,6 +683,12 @@ export async function getPatientRecord(
 
     subtotal:
       Number(invoiceRow?.subtotal ?? 0),
+
+    vatRate:
+      Number(invoiceRow?.vat_rate ?? 0),
+
+    vatAmount:
+      Number(invoiceRow?.vat_amount ?? 0),
 
     discountAmount:
       Number(

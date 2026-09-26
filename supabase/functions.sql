@@ -20,7 +20,8 @@ create or replace function public.record_patient_vitals(
 )
 returns uuid
 language plpgsql
-security invoker
+security definer
+set search_path = public
 as $$
 declare
   v_vitals_id uuid;
@@ -94,3 +95,47 @@ begin
   return v_vitals_id;
 end;
 $$;
+
+-- This function is intentionally callable only by the
+-- server-side Supabase service role.
+revoke execute on function public.record_patient_vitals(
+  uuid,
+  text,
+  text,
+  text,
+  boolean,
+  numeric,
+  numeric,
+  text,
+  numeric,
+  numeric,
+  numeric,
+  numeric,
+  numeric,
+  text,
+  text,
+  text,
+  text,
+  uuid
+) from public, anon, authenticated;
+
+grant execute on function public.record_patient_vitals(
+  uuid,
+  text,
+  text,
+  text,
+  boolean,
+  numeric,
+  numeric,
+  text,
+  numeric,
+  numeric,
+  numeric,
+  numeric,
+  numeric,
+  text,
+  text,
+  text,
+  text,
+  uuid
+) to service_role;

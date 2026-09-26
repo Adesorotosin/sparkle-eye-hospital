@@ -77,7 +77,7 @@ function normalizeStatus(status?: string | null): Patient["status"] {
   return "WAITING";
 }
 
-function formatArrivalTime(lastVisitAt?: string | null) {
+function formatArrivalTime(lastVisitAt?: string | null): string {
   if (!lastVisitAt) {
     return "Today";
   }
@@ -94,7 +94,7 @@ function formatArrivalTime(lastVisitAt?: string | null) {
   });
 }
 
-function formatVisitType(isWalkIn?: boolean | null) {
+function formatVisitType(isWalkIn?: boolean | null): string {
   return isWalkIn === false ? "APPOINTMENT" : "WALK-IN";
 }
 
@@ -287,7 +287,7 @@ export default function NurseDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800 font-sans antialiased">
-      {/* HEADER BAR */}
+      {/* HEADER */}
       <header className="bg-white border-b border-slate-200/80 px-6 md:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="relative w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 bg-[#6B21A8]/5 border border-[#6B21A8]/10 shadow-xs">
@@ -313,7 +313,8 @@ export default function NurseDashboard() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 bg-purple-50 border border-purple-200/80 px-3.5 py-1.5 rounded-xl">
+          {/* STAFF */}
+          <div className="hidden lg:flex items-center gap-2 bg-purple-50 border border-purple-200/80 px-3.5 py-1.5 rounded-xl">
             <User className="w-4 h-4 text-[#6B21A8]" />
 
             <span className="text-xs font-bold text-[#6B21A8]">
@@ -321,7 +322,18 @@ export default function NurseDashboard() {
             </span>
           </div>
 
+          {/* DIAGNOSTICS */}
+          <Link
+            href="/diagnostics"
+            className="inline-flex items-center gap-2 bg-white hover:bg-purple-50 text-[#6B21A8] border border-purple-200 px-4 py-2 rounded-xl text-xs font-bold transition"
+          >
+            <Activity className="w-4 h-4" />
+            <span>Diagnostics</span>
+          </Link>
+
+          {/* LOGOUT */}
           <button
+            type="button"
             onClick={handleLogout}
             title="Log Out"
             className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
@@ -330,9 +342,10 @@ export default function NurseDashboard() {
             <span className="hidden sm:inline">Logout</span>
           </button>
 
+          {/* NEW VITALS */}
           <Link
             href="/triage"
-            className="bg-[#6B21A8] hover:bg-[#581c87] text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 transition shadow-md"
+            className="inline-flex items-center gap-2 bg-[#6B21A8] hover:bg-[#581c87] text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-md"
           >
             <Plus className="w-4 h-4" />
             <span>New Vitals Intake</span>
@@ -341,7 +354,7 @@ export default function NurseDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
-        {/* STATS OVERVIEW */}
+        {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
             <div>
@@ -414,6 +427,7 @@ export default function NurseDashboard() {
             {(["All", "Waiting", "In Progress", "Completed"] as const).map(
               (tab) => (
                 <button
+                  type="button"
                   key={tab}
                   onClick={() => setFilter(tab)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer whitespace-nowrap ${
@@ -457,7 +471,7 @@ export default function NurseDashboard() {
           </div>
         </div>
 
-        {/* ERROR MESSAGE */}
+        {/* ERROR */}
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl px-4 py-3 flex items-center justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -468,9 +482,7 @@ export default function NurseDashboard() {
                   Unable to load the patient queue
                 </p>
 
-                <p className="text-xs font-medium mt-0.5">
-                  {error}
-                </p>
+                <p className="text-xs font-medium mt-0.5">{error}</p>
               </div>
             </div>
 
@@ -484,7 +496,7 @@ export default function NurseDashboard() {
           </div>
         )}
 
-        {/* CLINICAL QUEUE TABLE */}
+        {/* CLINICAL QUEUE */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
@@ -529,9 +541,9 @@ export default function NurseDashboard() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                  {filteredPatients.map((patient) => (
+                  {filteredPatients.map((patient, index) => (
                     <tr
-                      key={patient.id}
+                      key={`${patient.id || "patient"}-${index}`}
                       className="hover:bg-purple-50/30 transition-colors"
                     >
                       {/* PATIENT INFO */}
@@ -597,6 +609,7 @@ export default function NurseDashboard() {
                       {/* ACTION */}
                       <td className="py-4 px-6 text-right">
                         <button
+                          type="button"
                           onClick={() => handlePatientAction(patient)}
                           className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
                             patient.status === "IN PROGRESS"
@@ -670,8 +683,9 @@ export default function NurseDashboard() {
                   </h3>
 
                   <span className="text-xs text-slate-400 font-medium">
-                    ID: {selectedPatient.id} • {selectedPatient.age || "—"} yrs
-                    • {selectedPatient.gender}
+                    ID: {selectedPatient.id} •{" "}
+                    {selectedPatient.age || "—"} yrs •{" "}
+                    {selectedPatient.gender}
                   </span>
                 </div>
               </div>

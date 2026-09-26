@@ -96,6 +96,41 @@ export async function getBillingPatient(
         };
       }
 
+      /*
+       * Recalculate the active draft/pending invoice before loading
+       * the billing record. This ensures the invoice uses the
+       * currently configured VAT rate and any saved discount.
+       *
+       * We intentionally limit this to draft/pending invoices so
+       * finalized paid/cancelled invoices are not silently changed.
+       */
+      const { data: activeInvoice, error: invoiceError } =
+        await supabaseServer
+          .from("invoices")
+          .select("id, status")
+          .eq("patient_id", patient.id)
+          .in("status", ["draft", "pending"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+      if (invoiceError) {
+        console.error(
+          "Billing invoice lookup failed:",
+          invoiceError
+        );
+
+        return {
+          success: false,
+          message: "Unable to load the patient's billing invoice.",
+          patient: null,
+        };
+      }
+
+      if (activeInvoice?.id) {
+        await recalcInvoice(activeInvoice.id);
+      }
+
       const record = await getPatientRecord(patient.patient_code);
 
       if (!record) {
@@ -113,13 +148,14 @@ export async function getBillingPatient(
       };
     }
 
-    const { data: invoice, error: invoiceError } = await supabaseServer
-      .from("invoices")
-      .select("patient_id, status, created_at")
-      .in("status", ["draft", "pending"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: invoice, error: invoiceError } =
+      await supabaseServer
+        .from("invoices")
+        .select("id, patient_id, status, created_at")
+        .in("status", ["draft", "pending"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
     if (invoiceError) {
       console.error("Billing invoice lookup failed:", invoiceError);
@@ -139,11 +175,18 @@ export async function getBillingPatient(
       };
     }
 
-    const { data: patient, error: patientError } = await supabaseServer
-      .from("patients")
-      .select("patient_code")
-      .eq("id", invoice.patient_id)
-      .maybeSingle();
+    /*
+     * Recalculate the active draft/pending invoice before loading
+     * it into the cashier screen.
+     */
+    await recalcInvoice(invoice.id);
+
+    const { data: patient, error: patientError } =
+      await supabaseServer
+        .from("patients")
+        .select("patient_code")
+        .eq("id", invoice.patient_id)
+        .maybeSingle();
 
     if (patientError || !patient) {
       return {
@@ -231,17 +274,19 @@ export async function applyBillingDiscount(input: {
       };
     }
 
-    const { data: invoice, error: invoiceError } =
-      await supabaseServer
-        .from("invoices")
-        .select("*")
-        .eq("patient_id", patient.id)
-        .neq("status", "cancelled")
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
+    const {
+      data: invoice,
+      error: invoiceError,
+    } = await supabaseServer
+      .from("invoices")
+      .select("*")
+      .eq("patient_id", patient.id)
+      .neq("status", "cancelled")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
 
     if (invoiceError) {
       console.error(
@@ -269,17 +314,25 @@ export async function applyBillingDiscount(input: {
       };
     }
 
-    const recalculated = await recalcInvoice(invoice.id);
+    /*
+     * First recalculate the invoice using the current line items
+     * and current VAT configuration.
+     *
+     * This gives us the authoritative subtotal.
+     */
+    const initialTotals = await recalcInvoice(invoice.id);
 
     const subtotal = Number(
-      recalculated.subtotal ?? invoice.subtotal ?? 0
+      initialTotals.subtotal ?? invoice.subtotal ?? 0
     );
 
-    if (!Number.isFinite(subtotal) || subtotal < 0) {
+    if (
+      !Number.isFinite(subtotal) ||
+      subtotal < 0
+    ) {
       return {
         success: false,
-        message:
-          "Unable to calculate the invoice subtotal.",
+        message: "Unable to calculate the invoice subtotal.",
       };
     }
 
@@ -289,8 +342,7 @@ export async function applyBillingDiscount(input: {
       if (numericValue > 100) {
         return {
           success: false,
-          message:
-            "Percentage discount cannot exceed 100%.",
+          message: "Percentage discount cannot exceed 100%.",
         };
       }
 
@@ -303,27 +355,32 @@ export async function applyBillingDiscount(input: {
       subtotal
     );
 
-    const grandTotal = Math.max(
-      0,
-      subtotal - discountAmount
-    );
+    /*
+     * Store the discount first.
+     *
+     * We intentionally do NOT calculate grandTotal manually here.
+     * recalcInvoice() is the single source of truth for:
+     *
+     * subtotal
+     * discount
+     * VAT
+     * grand total
+     */
+    const {
+      error: discountUpdateError,
+    } = await supabaseServer
+      .from("invoices")
+      .update({
+        discount_amount: discountAmount,
+        discount_reason: reason.trim(),
+        approved_by_pin: "AUTHORIZED",
+      })
+      .eq("id", invoice.id);
 
-    const { error: updateError } =
-      await supabaseServer
-        .from("invoices")
-        .update({
-          discount_amount: discountAmount,
-          discount_reason: reason.trim(),
-          approved_by_pin: "AUTHORIZED",
-          subtotal,
-          grand_total: grandTotal,
-        })
-        .eq("id", invoice.id);
-
-    if (updateError) {
+    if (discountUpdateError) {
       console.error(
         "Invoice discount update failed:",
-        updateError
+        discountUpdateError
       );
 
       return {
@@ -331,6 +388,29 @@ export async function applyBillingDiscount(input: {
         message: "Failed to apply the discount.",
       };
     }
+
+    /*
+     * Recalculate again after saving the discount.
+     *
+     * This applies VAT to:
+     *
+     * subtotal - discount
+     *
+     * and persists the final grand total.
+     */
+    const finalTotals = await recalcInvoice(invoice.id);
+
+    const grandTotal = Number(
+      finalTotals.grandTotal ?? 0
+    );
+
+    const vatAmount = Number(
+      finalTotals.vatAmount ?? 0
+    );
+
+    const vatRate = Number(
+      finalTotals.vatRate ?? 0
+    );
 
     await logActivity({
       module: "Billing",
@@ -346,6 +426,8 @@ export async function applyBillingDiscount(input: {
         requestedValue: numericValue,
         discountAmount,
         reason: reason.trim(),
+        vatRate,
+        vatAmount,
         grandTotal,
         authorizedBy: staff.name,
         authorizedByStaffId: staff.id,
@@ -355,6 +437,7 @@ export async function applyBillingDiscount(input: {
 
     revalidatePath("/billing");
     revalidatePath("/cashier");
+    revalidatePath(`/doctor/patients/${patient.patient_code}`);
 
     return {
       success: true,
@@ -497,6 +580,9 @@ export async function processBillingPayment(input: {
     /*
      * Recalculate immediately before payment so the
      * cashier always pays the current invoice amount.
+     *
+     * This also applies the current VAT setting and persists
+     * vat_rate, vat_amount and grand_total.
      */
     const totals = await recalcInvoice(invoice.id);
 
@@ -776,7 +862,7 @@ export async function processBillingPayment(input: {
           "id, name, price, status, created_at"
         )
         .eq("patient_id", patient.id)
-         .eq("status", "ordered")
+        .eq("status", "ordered")
         .order("created_at", {
           ascending: true,
         });
