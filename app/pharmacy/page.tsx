@@ -1213,7 +1213,7 @@ function PharmacyContent() {
             <div className="flex items-center gap-3">
               <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
                 <Image
-                  src="/logo.png"
+                  src="/Logo.png"
                   alt="Sparkle Eye Specialist Hospital Logo"
                   width={36}
                   height={36}
@@ -1659,7 +1659,7 @@ function PharmacyContent() {
 
             <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
               <Image
-                src="/logo.png"
+                src="/Logo.png"
                 alt="Sparkle Eye Specialist Hospital Logo"
                 width={36}
                 height={36}
