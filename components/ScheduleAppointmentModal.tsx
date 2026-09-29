@@ -1,59 +1,163 @@
-'use client';
+"use client";
 
-import React, { useState } from "react";
-import { X, Calendar, Clock, User, Stethoscope, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { X, User, AlertCircle, Loader2 } from "lucide-react";
+
+interface Doctor {
+  id: string;
+  staffId: string;
+  name: string;
+  title?: string | null;
+  department?: string | null;
+}
 
 interface ScheduleAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onBooked?: () => void;
 }
 
 export default function ScheduleAppointmentModal({
   isOpen,
   onClose,
+  onBooked,
 }: ScheduleAppointmentModalProps) {
   const [patientName, setPatientName] = useState("");
-  const [resource, setResource] = useState("Consultation Room 1");
-  const [physician, setPhysician] = useState("Dr. James Okoro");
+  const [doctorStaffId, setDoctorStaffId] = useState("");
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [appointmentType, setAppointmentType] = useState("Consultation");
-  const [date, setDate] = useState("2026-08-30");
+  const [date, setDate] = useState("");
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("09:45");
   const [priority, setPriority] = useState("Confirmed");
   const [notes, setNotes] = useState("");
+  const [loadingDoctors, setLoadingDoctors] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const today = new Date();
+    const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 10);
+
+    setDate(localDate);
+    setError("");
+    setSubmitting(false);
+
+    const loadDoctors = async () => {
+      setLoadingDoctors(true);
+
+      try {
+        const response = await fetch("/api/doctors", { cache: "no-store" });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to load doctors.");
+        }
+
+        const availableDoctors = Array.isArray(payload?.doctors)
+          ? payload.doctors
+          : [];
+
+        setDoctors(availableDoctors);
+
+        if (availableDoctors.length > 0) {
+          setDoctorStaffId((current) =>
+            availableDoctors.some((doctor: Doctor) => doctor.id === current)
+              ? current
+              : availableDoctors[0].id
+          );
+        } else {
+          setDoctorStaffId("");
+        }
+      } catch (err) {
+        setDoctors([]);
+        setDoctorStaffId("");
+        setError(err instanceof Error ? err.message : "Failed to load doctors.");
+      } finally {
+        setLoadingDoctors(false);
+      }
+    };
+
+    void loadDoctors();
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic to save appointment to state or database
-    onClose();
+    setError("");
+
+    if (!doctorStaffId) {
+      setError("Please select an active doctor.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientName,
+          doctorStaffId,
+          date,
+          startTime,
+          endTime,
+          notes: [
+            appointmentType ? `Appointment type: ${appointmentType}` : "",
+            priority ? `Priority: ${priority}` : "",
+            notes.trim(),
+          ]
+            .filter(Boolean)
+            .join(" • "),
+        }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to book appointment.");
+      }
+
+      onBooked?.();
+      onClose();
+      setPatientName("");
+      setNotes("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to book appointment.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
         <div className="bg-slate-50 border-b border-slate-200/80 px-6 py-4 flex items-center justify-between">
           <div>
             <h2 className="text-base font-extrabold text-slate-900">
-              Schedule Appointment / OR Slot
+              Schedule Appointment
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Book a consultation room or surgical theater
+              Select an active doctor from the staff directory.
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs font-bold text-slate-700">
-          {/* Patient Search / Name */}
           <div>
             <label className="block mb-1 text-slate-600">Patient Name / MRN</label>
             <div className="relative">
@@ -69,38 +173,27 @@ export default function ScheduleAppointmentModal({
             </div>
           </div>
 
-          {/* Resource & Physician Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block mb-1 text-slate-600">Resource / Room</label>
-              <select
-                value={resource}
-                onChange={(e) => setResource(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition"
-              >
-                <option>Consultation Room 1</option>
-                <option>Consultation Room 2</option>
-                <option>OR-1 (Cataract Suite)</option>
-                <option>OR-2 (Laser Eye Suite)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-1 text-slate-600">Assigned Physician</label>
-              <select
-                value={physician}
-                onChange={(e) => setPhysician(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition"
-              >
-                <option>Dr. James Okoro</option>
-                <option>Dr. Amina Bello</option>
-                <option>Dr. Sarah Patel</option>
-                <option>Dr. Fatima Hassan</option>
-              </select>
-            </div>
+          <div>
+            <label className="block mb-1 text-slate-600">Assigned Physician</label>
+            <select
+              required
+              value={doctorStaffId}
+              onChange={(e) => setDoctorStaffId(e.target.value)}
+              disabled={loadingDoctors || submitting}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition disabled:opacity-60"
+            >
+              {loadingDoctors && <option value="">Loading doctors...</option>}
+              {!loadingDoctors && doctors.length === 0 && (
+                <option value="">No active doctors available</option>
+              )}
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.name}{doctor.title ? ` — ${doctor.title}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Procedure Type & Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block mb-1 text-slate-600">Appointment / Procedure Type</label>
@@ -129,12 +222,12 @@ export default function ScheduleAppointmentModal({
             </div>
           </div>
 
-          {/* Date, Start Time, End Time */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block mb-1 text-slate-600">Date</label>
               <input
                 type="date"
+                required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition"
@@ -144,6 +237,7 @@ export default function ScheduleAppointmentModal({
               <label className="block mb-1 text-slate-600">Start Time</label>
               <input
                 type="time"
+                required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition"
@@ -153,6 +247,7 @@ export default function ScheduleAppointmentModal({
               <label className="block mb-1 text-slate-600">End Time</label>
               <input
                 type="time"
+                required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 focus:bg-white focus:border-purple-600 focus:outline-none transition"
@@ -160,9 +255,10 @@ export default function ScheduleAppointmentModal({
             </div>
           </div>
 
-          {/* Notes */}
           <div>
-            <label className="block mb-1 text-slate-600">Clinical Notes / Special Instructions</label>
+            <label className="block mb-1 text-slate-600">
+              Clinical Notes / Special Instructions
+            </label>
             <textarea
               rows={2}
               placeholder="Add surgical requirements, pre-op preparations..."
@@ -172,20 +268,29 @@ export default function ScheduleAppointmentModal({
             />
           </div>
 
-          {/* Footer Buttons */}
+          {error && (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-rose-700">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition"
+              disabled={submitting}
+              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-5 py-2 rounded-xl transition shadow-xs"
+              disabled={submitting || loadingDoctors || doctors.length === 0}
+              className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-5 py-2 rounded-xl transition shadow-xs disabled:opacity-50 flex items-center gap-2"
             >
-              Confirm & Book Slot
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {submitting ? "Booking..." : "Confirm & Book Appointment"}
             </button>
           </div>
         </form>
