@@ -353,17 +353,21 @@ export async function getOptometryPatient(
             recorded_at
           ),
           encounters (
-            id,
-            encounter_type,
-            slit_lamp_od,
-            slit_lamp_os,
-            refraction_od,
-            refraction_os,
-            diagnosis,
-            status,
-            created_at,
-            updated_at
-          )
+  id,
+  encounter_type,
+  visual_acuity_od,
+  visual_acuity_os,
+  visual_acuity_ou,
+  with_correction,
+  slit_lamp_od,
+  slit_lamp_os,
+  refraction_od,
+  refraction_os,
+  diagnosis,
+  status,
+  created_at,
+  updated_at
+)
         `)
         .eq(
           "patient_code",
@@ -481,31 +485,55 @@ export async function getOptometryPatient(
             }
           : null,
         previousOptometryEncounter:
-          optometryEncounter
-            ? {
-                id:
-                  optometryEncounter.id,
-                slitLampOD:
-                  optometryEncounter.slit_lamp_od ??
-                  "",
-                slitLampOS:
-                  optometryEncounter.slit_lamp_os ??
-                  "",
-                refractionOD:
-                  optometryEncounter.refraction_od ??
-                  null,
-                refractionOS:
-                  optometryEncounter.refraction_os ??
-                  null,
-                diagnosis:
-                  optometryEncounter.diagnosis ??
-                  "",
-                status:
-                  optometryEncounter.status,
-                createdAt:
-                  optometryEncounter.created_at,
-              }
-            : null,
+  optometryEncounter
+    ? {
+        id:
+          optometryEncounter.id,
+
+        visualAcuityOD:
+          optometryEncounter.visual_acuity_od ??
+          "",
+
+        visualAcuityOS:
+          optometryEncounter.visual_acuity_os ??
+          "",
+
+        visualAcuityOU:
+          optometryEncounter.visual_acuity_ou ??
+          "",
+
+        withCorrection:
+          Boolean(
+            optometryEncounter.with_correction
+          ),
+
+        slitLampOD:
+          optometryEncounter.slit_lamp_od ??
+          "",
+
+        slitLampOS:
+          optometryEncounter.slit_lamp_os ??
+          "",
+
+        refractionOD:
+          optometryEncounter.refraction_od ??
+          null,
+
+        refractionOS:
+          optometryEncounter.refraction_os ??
+          null,
+
+        diagnosis:
+          optometryEncounter.diagnosis ??
+          "",
+
+        status:
+          optometryEncounter.status,
+
+        createdAt:
+          optometryEncounter.created_at,
+      }
+    : null,
       },
     };
   } catch (error) {
