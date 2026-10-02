@@ -1,22 +1,23 @@
 "use client";
 
-import React, { useState, Suspense } from "react";
+import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Eye,
-  Bell,
-  MessageSquare,
-  Clock,
-  ArrowRight,
-  ArrowLeft,
-  ChevronDown,
-  User,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Eye,
   Info,
   Loader2,
-  CheckCircle2,
+  MessageSquare,
+  User,
 } from "lucide-react";
+import { VISUAL_ACUITY_OPTIONS } from "@/lib/visual-acuity";
 
 type Severity = "Mild" | "Moderate" | "Severe";
 
@@ -26,28 +27,41 @@ function TriageVitalsContent() {
 
   const patientId = searchParams.get("patientId")?.trim() || "";
 
-  // Eye vitals
-  const [odVisual, setOdVisual] = useState("20/40");
-  const [osVisual, setOsVisual] = useState("20/20");
-  const [ouVisual, setOuVisual] = useState("20/30");
+  // ------------------------------------------------------------
+  // EYE VITALS
+  // ------------------------------------------------------------
+
+  const [odVisual, setOdVisual] = useState("6/6");
+  const [osVisual, setOsVisual] = useState("6/6");
+  const [ouVisual, setOuVisual] = useState("6/6");
   const [withCorrection, setWithCorrection] = useState(false);
 
   const [odIop, setOdIop] = useState("16");
   const [osIop, setOsIop] = useState("24");
   const [instrument, setInstrument] = useState("Goldmann Applanation");
 
-  // General vitals
+  // ------------------------------------------------------------
+  // GENERAL VITALS
+  // ------------------------------------------------------------
+
   const [bpSystolic, setBpSystolic] = useState("128");
   const [bpDiastolic, setBpDiastolic] = useState("82");
   const [pulse, setPulse] = useState("76");
   const [temp, setTemp] = useState("36.8");
   const [spo2, setSpo2] = useState("98");
 
-  // Chief complaint
+  // ------------------------------------------------------------
+  // CHIEF COMPLAINT
+  // ------------------------------------------------------------
+
   const [complaintText, setComplaintText] = useState("");
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [severity, setSeverity] = useState<Severity>("Moderate");
   const [duration, setDuration] = useState("2 weeks");
+
+  // ------------------------------------------------------------
+  // SAVE STATE
+  // ------------------------------------------------------------
 
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -70,14 +84,24 @@ function TriageVitalsContent() {
     );
   };
 
+  // ------------------------------------------------------------
+  // IOP FLAGS
+  // ------------------------------------------------------------
+
   const numOdIop = Number.parseFloat(odIop) || 0;
   const numOsIop = Number.parseFloat(osIop) || 0;
 
   const isOdHigh = numOdIop > 21;
   const isOsHigh = numOsIop > 21;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // ------------------------------------------------------------
+  // SUBMIT
+  // ------------------------------------------------------------
+
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
 
     setSaveMessage("");
     setSaveError("");
@@ -89,8 +113,8 @@ function TriageVitalsContent() {
       return;
     }
 
-    if (!odVisual || !osVisual) {
-      setSaveError("Visual acuity for both eyes is required.");
+    if (!odVisual || !osVisual || !ouVisual) {
+      setSaveError("Visual acuity for all required measurements is required.");
       return;
     }
 
@@ -136,10 +160,14 @@ function TriageVitalsContent() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result?.error || "Failed to save patient vitals.");
+        throw new Error(
+          result?.error || "Failed to save patient vitals."
+        );
       }
 
-      setSaveMessage("Vitals saved successfully. Patient sent to the doctor queue.");
+      setSaveMessage(
+        "Vitals saved successfully. Patient sent to the doctor queue."
+      );
 
       setTimeout(() => {
         router.push("/nurse");
@@ -171,6 +199,7 @@ function TriageVitalsContent() {
               <h1 className="font-extrabold text-sm text-slate-900 leading-tight">
                 Sparkle Eye Specialist Hospital
               </h1>
+
               <span className="text-[10px] font-bold text-indigo-600 tracking-wider uppercase block">
                 Triage & Clinical Care
               </span>
@@ -194,6 +223,7 @@ function TriageVitalsContent() {
             className="relative p-2 rounded-full hover:bg-slate-100 text-slate-500 transition"
           >
             <Bell className="w-5 h-5" />
+
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" />
           </button>
 
@@ -206,6 +236,7 @@ function TriageVitalsContent() {
               <span className="block font-bold text-xs text-slate-900">
                 Nurse On-Duty
               </span>
+
               <span className="text-[10px] text-slate-400 font-medium">
                 Triage Nurse
               </span>
@@ -216,7 +247,7 @@ function TriageVitalsContent() {
 
       {/* PATIENT IDENTIFIER */}
       <div className="bg-white border-b border-slate-200/80 px-6 md:px-8 py-3">
-        <div className="max-w-[1400px] mx-auto flex flex-wrap items-center justify-between gap-3">
+        <div className="max-w-350 mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-purple-50 text-[#6B21A8] flex items-center justify-center">
               <User className="w-4 h-4" />
@@ -240,7 +271,8 @@ function TriageVitalsContent() {
         </div>
       </div>
 
-      <main className="max-w-[1400px] mx-auto p-6 md:p-8">
+      <main className="max-w-350 mx-auto p-6 md:p-8">
+        {/* NO PATIENT */}
         {!patientId && (
           <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 text-sm font-semibold">
             No patient was selected. Please return to the nurse queue and
@@ -248,6 +280,7 @@ function TriageVitalsContent() {
           </div>
         )}
 
+        {/* SAVE ERROR */}
         {saveError && (
           <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 text-sm font-semibold flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -255,6 +288,7 @@ function TriageVitalsContent() {
           </div>
         )}
 
+        {/* SAVE SUCCESS */}
         {saveMessage && (
           <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl p-4 text-sm font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -266,7 +300,9 @@ function TriageVitalsContent() {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 lg:grid-cols-12 gap-6"
         >
-          {/* LEFT COLUMN */}
+          {/* =====================================================
+              LEFT COLUMN
+              ===================================================== */}
           <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 md:p-8 space-y-8">
             {/* EYE VITALS */}
             <div className="space-y-6">
@@ -290,10 +326,12 @@ function TriageVitalsContent() {
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                     Visual Acuity
                   </label>
+
                   <Info className="w-3.5 h-3.5 text-slate-400" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* OD */}
                   <div className="space-y-1.5">
                     <span className="text-xs font-bold text-slate-600 block">
                       OD — Right Eye
@@ -301,16 +339,14 @@ function TriageVitalsContent() {
 
                     <select
                       value={odVisual}
-                      onChange={(e) => setOdVisual(e.target.value)}
+                      onChange={(event) => setOdVisual(event.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                     >
-                      <option value="20/20">20/20</option>
-                      <option value="20/25">20/25</option>
-                      <option value="20/30">20/30</option>
-                      <option value="20/40">20/40</option>
-                      <option value="20/50">20/50</option>
-                      <option value="20/100">20/100</option>
-                      <option value="20/200">20/200</option>
+                      {VISUAL_ACUITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
 
                     <span className="text-[10px] text-slate-400">
@@ -318,6 +354,7 @@ function TriageVitalsContent() {
                     </span>
                   </div>
 
+                  {/* OS */}
                   <div className="space-y-1.5">
                     <span className="text-xs font-bold text-slate-600 block">
                       OS — Left Eye
@@ -325,16 +362,14 @@ function TriageVitalsContent() {
 
                     <select
                       value={osVisual}
-                      onChange={(e) => setOsVisual(e.target.value)}
+                      onChange={(event) => setOsVisual(event.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                     >
-                      <option value="20/20">20/20</option>
-                      <option value="20/25">20/25</option>
-                      <option value="20/30">20/30</option>
-                      <option value="20/40">20/40</option>
-                      <option value="20/50">20/50</option>
-                      <option value="20/100">20/100</option>
-                      <option value="20/200">20/200</option>
+                      {VISUAL_ACUITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
 
                     <span className="text-[10px] text-slate-400">
@@ -342,6 +377,7 @@ function TriageVitalsContent() {
                     </span>
                   </div>
 
+                  {/* OU */}
                   <div className="space-y-1.5">
                     <span className="text-xs font-bold text-slate-600 block">
                       OU — Both Eyes
@@ -349,14 +385,14 @@ function TriageVitalsContent() {
 
                     <select
                       value={ouVisual}
-                      onChange={(e) => setOuVisual(e.target.value)}
+                      onChange={(event) => setOuVisual(event.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                     >
-                      <option value="20/20">20/20</option>
-                      <option value="20/25">20/25</option>
-                      <option value="20/30">20/30</option>
-                      <option value="20/40">20/40</option>
-                      <option value="20/50">20/50</option>
+                      {VISUAL_ACUITY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
 
                     <span className="text-[10px] text-slate-400">
@@ -365,6 +401,7 @@ function TriageVitalsContent() {
                   </div>
                 </div>
 
+                {/* CORRECTION */}
                 <div className="flex items-center justify-between pt-2">
                   <div>
                     <span className="text-xs font-bold text-slate-700 block">
@@ -378,9 +415,14 @@ function TriageVitalsContent() {
 
                   <button
                     type="button"
-                    onClick={() => setWithCorrection((value) => !value)}
+                    onClick={() =>
+                      setWithCorrection((current) => !current)
+                    }
+                    aria-pressed={withCorrection}
                     className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
-                      withCorrection ? "bg-[#6B21A8]" : "bg-slate-200"
+                      withCorrection
+                        ? "bg-[#6B21A8]"
+                        : "bg-slate-200"
                     }`}
                   >
                     <div
@@ -434,7 +476,9 @@ function TriageVitalsContent() {
                           min="0"
                           step="0.1"
                           value={eye.value}
-                          onChange={(e) => eye.setValue(e.target.value)}
+                          onChange={(event) =>
+                            eye.setValue(event.target.value)
+                          }
                           className={`w-full border rounded-xl py-2.5 pl-3 pr-14 text-xs font-bold focus:outline-none ${
                             eye.high
                               ? "bg-rose-50 border-rose-400 text-rose-700"
@@ -461,6 +505,7 @@ function TriageVitalsContent() {
                   ))}
                 </div>
 
+                {/* INSTRUMENT */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-600 block">
                     Instrument Used
@@ -469,15 +514,19 @@ function TriageVitalsContent() {
                   <div className="relative">
                     <select
                       value={instrument}
-                      onChange={(e) => setInstrument(e.target.value)}
+                      onChange={(event) =>
+                        setInstrument(event.target.value)
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-3 pr-8 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:border-purple-600"
                     >
                       <option value="Goldmann Applanation">
                         Goldmann Applanation
                       </option>
+
                       <option value="Non-Contact Tonometer">
                         Non-Contact Tonometer
                       </option>
+
                       <option value="Icare Tonometer">
                         Icare Tonometer
                       </option>
@@ -497,6 +546,7 @@ function TriageVitalsContent() {
                 </label>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* BP */}
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-bold text-slate-600 block">
                       Blood Pressure
@@ -507,17 +557,23 @@ function TriageVitalsContent() {
                         type="number"
                         min="0"
                         value={bpSystolic}
-                        onChange={(e) => setBpSystolic(e.target.value)}
+                        onChange={(event) =>
+                          setBpSystolic(event.target.value)
+                        }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none"
                       />
 
-                      <span className="text-slate-300 font-bold">/</span>
+                      <span className="text-slate-300 font-bold">
+                        /
+                      </span>
 
                       <input
                         type="number"
                         min="0"
                         value={bpDiastolic}
-                        onChange={(e) => setBpDiastolic(e.target.value)}
+                        onChange={(event) =>
+                          setBpDiastolic(event.target.value)
+                        }
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none"
                       />
                     </div>
@@ -527,6 +583,7 @@ function TriageVitalsContent() {
                     </span>
                   </div>
 
+                  {/* PULSE */}
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-bold text-slate-600 block">
                       Pulse Rate
@@ -536,7 +593,9 @@ function TriageVitalsContent() {
                       type="number"
                       min="0"
                       value={pulse}
-                      onChange={(e) => setPulse(e.target.value)}
+                      onChange={(event) =>
+                        setPulse(event.target.value)
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
                     />
 
@@ -545,6 +604,7 @@ function TriageVitalsContent() {
                     </span>
                   </div>
 
+                  {/* TEMPERATURE */}
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-bold text-slate-600 block">
                       Temperature
@@ -555,7 +615,9 @@ function TriageVitalsContent() {
                       min="0"
                       step="0.1"
                       value={temp}
-                      onChange={(e) => setTemp(e.target.value)}
+                      onChange={(event) =>
+                        setTemp(event.target.value)
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
                     />
 
@@ -564,6 +626,7 @@ function TriageVitalsContent() {
                     </span>
                   </div>
 
+                  {/* SPO2 */}
                   <div className="space-y-1.5">
                     <span className="text-[11px] font-bold text-slate-600 block">
                       SpO2
@@ -574,7 +637,9 @@ function TriageVitalsContent() {
                       min="0"
                       max="100"
                       value={spo2}
-                      onChange={(e) => setSpo2(e.target.value)}
+                      onChange={(event) =>
+                        setSpo2(event.target.value)
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
                     />
 
@@ -617,7 +682,9 @@ function TriageVitalsContent() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN */}
+          {/* =====================================================
+              RIGHT COLUMN
+              ===================================================== */}
           <div className="lg:col-span-5 space-y-6">
             {/* CHIEF COMPLAINT */}
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-5">
@@ -632,7 +699,9 @@ function TriageVitalsContent() {
               <textarea
                 rows={5}
                 value={complaintText}
-                onChange={(e) => setComplaintText(e.target.value)}
+                onChange={(event) =>
+                  setComplaintText(event.target.value)
+                }
                 placeholder="Describe the patient's main complaint..."
                 className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl p-3.5 text-xs font-medium text-slate-700 leading-relaxed focus:outline-none focus:border-purple-600 resize-none"
               />
@@ -644,7 +713,8 @@ function TriageVitalsContent() {
 
                 <div className="flex flex-wrap gap-2">
                   {symptomsList.map((symptom) => {
-                    const selected = selectedSymptoms.includes(symptom);
+                    const selected =
+                      selectedSymptoms.includes(symptom);
 
                     return (
                       <button
@@ -665,6 +735,7 @@ function TriageVitalsContent() {
                 </div>
               </div>
 
+              {/* SEVERITY + DURATION */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -672,22 +743,22 @@ function TriageVitalsContent() {
                   </label>
 
                   <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                    {(["Mild", "Moderate", "Severe"] as Severity[]).map(
-                      (item) => (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => setSeverity(item)}
-                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition ${
-                            severity === item
-                              ? "bg-white text-slate-900 shadow-xs"
-                              : "text-slate-500"
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      )
-                    )}
+                    {(
+                      ["Mild", "Moderate", "Severe"] as Severity[]
+                    ).map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => setSeverity(item)}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition ${
+                          severity === item
+                            ? "bg-white text-slate-900 shadow-xs"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -699,7 +770,9 @@ function TriageVitalsContent() {
                   <div className="relative">
                     <select
                       value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
+                      onChange={(event) =>
+                        setDuration(event.target.value)
+                      }
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-3 pr-8 text-xs font-bold text-slate-800 appearance-none focus:outline-none"
                     >
                       <option value="Today">Today</option>
@@ -735,8 +808,8 @@ function TriageVitalsContent() {
                   </p>
 
                   <p className="text-[11px] text-rose-600 mt-1 leading-relaxed">
-                    The elevated reading will be included in the patient's
-                    clinical record for the doctor to review.
+                    The elevated reading will be included in the
+                    patient's clinical record for the doctor to review.
                   </p>
                 </div>
               ) : (
@@ -759,6 +832,7 @@ function TriageVitalsContent() {
               </div>
 
               <div className="space-y-3">
+                {/* STEP 1 */}
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">
                     ✓
@@ -768,6 +842,7 @@ function TriageVitalsContent() {
                     <p className="text-xs font-bold text-slate-800">
                       Patient Registration
                     </p>
+
                     <p className="text-[10px] text-slate-400">
                       Patient record created
                     </p>
@@ -776,6 +851,7 @@ function TriageVitalsContent() {
 
                 <div className="h-4 border-l border-dashed border-slate-300 ml-3.5" />
 
+                {/* STEP 2 */}
                 <div className="flex items-center gap-3">
                   <div className="w-7 h-7 rounded-full bg-purple-100 text-[#6B21A8] flex items-center justify-center text-xs font-bold">
                     2
@@ -785,6 +861,7 @@ function TriageVitalsContent() {
                     <p className="text-xs font-bold text-slate-800">
                       Triage & Vitals
                     </p>
+
                     <p className="text-[10px] text-slate-400">
                       Current stage
                     </p>
@@ -793,6 +870,7 @@ function TriageVitalsContent() {
 
                 <div className="h-4 border-l border-dashed border-slate-300 ml-3.5" />
 
+                {/* STEP 3 */}
                 <div className="flex items-center gap-3 opacity-50">
                   <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold">
                     3
@@ -802,6 +880,7 @@ function TriageVitalsContent() {
                     <p className="text-xs font-bold text-slate-800">
                       Doctor Consultation
                     </p>
+
                     <p className="text-[10px] text-slate-400">
                       Next stage
                     </p>
@@ -823,7 +902,10 @@ export default function TriageVitalsPage() {
         <div className="min-h-screen bg-[#F4F6FB] flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-[#6B21A8]">
             <Loader2 className="w-8 h-8 animate-spin" />
-            <p className="text-sm font-semibold">Loading triage dashboard...</p>
+
+            <p className="text-sm font-semibold">
+              Loading triage dashboard...
+            </p>
           </div>
         </div>
       }
