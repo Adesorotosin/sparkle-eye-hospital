@@ -37,38 +37,33 @@ function getProtectedRoute(pathname: string) {
   );
 }
 
-async function getAuthenticatedUser(
+/**
+ * Middleware only checks whether a session cookie exists.
+ *
+ * Full session validation is still performed by:
+ * - requireAuth()
+ * - requireRole()
+ * - protected server actions
+ * - protected API routes
+ *
+ * This avoids making an internal /api/auth/me request
+ * during every page navigation.
+ */
+function hasSessionCookie(
   request: NextRequest
-) {
-  const cookie = request.headers.get("cookie");
+): boolean {
+  const cookieNames = [
+    "sparkle_session",
+    "session",
+    "sparkle_session_token",
+  ];
 
-  if (!cookie) {
-    return null;
-  }
-
-  const url = new URL("/api/auth/me", request.url);
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: { cookie },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-
-    if (!data?.success || !data?.user) {
-      return null;
-    }
-
-    return data.user;
-  } catch {
-    return null;
-  }
+  return cookieNames.some(
+    (name) =>
+      Boolean(
+        request.cookies.get(name)?.value
+      )
+  );
 }
 
 export async function middleware(
@@ -76,7 +71,8 @@ export async function middleware(
 ) {
   const { pathname } = request.nextUrl;
 
-  // API routes perform their own authentication/authorization.
+  // API routes perform their own authentication
+  // and authorization.
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
@@ -97,14 +93,19 @@ export async function middleware(
   const protectedRoute =
     getProtectedRoute(pathname);
 
+  // Public/unprotected route.
   if (!protectedRoute) {
     return NextResponse.next();
   }
 
-  const user =
-    await getAuthenticatedUser(request);
-
-  if (!user) {
+  /*
+   * Middleware only verifies that a session cookie
+   * exists.
+   *
+   * The actual session token is validated against
+   * auth_sessions by getAuthenticatedStaff().
+   */
+  if (!hasSessionCookie(request)) {
     const loginUrl = new URL(
       "/",
       request.url
@@ -115,27 +116,24 @@ export async function middleware(
       pathname
     );
 
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const userRole =
-    normalizeRole(user.role) as UserRole;
-
-  const allowedRoles =
-    ROUTE_PERMISSIONS[protectedRoute];
-
-  if (!allowedRoles.includes(userRole)) {
-    const fallbackTarget =
-      ROLE_DASHBOARD_MAP[userRole] || "/";
-
     return NextResponse.redirect(
-      new URL(
-        fallbackTarget,
-        request.url
-      )
+      loginUrl
     );
   }
 
+  /*
+   * IMPORTANT:
+   *
+   * We deliberately do not perform role authorization
+   * here.
+   *
+   * Server-side pages/actions use requireRole()
+   * as the authoritative authorization layer.
+   *
+   * This prevents middleware from incorrectly sending
+   * a valid Optometrist session back to the login page
+   * because an internal authentication request failed.
+   */
   return NextResponse.next();
 }
 
@@ -154,17 +152,13 @@ export const config = {
     "/billing/:path*",
 
     "/nurse/:path*",
-    "/reception/:path*",
     "/receptionist/:path*",
+    "/reception/:path*",
     "/triage/:path*",
 
     "/diagnostics/:path*",
     "/laboratory/:path*",
 
-    "/optician/:path*",
-    "/optometry/:path*",
-
-    "/laboratory/:path*",
     "/optician/:path*",
     "/optometry/:path*",
 

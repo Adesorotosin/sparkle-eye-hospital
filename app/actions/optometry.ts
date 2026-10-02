@@ -1,309 +1,522 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
 
-export type OptometryRefraction = {
-  sphere: string;
-  cylinder: string;
-  axis: string;
-};
-
-export interface OptometryAssessmentFormData {
-  patientId: string;
-
-  visualAcuityOD: string;
-  visualAcuityOS: string;
-  visualAcuityOU?: string;
-
-  withCorrection?: boolean;
-
-  slitLampOD: string;
-  slitLampOS: string;
-
-  refractionOD: OptometryRefraction;
-  refractionOS: OptometryRefraction;
-
-  diagnosis: string;
-
-  status: "draft" | "completed";
-}
-
-export interface OptometryAssessmentResponse {
+export type OptometryActionResponse = {
   success: boolean;
   message: string;
-  encounterId?: string;
-}
+};
 
-/**
- * Saves an Optometry assessment as a clinical encounter.
- *
- * Optometry uses the existing encounters table rather than creating
- * a second, separate clinical-record system.
- */
-export async function saveOptometryAssessment(
-  formData: OptometryAssessmentFormData
-): Promise<OptometryAssessmentResponse> {
-  try {
-    const staff = await requireRole([
-      "IT_ADMIN",
-      "OPTOMETRIST",
-      "OPHTHALMOLOGIST",
-      "DOCTOR",
-    ]);
+export type OptometryPatient = {
+  id: string;
+  patientCode: string;
+  fullName: string;
+  age: number | null;
+  gender: string | null;
+  complaint: string;
+  visualAcuityOD: string;
+  visualAcuityOS: string;
+  visualAcuityOU: string;
+  withCorrection: boolean;
+  optometryStatus:
+    | "referred"
+    | "in_examination"
+    | "completed"
+    | null;
+  referredAt: string | null;
+};
 
-    const patientCode =
-      formData.patientId?.trim();
-
-    if (!patientCode) {
+function handleError(
+  error: unknown,
+  fallback: string
+): OptometryActionResponse {
+  if (error instanceof Error) {
+    if (error.message === "UNAUTHENTICATED") {
       return {
         success: false,
-        message: "Patient ID is required.",
+        message: "You must be signed in.",
       };
     }
 
-    /*
-     * Optometry is a clinical workflow.
-     * Never create a patient from this screen.
-     */
-    const { data: patient, error: patientError } =
-      await supabaseServer
-        .from("patients")
-        .select("id, patient_code, full_name")
-        .eq("patient_code", patientCode)
-        .maybeSingle();
+    if (error.message === "FORBIDDEN") {
+      return {
+        success: false,
+        message:
+          "You are not authorized to perform this Optometry action.",
+      };
+    }
+  }
 
-    if (patientError) {
+  console.error(fallback, error);
+
+  return {
+    success: false,
+    message: fallback,
+  };
+}
+
+/**
+ * Loads the real Optometry queue.
+ *
+ * Patients enter this queue when a doctor refers them by setting:
+ * patients.optometry_status = "referred"
+ */
+export async function getOptometryQueue(): Promise<{
+  success: boolean;
+  patients: OptometryPatient[];
+  message?: string;
+}> {
+  try {
+    await requireRole([
+      "IT_ADMIN",
+      "OPTOMETRIST",
+    ]);
+
+    const { data, error } = await supabaseServer
+      .from("patients")
+      .select(`
+        id,
+        patient_code,
+        full_name,
+        age,
+        gender,
+        optometry_status,
+        created_at,
+        vitals (
+          primary_complaint,
+          visual_acuity_od,
+          visual_acuity_os,
+          visual_acuity_ou,
+          with_correction,
+          recorded_at
+        )
+      `)
+      .in("optometry_status", [
+        "referred",
+        "in_examination",
+        "completed",
+      ])
+      .order("created_at", {
+        ascending: true,
+      });
+
+    if (error) {
       console.error(
-        "Optometry patient lookup failed:",
-        patientError
+        "Failed to load Optometry queue:",
+        error
       );
 
       return {
         success: false,
+        patients: [],
         message:
-          "Unable to find the patient record.",
+          "Unable to load the Optometry queue.",
       };
+    }
+
+    const patients: OptometryPatient[] = (
+      data ?? []
+    ).map((patient: any) => {
+      const vitals = Array.isArray(patient.vitals)
+        ? [...patient.vitals].sort(
+            (a, b) =>
+              new Date(
+                b.recorded_at ?? 0
+              ).getTime() -
+              new Date(
+                a.recorded_at ?? 0
+              ).getTime()
+          )[0]
+        : patient.vitals;
+
+      return {
+        id: patient.id,
+        patientCode: patient.patient_code,
+        fullName: patient.full_name,
+        age:
+          patient.age !== null &&
+          patient.age !== undefined
+            ? Number(patient.age)
+            : null,
+        gender:
+          patient.gender ?? null,
+        complaint:
+          vitals?.primary_complaint ??
+          "No complaint recorded",
+        visualAcuityOD:
+          vitals?.visual_acuity_od ??
+          "Not recorded",
+        visualAcuityOS:
+          vitals?.visual_acuity_os ??
+          "Not recorded",
+        visualAcuityOU:
+          vitals?.visual_acuity_ou ??
+          "Not recorded",
+        withCorrection:
+          Boolean(
+            vitals?.with_correction
+          ),
+        optometryStatus:
+          patient.optometry_status ?? null,
+        referredAt:
+          vitals?.recorded_at ??
+          patient.created_at ??
+          null,
+      };
+    });
+
+    return {
+      success: true,
+      patients,
+    };
+  } catch (error) {
+    const result = handleError(
+      error,
+      "Unable to load the Optometry queue."
+    );
+
+    return {
+      success: false,
+      patients: [],
+      message: result.message,
+    };
+  }
+}
+
+/**
+ * Starts an Optometry examination.
+ */
+export async function startOptometryExam(
+  patientCode: string
+): Promise<OptometryActionResponse> {
+  try {
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "OPTOMETRIST",
+    ]);
+
+    const normalizedCode =
+      patientCode?.trim();
+
+    if (!normalizedCode) {
+      return {
+        success: false,
+        message:
+          "Patient code is required.",
+      };
+    }
+
+    const { data: patient, error: patientError } =
+      await supabaseServer
+        .from("patients")
+        .select(
+          "id, patient_code, full_name, optometry_status"
+        )
+        .eq(
+          "patient_code",
+          normalizedCode
+        )
+        .maybeSingle();
+
+    if (patientError) {
+      throw patientError;
     }
 
     if (!patient) {
       return {
         success: false,
-        message: `Patient ${patientCode} was not found. Please return to the patient queue.`,
+        message:
+          `Patient ${normalizedCode} was not found.`,
       };
     }
 
-    /*
-     * A completed Optometry assessment must contain a diagnosis.
-     *
-     * Drafts may be saved without a diagnosis.
-     */
     if (
-      formData.status === "completed" &&
-      !formData.diagnosis.trim()
+      patient.optometry_status ===
+      "completed"
     ) {
       return {
         success: false,
         message:
-          "A diagnosis or clinical impression is required before completing the assessment.",
+          "This Optometry assessment has already been completed.",
       };
     }
 
-    /*
-     * Save the examination as an encounter.
-     *
-     * Visual acuity is stored in the existing vitals structure,
-     * while refraction and examination findings remain part of
-     * the encounter itself.
-     *
-     * We do not create a new table just for Optometry.
-     */
-    const { data: encounter, error: encounterError } =
-      await supabaseServer
-        .from("encounters")
-        .insert({
-          patient_id: patient.id,
-
-          slit_lamp_od:
-            formData.slitLampOD.trim() || null,
-
-          slit_lamp_os:
-            formData.slitLampOS.trim() || null,
-
-          refraction_od: {
-            sphere:
-              formData.refractionOD.sphere.trim(),
-
-            cylinder:
-              formData.refractionOD.cylinder.trim(),
-
-            axis:
-              formData.refractionOD.axis.trim(),
-          },
-
-          refraction_os: {
-            sphere:
-              formData.refractionOS.sphere.trim(),
-
-            cylinder:
-              formData.refractionOS.cylinder.trim(),
-
-            axis:
-              formData.refractionOS.axis.trim(),
-          },
-
-          diagnosis:
-            formData.diagnosis.trim() || null,
-
-          status: formData.status,
-
-          recorded_by: staff.id,
-        })
-        .select("id")
-        .single();
-
-    if (encounterError) {
-      console.error(
-        "Optometry encounter save failed:",
-        encounterError
-      );
-
+    if (
+      patient.optometry_status ===
+      "in_examination"
+    ) {
       return {
-        success: false,
+        success: true,
         message:
-          "Failed to save the Optometry assessment.",
+          "This patient is already in examination.",
       };
     }
 
-    /*
-     * If the assessment is completed, keep the patient workflow
-     * consistent with the existing clinical workflow.
-     *
-     * Draft:
-     *   patient remains in consultation/clinical workflow.
-     *
-     * Completed:
-     *   patient is marked as completed for the current clinical stage.
-     */
-    const nextPatientStatus =
-      formData.status === "completed"
-        ? "completed_today"
-        : "in_consultation";
-
-    const { error: patientUpdateError } =
+    const { error: updateError } =
       await supabaseServer
         .from("patients")
         .update({
-          status: nextPatientStatus,
+          optometry_status:
+            "in_examination",
         })
         .eq("id", patient.id);
 
-    if (patientUpdateError) {
-      /*
-       * The encounter has already been saved.
-       * Do not pretend the clinical record was lost.
-       */
-      console.error(
-        "Optometry patient status update failed:",
-        patientUpdateError
-      );
+    if (updateError) {
+      throw updateError;
     }
 
-    /*
-     * Keep an auditable record of who performed the assessment.
-     */
     await logActivity({
       module: "Optometry",
       category: "CLINICAL",
-
       action:
-        formData.status === "completed"
-          ? `Optometry assessment completed${
-              formData.diagnosis.trim()
-                ? `: ${formData.diagnosis.trim()}`
-                : ""
-            }`
-          : "Optometry assessment saved as draft.",
-
+        "Optometry examination started",
       performedBy: staff.name,
       staffId: staff.id,
-
       patientId: patient.id,
-
       details: JSON.stringify({
-        encounterId: encounter.id,
-        patientCode: patient.patient_code,
-        patientName: patient.full_name,
-
-        visualAcuityOD:
-          formData.visualAcuityOD.trim(),
-
-        visualAcuityOS:
-          formData.visualAcuityOS.trim(),
-
-        visualAcuityOU:
-          formData.visualAcuityOU?.trim() || null,
-
-        withCorrection:
-          formData.withCorrection ?? false,
-
-        status: formData.status,
+        patientCode:
+          patient.patient_code,
+        patientName:
+          patient.full_name,
       }),
     });
 
-    /*
-     * Refresh the Optometry and patient clinical pages.
-     */
     revalidatePath("/optometry");
-
-    revalidatePath(
-      `/doctor/patients/${patientCode}`
-    );
-
-    revalidatePath(
-      `/doctor/patients/${patientCode}/encounter`
-    );
 
     return {
       success: true,
-
       message:
-        formData.status === "completed"
-          ? "Optometry assessment completed successfully."
-          : "Optometry assessment draft saved successfully.",
-
-      encounterId: encounter.id,
+        "Optometry examination started.",
     };
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "UNAUTHENTICATED") {
-        return {
-          success: false,
-          message:
-            "You must be signed in to save an Optometry assessment.",
-        };
-      }
+    return handleError(
+      error,
+      "Unable to start the Optometry examination."
+    );
+  }
+}
 
-      if (error.message === "FORBIDDEN") {
-        return {
-          success: false,
-          message:
-            "You are not authorized to perform Optometry assessments.",
-        };
-      }
+/**
+ * Returns a patient and their latest clinical data
+ * for the Optometry examination workspace.
+ */
+export async function getOptometryPatient(
+  patientCode: string
+) {
+  try {
+    await requireRole([
+      "IT_ADMIN",
+      "OPTOMETRIST",
+    ]);
+
+    const normalizedCode =
+      patientCode?.trim();
+
+    if (!normalizedCode) {
+      return {
+        success: false,
+        patient: null,
+        message:
+          "Patient code is required.",
+      };
     }
 
-    console.error(
-      "Optometry assessment error:",
-      error
-    );
+    const { data: patient, error } =
+      await supabaseServer
+        .from("patients")
+        .select(`
+          id,
+          patient_code,
+          full_name,
+          age,
+          gender,
+          phone,
+          allergies,
+          status,
+          optometry_status,
+          vitals (
+            id,
+            visual_acuity_od,
+            visual_acuity_os,
+            visual_acuity_ou,
+            with_correction,
+            iop_od,
+            iop_os,
+            primary_complaint,
+            symptoms,
+            severity,
+            duration_text,
+            recorded_at
+          ),
+          encounters (
+            id,
+            encounter_type,
+            slit_lamp_od,
+            slit_lamp_os,
+            refraction_od,
+            refraction_os,
+            diagnosis,
+            status,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq(
+          "patient_code",
+          normalizedCode
+        )
+        .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!patient) {
+      return {
+        success: false,
+        patient: null,
+        message:
+          `Patient ${normalizedCode} was not found.`,
+      };
+    }
+
+    const vitals = Array.isArray(patient.vitals)
+      ? [...patient.vitals].sort(
+          (a, b) =>
+            new Date(
+              b.recorded_at ?? 0
+            ).getTime() -
+            new Date(
+              a.recorded_at ?? 0
+            ).getTime()
+        )[0]
+      : patient.vitals;
+
+    const encounters =
+      Array.isArray(patient.encounters)
+        ? [...patient.encounters].sort(
+            (a, b) =>
+              new Date(
+                b.created_at ?? 0
+              ).getTime() -
+              new Date(
+                a.created_at ?? 0
+              ).getTime()
+          )
+        : [];
+
+    const optometryEncounter =
+      encounters.find(
+        (encounter: any) =>
+          encounter.encounter_type ===
+          "optometry"
+      );
 
     return {
+      success: true,
+      patient: {
+        id: patient.id,
+        patientCode:
+          patient.patient_code,
+        fullName:
+          patient.full_name,
+        age:
+          patient.age !== null &&
+          patient.age !== undefined
+            ? Number(patient.age)
+            : null,
+        gender:
+          patient.gender ?? null,
+        phone:
+          patient.phone ?? null,
+        allergies:
+          patient.allergies ?? null,
+        status:
+          patient.status,
+        optometryStatus:
+          patient.optometry_status ??
+          null,
+        vitals: vitals
+          ? {
+              visualAcuityOD:
+                vitals.visual_acuity_od ??
+                "",
+              visualAcuityOS:
+                vitals.visual_acuity_os ??
+                "",
+              visualAcuityOU:
+                vitals.visual_acuity_ou ??
+                "",
+              withCorrection:
+                Boolean(
+                  vitals.with_correction
+                ),
+              iopOD:
+                vitals.iop_od !== null &&
+                vitals.iop_od !== undefined
+                  ? Number(vitals.iop_od)
+                  : null,
+              iopOS:
+                vitals.iop_os !== null &&
+                vitals.iop_os !== undefined
+                  ? Number(vitals.iop_os)
+                  : null,
+              primaryComplaint:
+                vitals.primary_complaint ??
+                "",
+              symptoms:
+                vitals.symptoms ?? null,
+              severity:
+                vitals.severity ?? null,
+              durationText:
+                vitals.duration_text ??
+                null,
+              recordedAt:
+                vitals.recorded_at ??
+                null,
+            }
+          : null,
+        previousOptometryEncounter:
+          optometryEncounter
+            ? {
+                id:
+                  optometryEncounter.id,
+                slitLampOD:
+                  optometryEncounter.slit_lamp_od ??
+                  "",
+                slitLampOS:
+                  optometryEncounter.slit_lamp_os ??
+                  "",
+                refractionOD:
+                  optometryEncounter.refraction_od ??
+                  null,
+                refractionOS:
+                  optometryEncounter.refraction_os ??
+                  null,
+                diagnosis:
+                  optometryEncounter.diagnosis ??
+                  "",
+                status:
+                  optometryEncounter.status,
+                createdAt:
+                  optometryEncounter.created_at,
+              }
+            : null,
+      },
+    };
+  } catch (error) {
+    return {
       success: false,
+      patient: null,
       message:
-        "An unexpected error occurred while saving the Optometry assessment.",
+        error instanceof Error &&
+        error.message === "FORBIDDEN"
+          ? "You are not authorized to access Optometry records."
+          : "Unable to load the patient record.",
     };
   }
 }

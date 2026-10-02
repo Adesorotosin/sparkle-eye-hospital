@@ -1,144 +1,214 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   CheckCircle2,
   Clock3,
   Eye,
   LogOut,
+  RefreshCw,
   Search,
   User,
 } from "lucide-react";
 
-type ExamStatus =
+import {
+  getOptometryQueue,
+  startOptometryExam,
+  type OptometryPatient,
+} from "@/app/actions/optometry";
+
+type QueueFilter =
+  | "ALL"
   | "WAITING"
   | "IN EXAMINATION"
   | "COMPLETED";
 
-interface OptometryPatient {
-  id: string;
-  name: string;
-  age: number;
-  complaint: string;
-  appointment: string;
-  status: ExamStatus;
-  visualAcuity: string;
-}
-
-const INITIAL_PATIENTS: OptometryPatient[] = [
-  {
-    id: "SPK-30892",
-    name: "Samuel Adeyemi",
-    age: 42,
-    complaint: "Blurred distance vision",
-    appointment: "08:30 AM",
-    status: "WAITING",
-    visualAcuity: "Not recorded",
-  },
-  {
-    id: "SPK-30901",
-    name: "Grace Okafor",
-    age: 29,
-    complaint: "Eye strain",
-    appointment: "09:00 AM",
-    status: "IN EXAMINATION",
-    visualAcuity: "RE 6/9 · LE 6/6",
-  },
-  {
-    id: "SPK-30905",
-    name: "Ibrahim Musa",
-    age: 51,
-    complaint: "Difficulty reading",
-    appointment: "09:30 AM",
-    status: "WAITING",
-    visualAcuity: "Not recorded",
-  },
-  {
-    id: "SPK-30911",
-    name: "Esther Johnson",
-    age: 36,
-    complaint: "Headaches",
-    appointment: "10:00 AM",
-    status: "COMPLETED",
-    visualAcuity: "RE 6/6 · LE 6/6",
-  },
-];
-
 export default function OptometryDashboard() {
-  const [patients, setPatients] =
-    useState<OptometryPatient[]>(
-      INITIAL_PATIENTS
-    );
+  const router = useRouter();
 
-  const [search, setSearch] = useState("");
+  const [patients, setPatients] =
+    useState<OptometryPatient[]>([]);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState<QueueFilter>("ALL");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [feedback, setFeedback] =
+    useState("");
+
+  const [isPending, startTransition] =
+    useTransition();
+
+  const loadQueue = useCallback(
+    async () => {
+      setLoading(true);
+      setFeedback("");
+
+      try {
+        const result =
+          await getOptometryQueue();
+
+        if (!result.success) {
+          setFeedback(
+            result.message ??
+              "Unable to load Optometry queue."
+          );
+
+          setPatients([]);
+          return;
+        }
+
+        setPatients(result.patients);
+      } catch (error) {
+        console.error(
+          "Failed to load Optometry queue:",
+          error
+        );
+
+        setFeedback(
+          "Unable to load the Optometry queue."
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    loadQueue();
+  }, [loadQueue]);
+
+  const waiting = patients.filter(
+    (patient) =>
+      patient.optometryStatus ===
+      "referred"
+  ).length;
+
+  const examining = patients.filter(
+    (patient) =>
+      patient.optometryStatus ===
+      "in_examination"
+  ).length;
+
+  const completed = patients.filter(
+    (patient) =>
+      patient.optometryStatus ===
+      "completed"
+  ).length;
 
   const filteredPatients = useMemo(() => {
     const query = search
       .trim()
       .toLowerCase();
 
-    if (!query) return patients;
-
     return patients.filter(
-      (patient) =>
-        patient.name
-          .toLowerCase()
-          .includes(query) ||
-        patient.id
-          .toLowerCase()
-          .includes(query)
+      (patient) => {
+        const matchesSearch =
+          !query ||
+          patient.fullName
+            .toLowerCase()
+            .includes(query) ||
+          patient.patientCode
+            .toLowerCase()
+            .includes(query);
+
+        const matchesFilter =
+          filter === "ALL" ||
+          (filter === "WAITING" &&
+            patient.optometryStatus ===
+              "referred") ||
+          (filter ===
+            "IN EXAMINATION" &&
+            patient.optometryStatus ===
+              "in_examination") ||
+          (filter === "COMPLETED" &&
+            patient.optometryStatus ===
+              "completed");
+
+        return (
+          matchesSearch &&
+          matchesFilter
+        );
+      }
     );
-  }, [patients, search]);
+  }, [patients, search, filter]);
 
-  const waiting = patients.filter(
-    (patient) =>
-      patient.status === "WAITING"
-  ).length;
+  function getStatusLabel(
+    status: OptometryPatient["optometryStatus"]
+  ) {
+    switch (status) {
+      case "referred":
+        return "WAITING";
 
-  const examining = patients.filter(
-    (patient) =>
-      patient.status === "IN EXAMINATION"
-  ).length;
+      case "in_examination":
+        return "IN EXAMINATION";
 
-  const completed = patients.filter(
-    (patient) =>
-      patient.status === "COMPLETED"
-  ).length;
+      case "completed":
+        return "COMPLETED";
 
-  function startExam(id: string) {
-    setPatients((current) =>
-      current.map((patient) =>
-        patient.id === id
-          ? {
-              ...patient,
-              status: "IN EXAMINATION",
-            }
-          : patient
-      )
-    );
+      default:
+        return "UNKNOWN";
+    }
   }
 
-  function completeExam(id: string) {
-    setPatients((current) =>
-      current.map((patient) =>
-        patient.id === id
-          ? {
-              ...patient,
-              status: "COMPLETED",
-              visualAcuity:
-                "RE 6/6 · LE 6/6",
-            }
-          : patient
-      )
-    );
+  function handleStartExam(
+    patientCode: string
+  ) {
+    setFeedback("");
+
+    startTransition(async () => {
+      try {
+        const result =
+          await startOptometryExam(
+            patientCode
+          );
+
+        setFeedback(result.message);
+
+        if (!result.success) {
+          return;
+        }
+
+        router.push(
+          `/optometry/${encodeURIComponent(
+            patientCode
+          )}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to start Optometry examination:",
+          error
+        );
+
+        setFeedback(
+          "Unable to start the Optometry examination."
+        );
+      }
+    });
   }
 
   async function handleLogout() {
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      });
+      await fetch(
+        "/api/auth/logout",
+        {
+          method: "POST",
+        }
+      );
     } finally {
       localStorage.removeItem(
         "sparkle_staff_token"
@@ -179,7 +249,7 @@ export default function OptometryDashboard() {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700"
+            className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100"
           >
             <LogOut className="h-4 w-4" />
             Logout
@@ -188,48 +258,123 @@ export default function OptometryDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8">
-        <div>
-          <h2 className="text-2xl font-black text-slate-900">
-            Optometry
-          </h2>
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900">
+              Optometry
+            </h2>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Manage visual assessments, refraction and preliminary eye measurements.
-          </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage referred patients, visual
+              assessments and refraction.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadQueue}
+            disabled={loading}
+            className="flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                loading
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
+            Refresh Queue
+          </button>
         </div>
+
+        {feedback && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+            {feedback}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Stat
-            label="Waiting"
-            value={waiting}
-            icon={Clock3}
-            className="text-amber-600"
-          />
+          <button
+            type="button"
+            onClick={() =>
+              setFilter("WAITING")
+            }
+            className="text-left"
+          >
+            <Stat
+              label="Waiting"
+              value={waiting}
+              icon={Clock3}
+              className="text-amber-600"
+              active={
+                filter === "WAITING"
+              }
+            />
+          </button>
 
-          <Stat
-            label="In Examination"
-            value={examining}
-            icon={Activity}
-            className="text-blue-600"
-          />
+          <button
+            type="button"
+            onClick={() =>
+              setFilter(
+                "IN EXAMINATION"
+              )
+            }
+            className="text-left"
+          >
+            <Stat
+              label="In Examination"
+              value={examining}
+              icon={Activity}
+              className="text-blue-600"
+              active={
+                filter ===
+                "IN EXAMINATION"
+              }
+            />
+          </button>
 
-          <Stat
-            label="Completed Today"
-            value={completed}
-            icon={CheckCircle2}
-            className="text-emerald-600"
-          />
+          <button
+            type="button"
+            onClick={() =>
+              setFilter("COMPLETED")
+            }
+            className="text-left"
+          >
+            <Stat
+              label="Completed Today"
+              value={completed}
+              icon={CheckCircle2}
+              className="text-emerald-600"
+              active={
+                filter === "COMPLETED"
+              }
+            />
+          </button>
         </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="font-black text-slate-900">
-                Optometry Queue
-              </h3>
+              <div className="flex items-center gap-3">
+                <h3 className="font-black text-slate-900">
+                  Optometry Queue
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilter("ALL")
+                  }
+                  className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-200"
+                >
+                  {patients.length} patients
+                </button>
+              </div>
 
               <p className="mt-1 text-xs text-slate-500">
-                Patients awaiting vision assessment.
+                Patients referred by the clinical
+                team for Optometry assessment.
               </p>
             </div>
 
@@ -239,126 +384,240 @@ export default function OptometryDashboard() {
               <input
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
-                placeholder="Search patient..."
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs outline-none focus:border-blue-500"
+                placeholder="Search patient name or code..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs outline-none transition focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-212.5">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Patient
-                  </th>
+          {loading ? (
+            <div className="flex min-h-60 items-center justify-center">
+              <div className="flex items-center gap-3 text-sm font-medium text-slate-500">
+                <RefreshCw className="h-5 w-5 animate-spin" />
+                Loading Optometry queue...
+              </div>
+            </div>
+          ) : filteredPatients.length ===
+            0 ? (
+            <div className="flex min-h-60 flex-col items-center justify-center px-6 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <Eye className="h-5 w-5 text-slate-400" />
+              </div>
 
-                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Complaint
-                  </th>
+              <h4 className="mt-4 text-sm font-black text-slate-900">
+                No patients found
+              </h4>
 
-                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Appointment
-                  </th>
+              <p className="mt-1 max-w-sm text-xs text-slate-500">
+                {patients.length === 0
+                  ? "Patients referred from Doctor consultation will appear here."
+                  : "Try changing the search or queue filter."}
+              </p>
 
-                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Visual Acuity
-                  </th>
+              {filter !== "ALL" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilter("ALL")
+                  }
+                  className="mt-4 rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white"
+                >
+                  Show All Patients
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-212.5">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Patient
+                    </th>
 
-                  <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Status
-                  </th>
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Complaint
+                    </th>
 
-                  <th className="px-5 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">
-                    Action
-                  </th>
-                </tr>
-              </thead>
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Triage VA
+                    </th>
 
-              <tbody>
-                {filteredPatients.map(
-                  (patient) => (
-                    <tr
-                      key={patient.id}
-                      className="border-t border-slate-100"
-                    >
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-bold text-slate-900">
-                          {patient.name}
-                        </p>
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Correction
+                    </th>
 
-                        <p className="text-[11px] text-slate-400">
-                          {patient.id} · Age {patient.age}
-                        </p>
-                      </td>
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Status
+                    </th>
 
-                      <td className="px-5 py-4 text-xs font-medium text-slate-600">
-                        {patient.complaint}
-                      </td>
+                    <th className="px-5 py-3 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
 
-                      <td className="px-5 py-4 text-xs font-semibold">
-                        {patient.appointment}
-                      </td>
+                <tbody>
+                  {filteredPatients.map(
+                    (patient) => {
+                      const status =
+                        getStatusLabel(
+                          patient.optometryStatus
+                        );
 
-                      <td className="px-5 py-4 text-xs font-semibold">
-                        {patient.visualAcuity}
-                      </td>
+                      return (
+                        <tr
+                          key={patient.id}
+                          className="border-t border-slate-100 transition hover:bg-slate-50/70"
+                        >
+                          <td className="px-5 py-4">
+                            <p className="text-sm font-bold text-slate-900">
+                              {patient.fullName}
+                            </p>
 
-                      <td className="px-5 py-4">
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
-                          {patient.status}
-                        </span>
-                      </td>
+                            <p className="text-[11px] text-slate-400">
+                              {patient.patientCode}
 
-                      <td className="px-5 py-4 text-right">
-                        {patient.status ===
-                          "WAITING" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              startExam(
-                                patient.id
-                              )
-                            }
-                            className="rounded-xl bg-blue-700 px-3 py-2 text-[10px] font-black text-white"
-                          >
-                            Start Assessment
-                          </button>
-                        )}
+                              {patient.age !==
+                                null &&
+                                ` · Age ${patient.age}`}
+                            </p>
+                          </td>
 
-                        {patient.status ===
-                          "IN EXAMINATION" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              completeExam(
-                                patient.id
-                              )
-                            }
-                            className="rounded-xl bg-emerald-600 px-3 py-2 text-[10px] font-black text-white"
-                          >
-                            Complete Assessment
-                          </button>
-                        )}
+                          <td className="max-w-56 px-5 py-4 text-xs font-medium text-slate-600">
+                            {patient.complaint}
+                          </td>
 
-                        {patient.status ===
-                          "COMPLETED" && (
-                          <span className="text-[10px] font-bold text-emerald-600">
-                            Assessment Complete
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                )}
-              </tbody>
-            </table>
-          </div>
+                          <td className="px-5 py-4">
+                            <div className="space-y-0.5 text-xs font-semibold text-slate-700">
+                              <p>
+                                OD:{" "}
+                                {patient.visualAcuityOD}
+                              </p>
+
+                              <p>
+                                OS:{" "}
+                                {patient.visualAcuityOS}
+                              </p>
+
+                              <p>
+                                OU:{" "}
+                                {patient.visualAcuityOU}
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                patient.withCorrection
+                                  ? "bg-violet-50 text-violet-700"
+                                  : "bg-slate-100 text-slate-600"
+                              }`}
+                            >
+                              {patient.withCorrection
+                                ? "With correction"
+                                : "Unaided"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <StatusBadge
+                              status={status}
+                            />
+                          </td>
+
+                          <td className="px-5 py-4 text-right">
+                            {patient.optometryStatus ===
+                              "referred" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleStartExam(
+                                    patient.patientCode
+                                  )
+                                }
+                                disabled={
+                                  isPending
+                                }
+                                className="rounded-xl bg-blue-700 px-3 py-2 text-[10px] font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {isPending
+                                  ? "Opening..."
+                                  : "Start Assessment"}
+                              </button>
+                            )}
+
+                            {patient.optometryStatus ===
+                              "in_examination" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/optometry/${encodeURIComponent(
+                                      patient.patientCode
+                                    )}`
+                                  )
+                                }
+                                className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-[10px] font-black text-blue-700 transition hover:bg-blue-100"
+                              >
+                                Continue Assessment
+                              </button>
+                            )}
+
+                            {patient.optometryStatus ===
+                              "completed" && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/optometry/${encodeURIComponent(
+                                      patient.patientCode
+                                    )}`
+                                  )
+                                }
+                                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-100"
+                              >
+                                View Assessment
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </main>
     </div>
+  );
+}
+
+function StatusBadge({
+  status,
+}: {
+  status: string;
+}) {
+  const styles =
+    status === "WAITING"
+      ? "bg-amber-50 text-amber-700"
+      : status === "IN EXAMINATION"
+        ? "bg-blue-50 text-blue-700"
+        : "bg-emerald-50 text-emerald-700";
+
+  return (
+    <span
+      className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${styles}`}
+    >
+      {status}
+    </span>
   );
 }
 
@@ -367,6 +626,7 @@ function Stat({
   value,
   icon: Icon,
   className,
+  active,
 }: {
   label: string;
   value: number;
@@ -374,20 +634,29 @@ function Stat({
     className?: string;
   }>;
   className: string;
+  active: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div
+      className={`flex items-center justify-between rounded-2xl border bg-white p-5 shadow-sm transition ${
+        active
+          ? "border-blue-300 ring-2 ring-blue-100"
+          : "border-slate-200 hover:border-slate-300"
+      }`}
+    >
       <div>
         <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
           {label}
         </p>
 
-        <p className="mt-1 text-2xl font-black">
+        <p className="mt-1 text-2xl font-black text-slate-900">
           {value}
         </p>
       </div>
 
-      <Icon className={`h-6 w-6 ${className}`} />
+      <Icon
+        className={`h-6 w-6 ${className}`}
+      />
     </div>
   );
 }
