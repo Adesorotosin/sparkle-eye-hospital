@@ -19,6 +19,7 @@ import {
 
 import { getOptometryPatient } from "@/app/actions/optometry";
 import { saveOptometryEncounter } from "@/app/actions/optometry-encounter";
+import { createOpticalOrder } from "@/app/actions/optician";
 import { VISUAL_ACUITY_OPTIONS } from "@/lib/visual-acuity";
 
 type Refraction = {
@@ -98,6 +99,7 @@ export default function OptometryExaminationPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [opticianSent, setOpticianSent] = useState(false);
 
   const [isPending, startTransition] =
     useTransition();
@@ -363,19 +365,15 @@ export default function OptometryExaminationPage() {
 
         setFeedback(result.message);
 
-        if (status === "completed") {
-          setTimeout(() => {
-            router.push("/optometry");
-            router.refresh();
-          }, 700);
-        } else {
-          /*
-           * Reload the patient from the database after
-           * saving the draft. This verifies that the
-           * round-trip persistence is working.
-           */
-          await loadPatient();
-        }
+        /*
+         * Do not immediately leave the patient page
+         * after completing the assessment.
+         *
+         * The Optometrist must now have the option
+         * to send the completed assessment to the
+         * Optician.
+         */
+        await loadPatient();
       } catch (saveError) {
         console.error(
           "Failed to save Optometry assessment:",
@@ -384,6 +382,39 @@ export default function OptometryExaminationPage() {
 
         setError(
           "Unable to save the Optometry assessment."
+        );
+      }
+    });
+  }
+
+  function handleSendToOptician() {
+    setFeedback("");
+    setError("");
+
+    startTransition(async () => {
+      try {
+        const result =
+          await createOpticalOrder(patientCode);
+
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+
+        setFeedback(
+          result.message ??
+            "Patient has been sent to the Optician successfully."
+        );
+
+        setOpticianSent(true);
+      } catch (sendError) {
+        console.error(
+          "Failed to send patient to Optician:",
+          sendError
+        );
+
+        setError(
+          "Unable to send the patient to the Optician."
         );
       }
     });
@@ -434,6 +465,9 @@ export default function OptometryExaminationPage() {
     return null;
   }
 
+  const assessmentCompleted =
+    patient.optometryStatus === "completed";
+
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
@@ -449,8 +483,12 @@ export default function OptometryExaminationPage() {
               <ArrowLeft className="h-4 w-4" />
             </button>
 
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-              <Eye className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
+              <img
+                src="/Logo.png"
+                alt="Sparkle Eye Specialist Hospital"
+                className="h-full w-full object-contain"
+              />
             </div>
 
             <div>
@@ -547,6 +585,51 @@ export default function OptometryExaminationPage() {
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
             {error}
           </div>
+        )}
+
+        {assessmentCompleted && (
+          <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                  <Eye className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-black text-violet-900">
+                    Optometry Assessment Completed
+                  </h3>
+
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-violet-700">
+                    The clinical assessment is complete. Send this
+                    patient to Optician to begin optical measurements,
+                    frame selection and lens preparation.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSendToOptician}
+                disabled={
+                  isPending || opticianSent
+                }
+                className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : opticianSent ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+
+                {opticianSent
+                  ? "Sent to Optician"
+                  : "Send to Optician"}
+              </button>
+            </div>
+          </section>
         )}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -745,39 +828,56 @@ export default function OptometryExaminationPage() {
 
         <div className="sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-[#F4F6FB]/95 px-4 py-4 backdrop-blur md:-mx-8 md:px-8">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={() =>
-                handleSave("draft")
-              }
-              disabled={isPending}
-              className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
+            {!assessmentCompleted && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSave("draft")
+                  }
+                  disabled={isPending}
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
 
-              Save Draft
-            </button>
+                  Save Draft
+                </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                handleSave("completed")
-              }
-              disabled={isPending}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 className="h-4 w-4" />
-              )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSave("completed")
+                  }
+                  disabled={isPending}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
 
-              Complete Assessment
-            </button>
+                  Complete Assessment
+                </button>
+              </>
+            )}
+
+            {assessmentCompleted && (
+              <button
+                type="button"
+                onClick={() =>
+                  router.push("/optometry")
+                }
+                className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Return to Optometry
+              </button>
+            )}
           </div>
         </div>
       </main>

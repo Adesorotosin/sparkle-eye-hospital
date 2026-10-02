@@ -222,9 +222,13 @@ export default function OptometryDashboard() {
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-            <Eye className="h-5 w-5" />
-          </div>
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
+  <img
+    src="/Logo.png"
+    alt="Sparkle Eye Specialist Hospital"
+    className="h-full w-full object-contain"
+  />
+</div>
 
           <div>
             <h1 className="text-sm font-black text-slate-900">
