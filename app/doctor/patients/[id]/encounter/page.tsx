@@ -1,8 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useTransition } from "react";
+import React, {
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import { useParams } from "next/navigation";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
+import { createLabOrder } from "@/app/actions/lab-orders";
 import {
   createDiagnosticOrder,
   createPrescription,
@@ -67,6 +72,20 @@ type PatientDiagnostic = {
   completedAt?: string;
 };
 
+type PatientLaboratoryResult = {
+  id: string;
+  labOrderId: string;
+  testName: string;
+  specimenType?: string;
+  sampleId?: string;
+  priority?: string;
+  status: string;
+  resultData: unknown;
+  laboratoryComments?: string;
+  verifiedAt?: string;
+  createdAt?: string;
+};
+
 type PatientHistoryItem = {
   date: string;
   title: string;
@@ -83,6 +102,7 @@ type PatientRecord = {
 
   vitals?: PatientVitals;
   diagnostics: PatientDiagnostic[];
+  laboratoryResults: PatientLaboratoryResult[];
 
   history: PatientHistoryItem[];
 
@@ -118,6 +138,24 @@ type DiagnosticTest = {
   price: number;
 };
 
+type LaboratoryTest = {
+  code: string;
+  name: string;
+  specimenType: string;
+  price: number;
+};
+
+type LabOrderPriority = "NORMAL" | "URGENT" | "STAT";
+
+type LaboratoryResultRow = {
+  id: string;
+  name: string;
+  result: string;
+  unit: string;
+  referenceRange: string;
+  flag: string;
+};
+
 const DIAGNOSTIC_TESTS: DiagnosticTest[] = [
   {
     name: "Visual Field Test (Humphrey)",
@@ -141,6 +179,39 @@ const DIAGNOSTIC_TESTS: DiagnosticTest[] = [
   },
 ];
 
+const LABORATORY_TESTS: LaboratoryTest[] = [
+  {
+    code: "FBC",
+    name: "Full Blood Count",
+    specimenType: "EDTA Whole Blood",
+    price: 5000,
+  },
+  {
+    code: "BGL",
+    name: "Blood Glucose",
+    specimenType: "Blood",
+    price: 2500,
+  },
+  {
+    code: "MALARIA",
+    name: "Malaria Parasite",
+    specimenType: "Blood",
+    price: 2500,
+  },
+  {
+    code: "LIPID",
+    name: "Lipid Profile",
+    specimenType: "Blood",
+    price: 7000,
+  },
+  {
+    code: "URINALYSIS",
+    name: "Urinalysis",
+    specimenType: "Urine",
+    price: 2000,
+  },
+];
+
 const SURGERY_OPTIONS = [
   "Cataract (Phacoemulsification + IOL)",
   "Glaucoma Trabeculectomy",
@@ -148,7 +219,9 @@ const SURGERY_OPTIONS = [
   "Intravitreal Injection",
 ];
 
-function formatEncounterDate(value?: string | null): string {
+function formatEncounterDate(
+  value?: string | null
+): string {
   if (!value) return "";
 
   const date = new Date(value);
@@ -164,6 +237,26 @@ function formatEncounterDate(value?: string | null): string {
   });
 }
 
+function formatResultDate(
+  value?: string | null
+): string {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function safeRefraction(
   value?: Partial<Refraction> | null
 ): Refraction {
@@ -172,6 +265,185 @@ function safeRefraction(
     cylinder: value?.cylinder ?? "",
     axis: value?.axis ?? "",
   };
+}
+
+function formatLaboratoryValue(
+  value: unknown
+): string {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function getLaboratoryResultRows(
+  resultData: unknown
+): LaboratoryResultRow[] {
+  /*
+   * Current lab result structure:
+   *
+   * [
+   *   {
+   *     name: "Haemoglobin",
+   *     result: "13",
+   *     unit: "g/dL",
+   *     referenceRange: "12.0 - 17.0",
+   *     flag: "NORMAL"
+   *   }
+   * ]
+   *
+   * We explicitly handle arrays first so that
+   * Object.entries() does not render 0, 1, 2, 3...
+   * as the parameter names.
+   */
+
+  if (Array.isArray(resultData)) {
+    return resultData.map(
+      (item, index): LaboratoryResultRow => {
+        if (
+          item &&
+          typeof item === "object" &&
+          !Array.isArray(item)
+        ) {
+          const row =
+            item as Record<string, unknown>;
+
+          return {
+            id: `${index}`,
+            name: formatLaboratoryValue(
+              row.name ??
+                row.parameter ??
+                `Parameter ${index + 1}`
+            ),
+            result: formatLaboratoryValue(
+              row.result ?? row.value
+            ),
+            unit: formatLaboratoryValue(
+              row.unit
+            ),
+            referenceRange:
+              formatLaboratoryValue(
+                row.referenceRange ??
+                  row.reference_range ??
+                  row.refRange
+              ),
+            flag: formatLaboratoryValue(
+              row.flag
+            ),
+          };
+        }
+
+        return {
+          id: `${index}`,
+          name: `Parameter ${index + 1}`,
+          result: formatLaboratoryValue(item),
+          unit: "—",
+          referenceRange: "—",
+          flag: "—",
+        };
+      }
+    );
+  }
+
+  /*
+   * Backward-compatible handling in case another
+   * laboratory result is stored as an object.
+   */
+  if (
+    resultData &&
+    typeof resultData === "object"
+  ) {
+    return Object.entries(
+      resultData as Record<string, unknown>
+    ).map(
+      ([name, value], index): LaboratoryResultRow => {
+        if (
+          value &&
+          typeof value === "object" &&
+          !Array.isArray(value)
+        ) {
+          const row =
+            value as Record<string, unknown>;
+
+          return {
+            id: `${index}`,
+            name: formatLaboratoryValue(
+              row.name ?? name
+            ),
+            result: formatLaboratoryValue(
+              row.result ?? row.value
+            ),
+            unit: formatLaboratoryValue(
+              row.unit
+            ),
+            referenceRange:
+              formatLaboratoryValue(
+                row.referenceRange ??
+                  row.reference_range ??
+                  row.refRange
+              ),
+            flag: formatLaboratoryValue(
+              row.flag
+            ),
+          };
+        }
+
+        return {
+          id: `${index}`,
+          name,
+          result: formatLaboratoryValue(value),
+          unit: "—",
+          referenceRange: "—",
+          flag: "—",
+        };
+      }
+    );
+  }
+
+  return [];
+}
+
+function getLaboratoryFlagClass(
+  flag: string
+): string {
+  const normalized = flag
+    .trim()
+    .toUpperCase();
+
+  if (normalized === "NORMAL") {
+    return "bg-green-50 text-green-700";
+  }
+
+  if (normalized === "HIGH") {
+    return "bg-red-50 text-red-700";
+  }
+
+  if (normalized === "LOW") {
+    return "bg-amber-50 text-amber-700";
+  }
+
+  if (normalized === "CRITICAL") {
+    return "bg-red-100 text-red-800";
+  }
+
+  return "bg-gray-100 text-gray-600";
 }
 
 function mapApiPatientToRecord(
@@ -240,6 +512,47 @@ function mapApiPatientToRecord(
               undefined,
             completedAt:
               diagnostic.completedAt ??
+              undefined,
+          })
+        )
+      : [];
+
+  const laboratoryResults: PatientLaboratoryResult[] =
+    Array.isArray(
+      apiPatient?.laboratoryResults
+    )
+      ? apiPatient.laboratoryResults.map(
+          (
+            result: any
+          ): PatientLaboratoryResult => ({
+            id: result.id,
+            labOrderId:
+              result.labOrderId ?? "",
+            testName:
+              result.testName ?? "",
+            specimenType:
+              result.specimenType ??
+              undefined,
+            sampleId:
+              result.sampleId ??
+              undefined,
+            priority:
+              result.priority ??
+              undefined,
+            status:
+              result.status ??
+              "COMPLETED",
+            resultData:
+              result.resultData ??
+              [],
+            laboratoryComments:
+              result.laboratoryComments ??
+              undefined,
+            verifiedAt:
+              result.verifiedAt ??
+              undefined,
+            createdAt:
+              result.createdAt ??
               undefined,
           })
         )
@@ -384,6 +697,7 @@ function mapApiPatientToRecord(
 
     vitals: apiPatient.vitals,
     diagnostics,
+    laboratoryResults,
     history,
     imaging: [],
 
@@ -582,6 +896,242 @@ function DiagnosticResults({
   );
 }
 
+function LaboratoryResults({
+  results,
+}: {
+  results: PatientLaboratoryResult[];
+}) {
+  if (!results.length) {
+    return (
+      <div className="rounded-xl border bg-white p-4">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-gray-400" />
+
+          <h3 className="font-semibold text-gray-900">
+            Laboratory Results
+          </h3>
+        </div>
+
+        <p className="mt-3 text-sm text-gray-500">
+          No completed laboratory results are
+          available.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border bg-white p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-gray-500" />
+
+            <h3 className="font-semibold text-gray-900">
+              Laboratory Results
+            </h3>
+          </div>
+
+          <p className="mt-1 text-xs text-gray-500">
+            Completed and verified laboratory
+            investigations.
+          </p>
+        </div>
+
+        <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+          {results.length}{" "}
+          {results.length === 1
+            ? "Result"
+            : "Results"}
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-5">
+        {results.map((result) => {
+          const resultRows =
+            getLaboratoryResultRows(
+              result.resultData
+            );
+
+          return (
+            <div
+              key={result.id}
+              className="overflow-hidden rounded-xl border border-gray-200"
+            >
+              {/* Laboratory result header */}
+              <div className="border-b bg-gray-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h4 className="text-base font-semibold text-gray-900">
+                      {result.testName ||
+                        "Laboratory Test"}
+                    </h4>
+
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-600">
+                      {result.specimenType && (
+                        <span>
+                          Specimen:{" "}
+                          <strong className="font-medium text-gray-900">
+                            {
+                              result.specimenType
+                            }
+                          </strong>
+                        </span>
+                      )}
+
+                      {result.sampleId && (
+                        <span>
+                          Sample ID:{" "}
+                          <strong className="font-medium text-gray-900">
+                            {result.sampleId}
+                          </strong>
+                        </span>
+                      )}
+
+                      {result.priority && (
+                        <span>
+                          Priority:{" "}
+                          <strong className="font-medium text-gray-900">
+                            {result.priority}
+                          </strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-green-100 px-3 py-1.5 text-xs font-semibold text-green-700">
+                    <Check className="h-3.5 w-3.5" />
+                    Verified
+                  </span>
+                </div>
+              </div>
+
+              {/* Laboratory parameters */}
+              {resultRows.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-180px">
+                    <thead>
+                      <tr className="border-b bg-white text-left">
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Parameter
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Result
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Unit
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Reference Range
+                        </th>
+
+                        <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                          Flag
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {resultRows.map(
+                        (row) => (
+                          <tr
+                            key={row.id}
+                            className="border-b last:border-b-0 hover:bg-gray-50"
+                          >
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              {row.name}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                              {row.result}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {row.unit}
+                            </td>
+
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {
+                                row.referenceRange
+                              }
+                            </td>
+
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getLaboratoryFlagClass(
+                                  row.flag
+                                )}`}
+                              >
+                                {row.flag}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4">
+                  <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-500">
+                    No result parameters were
+                    recorded.
+                  </p>
+                </div>
+              )}
+
+              {/* Laboratory comments */}
+              {result.laboratoryComments && (
+                <div className="border-t border-gray-200 p-4">
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                      Laboratory Comments
+                    </p>
+
+                    <p className="mt-1 text-sm leading-6 text-blue-900">
+                      {
+                        result.laboratoryComments
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Result metadata */}
+              <div className="flex flex-wrap gap-x-6 gap-y-2 border-t bg-gray-50 px-4 py-3 text-xs text-gray-500">
+                {result.verifiedAt && (
+                  <span>
+                    Verified:{" "}
+                    <strong className="font-medium text-gray-700">
+                      {formatResultDate(
+                        result.verifiedAt
+                      )}
+                    </strong>
+                  </span>
+                )}
+
+                {result.createdAt && (
+                  <span>
+                    Result entered:{" "}
+                    <strong className="font-medium text-gray-700">
+                      {formatResultDate(
+                        result.createdAt
+                      )}
+                    </strong>
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function OphthalmologyConsultation() {
   const params = useParams();
 
@@ -632,6 +1182,7 @@ export default function OphthalmologyConsultation() {
   const [activeModal, setActiveModal] =
     useState<
       | "diagnostics"
+      | "laboratory"
       | "surgery"
       | "prescription"
       | null
@@ -641,6 +1192,22 @@ export default function OphthalmologyConsultation() {
     selectedDiagnostics,
     setSelectedDiagnostics,
   ] = useState<string[]>([]);
+
+  const [
+    selectedLaboratoryTests,
+    setSelectedLaboratoryTests,
+  ] = useState<string[]>([]);
+
+  const [labPriority, setLabPriority] =
+    useState<LabOrderPriority>("NORMAL");
+
+  const [labClinicalNotes, setLabClinicalNotes] =
+    useState("");
+
+  const [
+    isSubmittingLabOrders,
+    setIsSubmittingLabOrders,
+  ] = useState(false);
 
   const [surgeryType, setSurgeryType] =
     useState("");
@@ -918,6 +1485,19 @@ export default function OphthalmologyConsultation() {
     );
   }
 
+  function toggleLaboratoryTest(
+    code: string
+  ) {
+    setSelectedLaboratoryTests(
+      (current) =>
+        current.includes(code)
+          ? current.filter(
+              (item) => item !== code
+            )
+          : [...current, code]
+    );
+  }
+
   function handleSubmitDiagnostics() {
     if (!patientId) return;
 
@@ -956,6 +1536,18 @@ export default function OphthalmologyConsultation() {
               String(result.error)
             );
           }
+
+          if (
+            result &&
+            typeof result === "object" &&
+            "success" in result &&
+            result.success === false
+          ) {
+            throw new Error(
+              result.message ||
+                "Failed to create diagnostic order."
+            );
+          }
         }
 
         setFeedback(
@@ -977,6 +1569,74 @@ export default function OphthalmologyConsultation() {
         );
       }
     });
+  }
+
+  async function handleSubmitLaboratoryOrders() {
+    if (!patientId) return;
+
+    if (!selectedLaboratoryTests.length) {
+      setFeedback(
+        "Please select at least one laboratory test."
+      );
+      return;
+    }
+
+    setIsSubmittingLabOrders(true);
+
+    try {
+      const selectedTests =
+        LABORATORY_TESTS.filter((test) =>
+          selectedLaboratoryTests.includes(
+            test.code
+          )
+        );
+
+      for (const test of selectedTests) {
+        const result =
+          await createLabOrder({
+            patientCode: patientId,
+            testCode: test.code,
+            testName: test.name,
+            specimenType:
+              test.specimenType,
+            price: test.price,
+            priority: labPriority,
+            clinicalNotes:
+              labClinicalNotes,
+          });
+
+        if (!result.success) {
+          throw new Error(
+            result.message ||
+              `Failed to order ${test.name}.`
+          );
+        }
+      }
+
+      setFeedback(
+        selectedTests.length === 1
+          ? "Laboratory test ordered successfully."
+          : `${selectedTests.length} laboratory tests ordered successfully.`
+      );
+
+      setSelectedLaboratoryTests([]);
+      setLabPriority("NORMAL");
+      setLabClinicalNotes("");
+      setActiveModal(null);
+    } catch (error) {
+      console.error(
+        "Failed to create laboratory orders:",
+        error
+      );
+
+      setFeedback(
+        error instanceof Error
+          ? error.message
+          : "Failed to create laboratory orders."
+      );
+    } finally {
+      setIsSubmittingLabOrders(false);
+    }
   }
 
   function handleSavePrescription() {
@@ -1072,6 +1732,18 @@ export default function OphthalmologyConsultation() {
           );
         }
 
+        if (
+          result &&
+          typeof result === "object" &&
+          "success" in result &&
+          result.success === false
+        ) {
+          throw new Error(
+            result.message ||
+              "Failed to issue prescription."
+          );
+        }
+
         setFeedback(
           "Prescription issued successfully."
         );
@@ -1104,6 +1776,17 @@ export default function OphthalmologyConsultation() {
       "Surgery scheduling is not connected yet. No appointment was created."
     );
   }
+
+  const selectedLaboratoryTotal =
+    LABORATORY_TESTS.filter((test) =>
+      selectedLaboratoryTests.includes(
+        test.code
+      )
+    ).reduce(
+      (total, test) =>
+        total + test.price,
+      0
+    );
 
   if (loading) {
     return (
@@ -1177,6 +1860,10 @@ export default function OphthalmologyConsultation() {
 
         <DiagnosticResults
           diagnostics={patient.diagnostics}
+        />
+
+        <LaboratoryResults
+          results={patient.laboratoryResults}
         />
 
         <section className="overflow-hidden rounded-xl border bg-white">
@@ -1274,12 +1961,14 @@ export default function OphthalmologyConsultation() {
                     {
                       eye: "OD" as const,
                       value: refractionOD,
-                      setValue: setRefractionOD,
+                      setValue:
+                        setRefractionOD,
                     },
                     {
                       eye: "OS" as const,
                       value: refractionOS,
-                      setValue: setRefractionOS,
+                      setValue:
+                        setRefractionOS,
                     },
                   ].map(
                     ({
@@ -1313,7 +2002,8 @@ export default function OphthalmologyConsultation() {
                                 setValue({
                                   ...value,
                                   sphere:
-                                    event.target
+                                    event
+                                      .target
                                       .value,
                                 })
                               }
@@ -1343,7 +2033,8 @@ export default function OphthalmologyConsultation() {
                                 setValue({
                                   ...value,
                                   cylinder:
-                                    event.target
+                                    event
+                                      .target
                                       .value,
                                 })
                               }
@@ -1373,7 +2064,8 @@ export default function OphthalmologyConsultation() {
                                 setValue({
                                   ...value,
                                   axis:
-                                    event.target
+                                    event
+                                      .target
                                       .value,
                                 })
                               }
@@ -1571,7 +2263,8 @@ export default function OphthalmologyConsultation() {
               <p className="mt-2 text-sm text-gray-500">
                 {patient.diagnostics.length
                   ? `${
-                      patient.diagnostics.length
+                      patient.diagnostics
+                        .length
                     } diagnostic order${
                       patient.diagnostics
                         .length === 1
@@ -1579,6 +2272,27 @@ export default function OphthalmologyConsultation() {
                         : "s"
                     } on record.`
                   : "No diagnostic orders on record."}
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-900">
+                Laboratory Status
+              </h4>
+
+              <p className="mt-2 text-sm text-gray-500">
+                {patient.laboratoryResults
+                  .length
+                  ? `${
+                      patient.laboratoryResults
+                        .length
+                    } verified laboratory result${
+                      patient.laboratoryResults
+                        .length === 1
+                        ? ""
+                        : "s"
+                    } on record.`
+                  : "No verified laboratory results on record."}
               </p>
             </div>
           </div>
@@ -1612,7 +2326,10 @@ export default function OphthalmologyConsultation() {
             onClick={() =>
               handleSave("draft")
             }
-            disabled={isPending}
+            disabled={
+              isPending ||
+              isSubmittingLabOrders
+            }
             className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Save Draft
@@ -1626,7 +2343,10 @@ export default function OphthalmologyConsultation() {
                   "diagnostics"
                 )
               }
-              disabled={isPending}
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
               className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <ClipboardList className="h-4 w-4" />
@@ -1636,9 +2356,29 @@ export default function OphthalmologyConsultation() {
             <button
               type="button"
               onClick={() =>
+                setActiveModal(
+                  "laboratory"
+                )
+              }
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
+              className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Order Laboratory Tests
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
                 setActiveModal("surgery")
               }
-              disabled={isPending}
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
               className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <Calendar className="h-4 w-4" />
@@ -1652,7 +2392,10 @@ export default function OphthalmologyConsultation() {
                   "prescription"
                 )
               }
-              disabled={isPending}
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
               className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <Pill className="h-4 w-4" />
@@ -1664,7 +2407,10 @@ export default function OphthalmologyConsultation() {
               onClick={() =>
                 handleSave("completed")
               }
-              disabled={isPending}
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
               className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Check className="h-4 w-4" />
@@ -1838,6 +2584,225 @@ export default function OphthalmologyConsultation() {
                 {isPending
                   ? "Ordering..."
                   : "Order Selected"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === "laboratory" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Order Laboratory Tests
+                </h2>
+
+                <p className="mt-1 text-sm text-gray-500">
+                  Select the specimen-based laboratory tests required for this patient.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    !isSubmittingLabOrders
+                  ) {
+                    setActiveModal(null);
+                  }
+                }}
+                disabled={
+                  isSubmittingLabOrders
+                }
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="max-h-[65vh] overflow-y-auto p-5">
+              <div className="space-y-3">
+                {LABORATORY_TESTS.map(
+                  (test) => {
+                    const selected =
+                      selectedLaboratoryTests.includes(
+                        test.code
+                      );
+
+                    return (
+                      <button
+                        key={test.code}
+                        type="button"
+                        onClick={() =>
+                          toggleLaboratoryTest(
+                            test.code
+                          )
+                        }
+                        disabled={
+                          isSubmittingLabOrders
+                        }
+                        className={`w-full rounded-xl border p-4 text-left transition ${
+                          selected
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                        } disabled:cursor-not-allowed disabled:opacity-70`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                                selected
+                                  ? "border-blue-600 bg-blue-600 text-white"
+                                  : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {selected && (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                            </div>
+
+                            <div>
+                              <p className="font-medium text-gray-900">
+                                {test.name}
+                              </p>
+
+                              <p className="mt-1 text-sm text-gray-500">
+                                Code:{" "}
+                                {test.code}
+                              </p>
+
+                              <p className="text-sm text-gray-500">
+                                Specimen:{" "}
+                                {
+                                  test.specimenType
+                                }
+                              </p>
+                            </div>
+                          </div>
+
+                          <p className="shrink-0 font-medium text-gray-900">
+                            ₦
+                            {test.price.toLocaleString()}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  }
+                )}
+              </div>
+
+              <div className="mt-6">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Priority
+                </label>
+
+                <select
+                  value={labPriority}
+                  onChange={(event) =>
+                    setLabPriority(
+                      event.target
+                        .value as LabOrderPriority
+                    )
+                  }
+                  disabled={
+                    isSubmittingLabOrders
+                  }
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:bg-gray-50"
+                >
+                  <option value="NORMAL">
+                    Normal
+                  </option>
+
+                  <option value="URGENT">
+                    Urgent
+                  </option>
+
+                  <option value="STAT">
+                    STAT
+                  </option>
+                </select>
+              </div>
+
+              <div className="mt-5">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Clinical Notes
+                </label>
+
+                <textarea
+                  value={labClinicalNotes}
+                  onChange={(event) =>
+                    setLabClinicalNotes(
+                      event.target.value
+                    )
+                  }
+                  disabled={
+                    isSubmittingLabOrders
+                  }
+                  rows={4}
+                  placeholder="Optional clinical information for the laboratory..."
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-blue-500 disabled:bg-gray-50"
+                />
+              </div>
+
+              {selectedLaboratoryTests.length >
+                0 && (
+                <div className="mt-5 rounded-xl bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Selected tests
+                    </span>
+
+                    <span className="font-medium text-gray-900">
+                      {
+                        selectedLaboratoryTests.length
+                      }
+                    </span>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-sm text-gray-600">
+                      Laboratory charges
+                    </span>
+
+                    <span className="font-semibold text-gray-900">
+                      ₦
+                      {selectedLaboratoryTotal.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t p-5">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveModal(null)
+                }
+                disabled={
+                  isSubmittingLabOrders
+                }
+                className="rounded-lg border px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleSubmitLaboratoryOrders
+                }
+                disabled={
+                  isSubmittingLabOrders ||
+                  !selectedLaboratoryTests.length
+                }
+                className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSubmittingLabOrders
+                  ? "Ordering..."
+                  : "Order Laboratory Tests"}
               </button>
             </div>
           </div>

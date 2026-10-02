@@ -32,7 +32,10 @@ type StaffRole =
   | "PHARMACIST"
   | "NURSE"
   | "CASHIER"
-  | "RECEPTIONIST";
+  | "RECEPTIONIST"
+  | "LAB_SCIENTIST"
+  | "OPTICIAN"
+  | "OPTOMETRIST";
 
 type PermissionState =
   | "view_patient_records"
@@ -59,6 +62,9 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   NURSE: "Nurse",
   CASHIER: "Cashier",
   RECEPTIONIST: "Receptionist",
+  LAB_SCIENTIST: "Laboratory Scientist",
+  OPTICIAN: "Optician",
+  OPTOMETRIST: "Optometrist",
 };
 
 const ROLE_DEFAULTS: Record<StaffRole, Record<string, boolean>> = {
@@ -175,6 +181,60 @@ const ROLE_DEFAULTS: Record<StaffRole, Record<string, boolean>> = {
     edit_clinical_notes: false,
     order_diagnostics: false,
     view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
+  },
+
+  LAB_SCIENTIST: {
+    view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: true,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
+  },
+
+  OPTICIAN: {
+    view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: true,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
+  },
+
+  OPTOMETRIST: {
+    view_patient_records: true,
+    edit_clinical_notes: true,
+    order_diagnostics: true,
+    view_lab_results: true,
     issue_prescriptions: false,
     controlled_substance_override: false,
     pharmacy_dispensing_approval: false,
@@ -312,14 +372,10 @@ function generateTemporaryPassword() {
   const numbers = "23456789";
   const special = "!@#$%";
 
-  const allChars =
-    uppercase + lowercase + numbers + special;
+  const allChars = uppercase + lowercase + numbers + special;
 
   const getRandomIndex = (max: number) => {
-    if (
-      typeof crypto !== "undefined" &&
-      "getRandomValues" in crypto
-    ) {
+    if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
       const values = new Uint32Array(1);
       crypto.getRandomValues(values);
       return values[0] % max;
@@ -359,35 +415,51 @@ function generateTemporaryPassword() {
   return passwordCharacters.join("");
 }
 
-function createPermissions(role: StaffRole): Record<string, boolean> {
+function createPermissions(
+  role: StaffRole
+): Record<string, boolean> {
   return {
     ...ROLE_DEFAULTS[role],
   };
 }
 
 export default function OnboardStaffPage() {
-  const [selectedRole, setSelectedRole] = useState<StaffRole>("DOCTOR");
+  const [selectedRole, setSelectedRole] =
+    useState<StaffRole>("DOCTOR");
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
-  const [department, setDepartment] = useState("Ophthalmology");
+
+  const [department, setDepartment] =
+    useState("Clinical Services");
+
   const [title, setTitle] = useState("Doctor");
-  const [staffId, setStaffId] = useState(() => generateStaffId());
-  const [professionalLicense, setProfessionalLicense] = useState("");
-  const [assignedFacilities, setAssignedFacilities] = useState("");
-  const [temporaryPassword, setTemporaryPassword] = useState(() =>
-    generateTemporaryPassword()
+
+  const [staffId, setStaffId] = useState(() =>
+    generateStaffId()
   );
 
-  const [permissions, setPermissions] = useState<Record<string, boolean>>(() =>
-    createPermissions("DOCTOR")
-  );
+  const [professionalLicense, setProfessionalLicense] =
+    useState("");
+
+  const [assignedFacilities, setAssignedFacilities] =
+    useState("");
+
+  const [temporaryPassword, setTemporaryPassword] =
+    useState(() => generateTemporaryPassword());
+
+  const [permissions, setPermissions] = useState<
+    Record<string, boolean>
+  >(() => createPermissions("DOCTOR"));
 
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] =
+    useState<string | null>(null);
+  const [successMessage, setSuccessMessage] =
+    useState<string | null>(null);
 
   const [createdStaff, setCreatedStaff] = useState<{
     staffId: string;
@@ -402,7 +474,10 @@ export default function OnboardStaffPage() {
 
   const completedSteps = [
     Boolean(
-      firstName.trim() && lastName.trim() && email.trim() && username.trim()
+      firstName.trim() &&
+        lastName.trim() &&
+        email.trim() &&
+        username.trim()
     ),
     Boolean(department),
     Boolean(selectedRole),
@@ -424,6 +499,9 @@ export default function OnboardStaffPage() {
       NURSE: "Nursing & Triage",
       CASHIER: "Billing & Cashier",
       RECEPTIONIST: "Reception & Front Desk",
+      LAB_SCIENTIST: "Laboratory",
+      OPTICIAN: "Optical Services",
+      OPTOMETRIST: "Optometry",
     };
 
     setDepartment(departmentByRole[role]);
@@ -438,15 +516,23 @@ export default function OnboardStaffPage() {
 
   async function copyPassword() {
     try {
-      await navigator.clipboard.writeText(temporaryPassword);
+      await navigator.clipboard.writeText(
+        temporaryPassword
+      );
+
       setCopied(true);
+
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      setErrorMessage("Unable to copy the temporary password.");
+      setErrorMessage(
+        "Unable to copy the temporary password."
+      );
     }
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
     event.preventDefault();
 
     setSubmitting(true);
@@ -459,16 +545,28 @@ export default function OnboardStaffPage() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanUsername = username.trim().toLowerCase();
 
-    if (!cleanFirstName || !cleanLastName || !cleanEmail || !cleanUsername) {
+    if (
+      !cleanFirstName ||
+      !cleanLastName ||
+      !cleanEmail ||
+      !cleanUsername
+    ) {
       setErrorMessage(
         "Please complete the required personal and account fields."
       );
+
       setSubmitting(false);
       return;
     }
 
-    if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
-      setErrorMessage("Please enter a valid work email address.");
+    if (
+      !cleanEmail.includes("@") ||
+      !cleanEmail.includes(".")
+    ) {
+      setErrorMessage(
+        "Please enter a valid work email address."
+      );
+
       setSubmitting(false);
       return;
     }
@@ -477,6 +575,7 @@ export default function OnboardStaffPage() {
       setErrorMessage(
         "The temporary password must contain at least 8 characters."
       );
+
       setSubmitting(false);
       return;
     }
@@ -494,7 +593,8 @@ export default function OnboardStaffPage() {
           name: `${cleanFirstName} ${cleanLastName}`.trim(),
           email: cleanEmail,
           role: selectedRole,
-          title: title.trim() || ROLE_LABELS[selectedRole],
+          title:
+            title.trim() || ROLE_LABELS[selectedRole],
           department: department.trim() || null,
           assignedFacilities: assignedFacilities
             .split(",")
@@ -507,22 +607,29 @@ export default function OnboardStaffPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Failed to create staff account.");
+        throw new Error(
+          data?.error || "Failed to create staff account."
+        );
       }
 
       const created = data?.staff;
 
       setCreatedStaff({
         staffId: created?.staff_id ?? staffId,
-        username: created?.username ?? cleanUsername,
+        username:
+          created?.username ?? cleanUsername,
         name: created?.name ?? fullName,
       });
 
-      setSuccessMessage("Staff account created successfully.");
+      setSuccessMessage(
+        "Staff account created successfully."
+      );
 
       // Reset form after successful submission
       setStaffId(generateStaffId());
-      setTemporaryPassword(generateTemporaryPassword());
+      setTemporaryPassword(
+        generateTemporaryPassword()
+      );
       setFirstName("");
       setLastName("");
       setEmail("");
@@ -543,54 +650,6 @@ export default function OnboardStaffPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-sans pb-12">
-      {/* TOP NAVIGATION */}
-      <header className="bg-white border-b border-[#E2E8F0] sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#4F46E5] rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
-              <Building2 className="w-5 h-5" />
-            </div>
-
-            <div>
-              <h1 className="font-bold text-base leading-tight">Sparkle Eye</h1>
-              <p className="text-[10px] tracking-wider text-[#64748B] uppercase font-medium">
-                Specialist Hospital
-              </p>
-            </div>
-          </div>
-
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-medium">
-            <Link
-              href="/admin"
-              className="text-[#64748B] hover:text-[#0F172A] transition-colors py-5"
-            >
-              Dashboard
-            </Link>
-
-            <Link
-              href="/admin/access-control"
-              className="text-[#4F46E5] font-semibold border-b-2 border-[#4F46E5] py-5"
-            >
-              Staff & Access Control
-            </Link>
-
-            <Link
-              href="/admin/audit"
-              className="text-[#64748B] hover:text-[#0F172A] transition-colors py-5"
-            >
-              Audit Logs
-            </Link>
-
-            <Link
-              href="/admin/settings"
-              className="text-[#64748B] hover:text-[#0F172A] transition-colors py-5"
-            >
-              System Settings
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-6 pt-6">
         <Link
           href="/admin/access-control"
@@ -608,8 +667,8 @@ export default function OnboardStaffPage() {
             </h2>
 
             <p className="text-sm text-[#64748B] mt-1">
-              Create a real staff account and assign its initial application
-              permissions.
+              Create a real staff account and assign its
+              initial application permissions.
             </p>
           </div>
 
@@ -626,7 +685,9 @@ export default function OnboardStaffPage() {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
             <AlertTriangle className="w-5 h-5 shrink-0" />
 
-            <span className="flex-1">{errorMessage}</span>
+            <span className="flex-1">
+              {errorMessage}
+            </span>
 
             <button
               type="button"
@@ -644,16 +705,24 @@ export default function OnboardStaffPage() {
               <CheckCircle2 className="w-5 h-5 shrink-0" />
 
               <div>
-                <p className="font-semibold">{successMessage}</p>
+                <p className="font-semibold">
+                  {successMessage}
+                </p>
 
                 {createdStaff && (
                   <div className="mt-2 text-xs space-y-1">
                     <p>
-                      Staff ID: <strong>{createdStaff.staffId}</strong>
+                      Staff ID:{" "}
+                      <strong>
+                        {createdStaff.staffId}
+                      </strong>
                     </p>
 
                     <p>
-                      Username: <strong>{createdStaff.username}</strong>
+                      Username:{" "}
+                      <strong>
+                        {createdStaff.username}
+                      </strong>
                     </p>
                   </div>
                 )}
@@ -686,7 +755,9 @@ export default function OnboardStaffPage() {
 
                   <input
                     value={firstName}
-                    onChange={(event) => setFirstName(event.target.value)}
+                    onChange={(event) =>
+                      setFirstName(event.target.value)
+                    }
                     type="text"
                     required
                     autoComplete="given-name"
@@ -702,7 +773,9 @@ export default function OnboardStaffPage() {
 
                   <input
                     value={lastName}
-                    onChange={(event) => setLastName(event.target.value)}
+                    onChange={(event) =>
+                      setLastName(event.target.value)
+                    }
                     type="text"
                     required
                     autoComplete="family-name"
@@ -718,7 +791,9 @@ export default function OnboardStaffPage() {
 
                   <input
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
+                    onChange={(event) =>
+                      setEmail(event.target.value)
+                    }
                     type="email"
                     required
                     autoComplete="email"
@@ -736,7 +811,9 @@ export default function OnboardStaffPage() {
                     value={username}
                     onChange={(event) =>
                       setUsername(
-                        event.target.value.toLowerCase().replace(/\s+/g, "")
+                        event.target.value
+                          .toLowerCase()
+                          .replace(/\s+/g, "")
                       )
                     }
                     type="text"
@@ -758,14 +835,17 @@ export default function OnboardStaffPage() {
 
                   <input
                     value={staffId}
-                    onChange={(event) => setStaffId(event.target.value)}
+                    onChange={(event) =>
+                      setStaffId(event.target.value)
+                    }
                     type="text"
                     required
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                   />
 
                   <p className="text-[11px] text-[#64748B] mt-1">
-                    Generated automatically, but editable before submission.
+                    Generated automatically, but editable
+                    before submission.
                   </p>
                 </div>
               </div>
@@ -789,17 +869,24 @@ export default function OnboardStaffPage() {
 
                   <select
                     value={department}
-                    onChange={(event) => setDepartment(event.target.value)}
+                    onChange={(event) =>
+                      setDepartment(event.target.value)
+                    }
                     required
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                   >
-                    <option>Information Technology</option>
+                    <option>
+                      Information Technology
+                    </option>
                     <option>Ophthalmology</option>
                     <option>Clinical Services</option>
                     <option>Nursing & Triage</option>
                     <option>Pharmacy</option>
                     <option>Billing & Cashier</option>
                     <option>Reception & Front Desk</option>
+                    <option>Laboratory</option>
+                    <option>Optical Services</option>
+                    <option>Optometry</option>
                   </select>
                 </div>
 
@@ -810,7 +897,9 @@ export default function OnboardStaffPage() {
 
                   <input
                     value={title}
-                    onChange={(event) => setTitle(event.target.value)}
+                    onChange={(event) =>
+                      setTitle(event.target.value)
+                    }
                     type="text"
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
                     placeholder="e.g. Senior Nurse"
@@ -825,7 +914,9 @@ export default function OnboardStaffPage() {
                   <input
                     value={professionalLicense}
                     onChange={(event) =>
-                      setProfessionalLicense(event.target.value)
+                      setProfessionalLicense(
+                        event.target.value
+                      )
                     }
                     type="text"
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
@@ -833,9 +924,10 @@ export default function OnboardStaffPage() {
                   />
 
                   <p className="text-[11px] text-[#64748B] mt-1">
-                    This field is collected by the UI but is not currently
-                    persisted because the staff table/API does not expose a
-                    license-number field.
+                    This field is collected by the UI but is
+                    not currently persisted because the staff
+                    table/API does not expose a license-number
+                    field.
                   </p>
                 </div>
 
@@ -847,7 +939,9 @@ export default function OnboardStaffPage() {
                   <input
                     value={assignedFacilities}
                     onChange={(event) =>
-                      setAssignedFacilities(event.target.value)
+                      setAssignedFacilities(
+                        event.target.value
+                      )
                     }
                     type="text"
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#E2E8F0] text-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
@@ -855,7 +949,8 @@ export default function OnboardStaffPage() {
                   />
 
                   <p className="text-[11px] text-[#64748B] mt-1">
-                    Separate multiple facilities with commas.
+                    Separate multiple facilities with
+                    commas.
                   </p>
                 </div>
               </div>
@@ -871,7 +966,9 @@ export default function OnboardStaffPage() {
                 </h3>
               </div>
 
-              <label className="block text-xs font-semibold mb-3">Role</label>
+              <label className="block text-xs font-semibold mb-3">
+                Role
+              </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {(
@@ -881,16 +978,51 @@ export default function OnboardStaffPage() {
                       Stethoscope,
                       "Clinical ophthalmology access",
                     ],
-                    ["DOCTOR", Stethoscope, "Clinical and prescription access"],
-                    ["PHARMACIST", Pill, "Pharmacy and dispensing access"],
-                    ["NURSE", HeartPulse, "Nursing and triage access"],
-                    ["CASHIER", CreditCard, "Billing and payment access"],
+                    [
+                      "DOCTOR",
+                      Stethoscope,
+                      "Clinical and prescription access",
+                    ],
+                    [
+                      "PHARMACIST",
+                      Pill,
+                      "Pharmacy and dispensing access",
+                    ],
+                    [
+                      "NURSE",
+                      HeartPulse,
+                      "Nursing and triage access",
+                    ],
+                    [
+                      "CASHIER",
+                      CreditCard,
+                      "Billing and payment access",
+                    ],
                     [
                       "RECEPTIONIST",
                       Calendar,
                       "Registration and scheduling access",
                     ],
-                    ["IT_ADMIN", Shield, "System administration access"],
+                    [
+                      "LAB_SCIENTIST",
+                      ClipboardList,
+                      "Laboratory testing and results access",
+                    ],
+                    [
+                      "OPTICIAN",
+                      Briefcase,
+                      "Optical measurements and dispensing access",
+                    ],
+                    [
+                      "OPTOMETRIST",
+                      Stethoscope,
+                      "Eye examination and optometry access",
+                    ],
+                    [
+                      "IT_ADMIN",
+                      Shield,
+                      "System administration access",
+                    ],
                   ] as const
                 ).map(([role, Icon, description]) => (
                   <button
@@ -962,8 +1094,14 @@ export default function OnboardStaffPage() {
                             >
                               <input
                                 type="checkbox"
-                                checked={Boolean(permissions[item.key])}
-                                onChange={() => togglePermission(item.key)}
+                                checked={Boolean(
+                                  permissions[item.key]
+                                )}
+                                onChange={() =>
+                                  togglePermission(
+                                    item.key
+                                  )
+                                }
                                 className="mt-0.5 w-4 h-4 accent-[#4F46E5]"
                               />
 
@@ -993,8 +1131,9 @@ export default function OnboardStaffPage() {
                 </div>
 
                 <p className="text-[11px] text-[#64748B] mt-4">
-                  These permissions are stored with the account, but server-side
-                  role authorization remains the actual security boundary.
+                  These permissions are stored with the
+                  account, but server-side role authorization
+                  remains the actual security boundary.
                 </p>
               </div>
             </div>
@@ -1007,7 +1146,9 @@ export default function OnboardStaffPage() {
               <div className="flex items-center gap-2 mb-6">
                 <Lock className="w-5 h-5 text-[#4F46E5]" />
 
-                <h3 className="font-semibold text-base">Account Security</h3>
+                <h3 className="font-semibold text-base">
+                  Account Security
+                </h3>
               </div>
 
               <div>
@@ -1020,7 +1161,9 @@ export default function OnboardStaffPage() {
                     type="text"
                     value={temporaryPassword}
                     onChange={(event) =>
-                      setTemporaryPassword(event.target.value)
+                      setTemporaryPassword(
+                        event.target.value
+                      )
                     }
                     required
                     className="w-full px-3.5 py-2.5 pr-11 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4F46E5]"
@@ -1041,7 +1184,8 @@ export default function OnboardStaffPage() {
                 </div>
 
                 <p className="text-[11px] text-[#64748B] mt-1">
-                  The password is hashed by the server before it is stored.
+                  The password is hashed by the server
+                  before it is stored.
                 </p>
               </div>
 
@@ -1050,8 +1194,9 @@ export default function OnboardStaffPage() {
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
 
                   <p className="text-[11px] text-amber-800">
-                    Give the temporary password to the staff member through an
-                    appropriate secure channel. Do not put passwords in activity
+                    Give the temporary password to the staff
+                    member through an appropriate secure
+                    channel. Do not put passwords in activity
                     logs or emails.
                   </p>
                 </div>
@@ -1080,9 +1225,10 @@ export default function OnboardStaffPage() {
                 </div>
 
                 <p className="text-[11px] text-[#64748B] mt-3">
-                  2FA, IP restrictions, and account expiry are intentionally not
-                  presented as active controls because they are not yet
-                  persisted by the current backend.
+                  2FA, IP restrictions, and account expiry are
+                  intentionally not presented as active controls
+                  because they are not yet persisted by the
+                  current backend.
                 </p>
               </div>
             </div>
@@ -1119,18 +1265,26 @@ export default function OnboardStaffPage() {
               <div className="space-y-3.5 text-xs font-medium">
                 <div
                   className={`flex items-center gap-2.5 ${
-                    firstName && lastName && email && username
+                    firstName &&
+                    lastName &&
+                    email &&
+                    username
                       ? "text-[#0F172A]"
                       : "text-[#64748B]"
                   }`}
                 >
-                  {firstName && lastName && email && username ? (
+                  {firstName &&
+                  lastName &&
+                  email &&
+                  username ? (
                     <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
                   ) : (
                     <Circle className="w-4 h-4 text-[#CBD5E1]" />
                   )}
 
-                  <span>Personal details completed</span>
+                  <span>
+                    Personal details completed
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2.5 text-[#0F172A]">
@@ -1140,17 +1294,23 @@ export default function OnboardStaffPage() {
 
                 <div className="flex items-center gap-2.5 text-[#0F172A]">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                  <span>Role permissions configured</span>
+                  <span>
+                    Role permissions configured
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2.5 text-[#0F172A]">
                   <CheckCircle2 className="w-4 h-4 text-[#10B981]" />
-                  <span>Security credentials generated</span>
+                  <span>
+                    Security credentials generated
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2.5 text-[#64748B]">
                   <Circle className="w-4 h-4 text-[#CBD5E1]" />
-                  <span>Account creation pending</span>
+                  <span>
+                    Account creation pending
+                  </span>
                 </div>
               </div>
             </div>

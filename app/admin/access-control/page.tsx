@@ -1003,7 +1003,7 @@ export default function AccessControlPage() {
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-[300px] flex items-center justify-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-75 flex items-center justify-center">
             <div className="flex items-center gap-3 text-sm text-[#64748B]">
               <Loader2 className="w-5 h-5 animate-spin" />
               Loading staff directory...
@@ -1139,7 +1139,7 @@ export default function AccessControlPage() {
             {/* DETAILS / PERMISSIONS */}
             <section className="xl:col-span-3">
               {!selectedStaff ? (
-                <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-[400px] flex items-center justify-center">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm min-h-100 flex items-center justify-center">
                   <div className="text-center px-6">
                     <Shield className="w-10 h-10 mx-auto text-slate-300 mb-3" />
 
@@ -1564,7 +1564,7 @@ export default function AccessControlPage() {
       {/* RESET PASSWORD MODAL */}
       {resetPassword &&
         selectedStaff && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
             <button
               type="button"
               aria-label="Close password reset dialog"

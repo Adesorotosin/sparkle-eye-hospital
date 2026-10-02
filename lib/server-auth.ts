@@ -17,8 +17,11 @@ export type UserRole =
   | "PHARMACIST"
   | "NURSE"
   | "CASHIER"
-  | "RECEPTIONIST";
-
+  | "RECEPTIONIST"
+  | "LAB_SCIENTIST"
+  | "OPTICIAN"
+  | "OPTOMETRIST";
+  
 export interface AuthenticatedStaff {
   id: string;
   staffId: string;

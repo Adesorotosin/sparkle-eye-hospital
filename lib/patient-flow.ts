@@ -6,6 +6,7 @@ import {
   PatientRecord,
   TriageVitals,
   DiagnosticOrder,
+  LaboratoryResult,
   Prescription,
   PatientInvoice,
   LineItem,
@@ -204,9 +205,7 @@ async function getConfiguredVatRate(): Promise<number> {
     return 0;
   }
 
-  const rawVatRate = (
-    billing as Record<string, unknown>
-  ).vatRate;
+  const rawVatRate = (billing as Record<string, unknown>).vatRate;
 
   if (rawVatRate === undefined || rawVatRate === null) {
     console.warn(
@@ -221,11 +220,7 @@ async function getConfiguredVatRate(): Promise<number> {
 
   const vatRate = Number(normalizedVatRate);
 
-  if (
-    !Number.isFinite(vatRate) ||
-    vatRate < 0 ||
-    vatRate > 100
-  ) {
+  if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate > 100) {
     console.warn(
       `Invalid VAT rate "${String(rawVatRate)}". VAT will default to 0%.`
     );
@@ -275,27 +270,20 @@ export async function recalcInvoice(invoiceId: string) {
 
   const subtotal = roundCurrency(
     (items ?? []).reduce(
-      (sum, item) =>
-        sum + Number(item.total_price ?? 0),
+      (sum, item) => sum + Number(item.total_price ?? 0),
       0
     )
   );
 
   const discountAmount = roundCurrency(
     Math.min(
-      Math.max(
-        0,
-        Number(invoice.discount_amount ?? 0)
-      ),
+      Math.max(0, Number(invoice.discount_amount ?? 0)),
       subtotal
     )
   );
 
   const taxableAmount = roundCurrency(
-    Math.max(
-      0,
-      subtotal - discountAmount
-    )
+    Math.max(0, subtotal - discountAmount)
   );
 
   const vatRate = await getConfiguredVatRate();
@@ -476,6 +464,7 @@ function mapVitals(row: any): TriageVitals {
  * - Doctor
  * - Nurse/Triage
  * - Diagnostics
+ * - Laboratory
  * - Pharmacy
  * - Billing
  * - Cashier
@@ -508,6 +497,7 @@ export async function getPatientRecord(
   const [
     vitalsRes,
     diagnosticsRes,
+    laboratoryOrdersRes,
     prescriptionsRes,
     invoiceRes,
     logsRes,
@@ -527,6 +517,36 @@ export async function getPatientRecord(
       .from("diagnostic_orders")
       .select("*")
       .eq("patient_id", patient.id)
+      .order("created_at", {
+        ascending: true,
+      }),
+
+    /*
+     * Only completed laboratory orders are loaded here.
+     *
+     * The related lab_results rows are fetched with the order so
+     * the doctor receives the complete verified laboratory result.
+     */
+    supabaseServer
+      .from("lab_orders")
+      .select(`
+        id,
+        test_name,
+        specimen_type,
+        priority,
+        status,
+        sample_id,
+        created_at,
+        lab_results (
+          id,
+          result_data,
+          laboratory_comments,
+          verified_at,
+          created_at
+        )
+      `)
+      .eq("patient_id", patient.id)
+      .eq("status", "COMPLETED")
       .order("created_at", {
         ascending: true,
       }),
@@ -575,6 +595,10 @@ export async function getPatientRecord(
     throw diagnosticsRes.error;
   }
 
+  if (laboratoryOrdersRes.error) {
+    throw laboratoryOrdersRes.error;
+  }
+
   if (prescriptionsRes.error) {
     throw prescriptionsRes.error;
   }
@@ -600,37 +624,122 @@ export async function getPatientRecord(
     (diagnosticsRes.data ?? []).map(
       (diagnostic) => ({
         id: diagnostic.id,
+
         name: diagnostic.name,
+
         price: Number(
           diagnostic.price ?? 0
         ),
+
         status:
           diagnostic.status === "completed"
             ? "completed"
             : diagnostic.status === "ready_for_test"
               ? "ready_for_test"
               : "ordered",
-        findings: diagnostic.findings ?? undefined,
-        interpretation: diagnostic.interpretation ?? undefined,
-        completedAt: diagnostic.completed_at ?? undefined,
+
+        findings:
+          diagnostic.findings ??
+          undefined,
+
+        interpretation:
+          diagnostic.interpretation ??
+          undefined,
+
+        completedAt:
+          diagnostic.completed_at ??
+          undefined,
       })
     );
+
+  /**
+   * Converts completed laboratory orders and their verified
+   * laboratory results into the application's LaboratoryResult shape.
+   *
+   * A result is only exposed to the doctor when:
+   *
+   * 1. The laboratory order is COMPLETED.
+   * 2. The laboratory result has been verified.
+   */
+  const laboratoryResults: LaboratoryResult[] = (
+    laboratoryOrdersRes.data ?? []
+  ).flatMap((order: any) => {
+    const results = Array.isArray(order.lab_results)
+      ? order.lab_results
+      : [];
+
+    return results
+      .filter(
+        (result: any) =>
+          Boolean(result.verified_at)
+      )
+      .map(
+        (result: any) => ({
+          id: result.id,
+
+          labOrderId:
+            order.id,
+
+          testName:
+            order.test_name,
+
+          specimenType:
+            order.specimen_type ??
+            undefined,
+
+          sampleId:
+            order.sample_id ??
+            undefined,
+
+          priority:
+            order.priority ??
+            undefined,
+
+          status:
+            order.status,
+
+          resultData:
+            result.result_data ??
+            {},
+
+          laboratoryComments:
+            result.laboratory_comments ??
+            undefined,
+
+          verifiedAt:
+            result.verified_at ??
+            undefined,
+
+          createdAt:
+            result.created_at ??
+            order.created_at,
+        })
+      );
+  });
 
   const prescriptions: Prescription[] =
     (prescriptionsRes.data ?? []).map(
       (prescription) => ({
         id: prescription.id,
-        drugName: prescription.drug_name,
-        dosage: prescription.dosage,
+
+        drugName:
+          prescription.drug_name,
+
+        dosage:
+          prescription.dosage,
+
         quantity: Number(
           prescription.quantity ?? 0
         ),
+
         pricePerUnit: Number(
           prescription.price_per_unit ?? 0
         ),
+
         totalPrice: Number(
           prescription.total_price ?? 0
         ),
+
         status:
           prescription.status ===
           "ready_for_dispensing"
@@ -648,14 +757,21 @@ export async function getPatientRecord(
     invoiceRow?.invoice_items ?? []
   ).map((item: any) => ({
     id: item.id,
-    category: item.category,
-    name: item.name,
+
+    category:
+      item.category,
+
+    name:
+      item.name,
+
     quantity: Number(
       item.quantity ?? 0
     ),
+
     unitPrice: Number(
       item.unit_price ?? 0
     ),
+
     totalPrice: Number(
       item.total_price ?? 0
     ),
@@ -713,10 +829,18 @@ export async function getPatientRecord(
     (logsRes.data ?? []).map(
       (log) => ({
         id: log.id,
-        timestamp: log.created_at,
-        module: log.module,
-        action: log.action,
-        performedBy: log.performed_by,
+
+        timestamp:
+          log.created_at,
+
+        module:
+          log.module,
+
+        action:
+          log.action,
+
+        performedBy:
+          log.performed_by,
       })
     );
 
@@ -789,6 +913,8 @@ export async function getPatientRecord(
     vitals,
 
     diagnostics,
+
+    laboratoryResults,
 
     prescriptions,
 

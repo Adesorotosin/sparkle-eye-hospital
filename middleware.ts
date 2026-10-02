@@ -8,12 +8,18 @@ import {
 
 const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
   IT_ADMIN: "/admin",
+
   OPHTHALMOLOGIST: "/doctor",
   DOCTOR: "/doctor",
+
   NURSE: "/nurse",
   PHARMACIST: "/pharmacy",
   CASHIER: "/cashier",
   RECEPTIONIST: "/receptionist",
+
+  LAB_SCIENTIST: "/laboratory",
+  OPTICIAN: "/optician",
+  OPTOMETRIST: "/optometry",
 };
 
 function normalizeRole(role: unknown): string {
@@ -31,7 +37,9 @@ function getProtectedRoute(pathname: string) {
   );
 }
 
-async function getAuthenticatedUser(request: NextRequest) {
+async function getAuthenticatedUser(
+  request: NextRequest
+) {
   const cookie = request.headers.get("cookie");
 
   if (!cookie) {
@@ -63,7 +71,9 @@ async function getAuthenticatedUser(request: NextRequest) {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function middleware(
+  request: NextRequest
+) {
   const { pathname } = request.nextUrl;
 
   // API routes perform their own authentication/authorization.
@@ -84,29 +94,45 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Route permissions are defined centrally in lib/rbac-config.ts.
-  const protectedRoute = getProtectedRoute(pathname);
+  const protectedRoute =
+    getProtectedRoute(pathname);
 
   if (!protectedRoute) {
     return NextResponse.next();
   }
 
-  const user = await getAuthenticatedUser(request);
+  const user =
+    await getAuthenticatedUser(request);
 
   if (!user) {
-    const loginUrl = new URL("/", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    const loginUrl = new URL(
+      "/",
+      request.url
+    );
+
+    loginUrl.searchParams.set(
+      "redirect",
+      pathname
+    );
 
     return NextResponse.redirect(loginUrl);
   }
 
-  const userRole = normalizeRole(user.role) as UserRole;
-  const allowedRoles = ROUTE_PERMISSIONS[protectedRoute];
+  const userRole =
+    normalizeRole(user.role) as UserRole;
+
+  const allowedRoles =
+    ROUTE_PERMISSIONS[protectedRoute];
 
   if (!allowedRoles.includes(userRole)) {
-    const fallbackTarget = ROLE_DASHBOARD_MAP[userRole] || "/";
+    const fallbackTarget =
+      ROLE_DASHBOARD_MAP[userRole] || "/";
+
     return NextResponse.redirect(
-      new URL(fallbackTarget, request.url)
+      new URL(
+        fallbackTarget,
+        request.url
+      )
     );
   }
 
@@ -118,17 +144,30 @@ export const config = {
     "/",
     "/admin/:path*",
     "/audit/:path*",
+
     "/doctor/:path*",
     "/emr/:path*",
     "/consultation/:path*",
+
     "/pharmacy/:path*",
     "/cashier/:path*",
     "/billing/:path*",
+
     "/nurse/:path*",
     "/reception/:path*",
     "/receptionist/:path*",
     "/triage/:path*",
+
     "/diagnostics/:path*",
+    "/laboratory/:path*",
+
+    "/optician/:path*",
+    "/optometry/:path*",
+
+    "/laboratory/:path*",
+    "/optician/:path*",
+    "/optometry/:path*",
+
     "/appointments/:path*",
     "/inventory/:path*",
   ],

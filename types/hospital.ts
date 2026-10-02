@@ -69,6 +69,20 @@ export interface DiagnosticOrder {
   completedAt?: string;
 }
 
+export interface LaboratoryResult {
+  id: string;
+  labOrderId: string;
+  testName: string;
+  specimenType?: string;
+  sampleId?: string;
+  priority?: string;
+  status: string;
+  resultData: Record<string, unknown>;
+  laboratoryComments?: string;
+  verifiedAt?: string;
+  createdAt?: string;
+}
+
 export interface Prescription {
   id: string;
   drugName: string;
@@ -177,6 +191,8 @@ export interface PatientRecord {
   vitals?: TriageVitals;
 
   diagnostics: DiagnosticOrder[];
+
+  laboratoryResults: LaboratoryResult[];
 
   prescriptions: Prescription[];
 
