@@ -1,5 +1,9 @@
 -- Sparkle Eye Specialist Hospital
 -- Optometry workflow foundation
+--
+-- Adds a clinical encounter type so doctor consultations and optometry
+-- examinations can coexist in the same encounters table without creating
+-- a second clinical-record table.
 
 alter table public.encounters
   add column if not exists encounter_type text not null default 'consultation';
@@ -16,6 +20,8 @@ end $$;
 create index if not exists idx_encounters_patient_type
   on public.encounters(patient_id, encounter_type);
 
+-- Optometry referral state is kept on the patient record so the queue can
+-- be queried without introducing another patient table.
 alter table public.patients
   add column if not exists optometry_status text;
 
