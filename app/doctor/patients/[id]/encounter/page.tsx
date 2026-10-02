@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useParams } from "next/navigation";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
+import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import {
   createDiagnosticOrder,
@@ -1414,6 +1415,37 @@ export default function OphthalmologyConsultation() {
     });
   }
 
+  function handleReferToOptometry() {
+    if (!patientId) return;
+
+    startTransition(async () => {
+      try {
+        const result = await referPatientToOptometry(patientId);
+
+        setFeedback(result.message);
+
+        if (result.success) {
+          setPatient((current) =>
+            current
+              ? current
+              : current
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to refer patient to Optometry:",
+          error
+        );
+
+        setFeedback(
+          error instanceof Error
+            ? error.message
+            : "Failed to refer patient to Optometry."
+        );
+      }
+    });
+  }
+
   function handleSave(
     status: "draft" | "completed"
   ) {
@@ -2400,6 +2432,18 @@ export default function OphthalmologyConsultation() {
             >
               <Pill className="h-4 w-4" />
               Issue Prescription
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReferToOptometry}
+              disabled={
+                isPending ||
+                isSubmittingLabOrders
+              }
+              className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Refer to Optometry
             </button>
 
             <button
