@@ -91,6 +91,21 @@ function formatDate(value: string | null | undefined) {
   });
 }
 
+function formatCurrency(value: number | null | undefined) {
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(Number(value))
+  ) {
+    return "—";
+  }
+
+  return `₦${Number(value).toLocaleString("en-NG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 function formatRefraction(refraction?: Refraction | null) {
   if (!refraction) return "No prescription recorded";
 
@@ -100,7 +115,10 @@ function formatRefraction(refraction?: Refraction | null) {
     parts.push(`SPH ${refraction.sphere}`);
   }
 
-  if (refraction.cylinder !== null && refraction.cylinder !== undefined) {
+  if (
+    refraction.cylinder !== null &&
+    refraction.cylinder !== undefined
+  ) {
     parts.push(`CYL ${refraction.cylinder}`);
   }
 
@@ -201,12 +219,18 @@ function InputField({
   onChange,
   placeholder,
   disabled,
+  type = "text",
+  min,
+  step,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  type?: "text" | "number";
+  min?: string;
+  step?: string;
 }) {
   return (
     <label className="block">
@@ -215,10 +239,13 @@ function InputField({
       </span>
 
       <input
+        type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         disabled={disabled}
+        min={min}
+        step={step}
         className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-50"
       />
     </label>
@@ -250,6 +277,8 @@ export default function OpticianPatientPage({
   const [lensMaterial, setLensMaterial] = useState("");
   const [lensCoating, setLensCoating] = useState("");
   const [dispensingNotes, setDispensingNotes] = useState("");
+
+  const [opticalCharge, setOpticalCharge] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -298,29 +327,64 @@ export default function OpticianPatientPage({
       setPdBinocular(
         opticalOrder.pdBinocular ?? ""
       );
-      setPdOD(opticalOrder.pdOD ?? "");
-      setPdOS(opticalOrder.pdOS ?? "");
+
+      setPdOD(
+        opticalOrder.pdOD ?? ""
+      );
+
+      setPdOS(
+        opticalOrder.pdOS ?? ""
+      );
+
       setSegmentHeightOD(
         opticalOrder.segmentHeightOD ?? ""
       );
+
       setSegmentHeightOS(
         opticalOrder.segmentHeightOS ?? ""
       );
+
       setFrameSelection(
         opticalOrder.frameSelection ?? ""
       );
+
       setLensType(
         opticalOrder.lensType ?? ""
       );
+
       setLensMaterial(
         opticalOrder.lensMaterial ?? ""
       );
+
       setLensCoating(
         opticalOrder.lensCoating ?? ""
       );
+
       setDispensingNotes(
         opticalOrder.dispensingNotes ?? ""
       );
+
+      setOpticalCharge(
+        opticalOrder.opticalCharge !== null &&
+        opticalOrder.opticalCharge !== undefined &&
+        opticalOrder.opticalCharge > 0
+          ? String(
+              opticalOrder.opticalCharge
+            )
+          : ""
+      );
+    } else {
+      setPdBinocular("");
+      setPdOD("");
+      setPdOS("");
+      setSegmentHeightOD("");
+      setSegmentHeightOS("");
+      setFrameSelection("");
+      setLensType("");
+      setLensMaterial("");
+      setLensCoating("");
+      setDispensingNotes("");
+      setOpticalCharge("");
     }
   }
 
@@ -420,6 +484,22 @@ export default function OpticianPatientPage({
 
     setFeedback("");
 
+    const parsedCharge =
+      opticalCharge.trim() === ""
+        ? undefined
+        : Number(opticalCharge);
+
+    if (
+      parsedCharge !== undefined &&
+      (!Number.isFinite(parsedCharge) ||
+        parsedCharge < 0)
+    ) {
+      setFeedback(
+        "Please enter a valid optical charge."
+      );
+      return;
+    }
+
     startTransition(async () => {
       const result =
         await saveOpticalOrder({
@@ -434,6 +514,8 @@ export default function OpticianPatientPage({
           lensMaterial,
           lensCoating,
           dispensingNotes,
+          opticalCharge:
+            parsedCharge,
         });
 
       setFeedback(result.message);
@@ -449,7 +531,51 @@ export default function OpticianPatientPage({
 
     setFeedback("");
 
+    const parsedCharge =
+      opticalCharge.trim() === ""
+        ? 0
+        : Number(opticalCharge);
+
+    if (
+      !Number.isFinite(parsedCharge) ||
+      parsedCharge <= 0
+    ) {
+      setFeedback(
+        "Please enter the total optical charge before marking the order ready."
+      );
+      return;
+    }
+
     startTransition(async () => {
+      /*
+       * Save the latest optical information first.
+       *
+       * This prevents a user from entering a charge or
+       * changing frame/lens details and immediately clicking
+       * Mark Ready without those latest values reaching the DB.
+       */
+      const saveResult =
+        await saveOpticalOrder({
+          orderId: order.id,
+          pdBinocular,
+          pdOD,
+          pdOS,
+          segmentHeightOD,
+          segmentHeightOS,
+          frameSelection,
+          lensType,
+          lensMaterial,
+          lensCoating,
+          dispensingNotes,
+          opticalCharge:
+            parsedCharge,
+        });
+
+      if (!saveResult.success) {
+        setFeedback(saveResult.message);
+        return;
+      }
+
       const result =
         await markOpticalOrderReady(
           order.id
@@ -578,6 +704,17 @@ export default function OpticianPatientPage({
 
   const orderReady =
     orderStatus === "ready_for_dispense";
+
+  const parsedOpticalCharge =
+    opticalCharge.trim() === ""
+      ? 0
+      : Number(opticalCharge);
+
+  const hasValidOpticalCharge =
+    Number.isFinite(
+      parsedOpticalCharge
+    ) &&
+    parsedOpticalCharge > 0;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -952,6 +1089,47 @@ export default function OpticianPatientPage({
                 />
               </label>
             </SectionCard>
+
+            <SectionCard
+              title="Optical Billing"
+              description="Enter the total charge for the patient's eyewear order. This amount will be added to the patient's invoice when the order is marked ready."
+            >
+              <div className="max-w-md">
+                <InputField
+                  label="Total Optical Charge (₦)"
+                  value={opticalCharge}
+                  onChange={setOpticalCharge}
+                  placeholder="e.g. 85000"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  disabled={
+                    !measurementsStarted ||
+                    orderReady ||
+                    orderCollected
+                  }
+                />
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Include the complete eyewear charge, including frame,
+                  lenses, coatings and other optical items supplied.
+                </p>
+
+                {hasValidOpticalCharge ? (
+                  <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
+                      Current Optical Charge
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-violet-900">
+                      {formatCurrency(
+                        parsedOpticalCharge
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </SectionCard>
           </div>
 
           <aside className="space-y-6">
@@ -1003,6 +1181,36 @@ export default function OpticianPatientPage({
 
                     <p className="mt-1 text-sm font-medium">
                       {formatDate(order.referredAt)}
+                    </p>
+                  </div>
+                ) : null}
+
+                {order ? (
+                  <div className="border-t border-white/10 pt-4">
+                    <p className="text-xs text-slate-400">
+                      Optical Charge
+                    </p>
+
+                    <p className="mt-1 text-lg font-bold text-white">
+                      {opticalCharge
+                        ? formatCurrency(
+                            Number(
+                              opticalCharge
+                            )
+                          )
+                        : "Not set"}
+                    </p>
+                  </div>
+                ) : null}
+
+                {order?.invoiceId ? (
+                  <div>
+                    <p className="text-xs text-slate-400">
+                      Invoice
+                    </p>
+
+                    <p className="mt-1 break-all text-xs font-medium text-slate-300">
+                      {order.invoiceId}
                     </p>
                   </div>
                 ) : null}
@@ -1089,7 +1297,10 @@ export default function OpticianPatientPage({
                     <button
                       type="button"
                       onClick={handleMarkReady}
-                      disabled={isPending}
+                      disabled={
+                        isPending ||
+                        !hasValidOpticalCharge
+                      }
                       className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isPending ? (
