@@ -31,7 +31,6 @@ interface ApiPatient {
   status?: string | null;
   isWalkIn?: boolean | null;
   lastVisitAt?: string | null;
-  primaryComplaint?: string | null;
 }
 
 interface Patient {
@@ -41,12 +40,7 @@ interface Patient {
   gender: string;
   arrivalTime: string;
   visitType: string;
-  clinicalAlert: string;
-  alertType: "urgent" | "normal";
   status: "WAITING" | "IN PROGRESS" | "COMPLETED";
-  vitalsData?: {
-    primaryComplaint?: string;
-  };
 }
 
 type Filter = "All" | "Waiting" | "In Progress" | "Completed";
@@ -98,52 +92,7 @@ function formatVisitType(isWalkIn?: boolean | null): string {
   return isWalkIn === false ? "APPOINTMENT" : "WALK-IN";
 }
 
-function getClinicalAlert(
-  patient: ApiPatient
-): {
-  message: string;
-  type: "urgent" | "normal";
-} {
-  const complaint = patient.primaryComplaint?.trim();
-
-  if (!complaint) {
-    return {
-      message: "No active flags",
-      type: "normal",
-    };
-  }
-
-  const urgentKeywords = [
-    "chemical",
-    "trauma",
-    "injury",
-    "sudden vision loss",
-    "vision loss",
-    "severe pain",
-    "acute pain",
-    "chemical splash",
-    "red eye",
-    "bleeding",
-    "foreign body",
-    "flashes",
-    "floaters",
-  ];
-
-  const complaintLower = complaint.toLowerCase();
-
-  const isUrgent = urgentKeywords.some((keyword) =>
-    complaintLower.includes(keyword)
-  );
-
-  return {
-    message: complaint,
-    type: isUrgent ? "urgent" : "normal",
-  };
-}
-
 function mapApiPatient(patient: ApiPatient): Patient {
-  const alert = getClinicalAlert(patient);
-
   return {
     id: patient.patientId,
     name: patient.fullName,
@@ -151,12 +100,7 @@ function mapApiPatient(patient: ApiPatient): Patient {
     gender: patient.gender || "Unspecified",
     arrivalTime: formatArrivalTime(patient.lastVisitAt),
     visitType: formatVisitType(patient.isWalkIn),
-    clinicalAlert: alert.message,
-    alertType: alert.type,
     status: normalizeStatus(patient.status),
-    vitalsData: {
-      primaryComplaint: patient.primaryComplaint || undefined,
-    },
   };
 }
 
@@ -244,7 +188,9 @@ export default function NurseDashboard() {
       return;
     }
 
-    router.push(`/triage?patientId=${encodeURIComponent(patient.id)}`);
+    router.push(
+      `/triage?patientId=${encodeURIComponent(patient.id)}`
+    );
   };
 
   const filteredPatients = useMemo(() => {
@@ -279,10 +225,6 @@ export default function NurseDashboard() {
 
   const completedCount = patients.filter(
     (patient) => patient.status === "COMPLETED"
-  ).length;
-
-  const urgentCount = patients.filter(
-    (patient) => patient.alertType === "urgent"
   ).length;
 
   return (
@@ -355,7 +297,7 @@ export default function NurseDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
         {/* STATS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
@@ -401,22 +343,6 @@ export default function NurseDashboard() {
 
             <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-rose-50/60 p-5 rounded-2xl border border-rose-200/80 shadow-xs flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 block">
-                Clinical Alerts
-              </span>
-
-              <span className="text-2xl font-black text-rose-600">
-                {urgentCount} Urgent
-              </span>
-            </div>
-
-            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5" />
             </div>
           </div>
         </div>
@@ -534,7 +460,6 @@ export default function NurseDashboard() {
                     <th className="py-3.5 px-6">Patient Info</th>
                     <th className="py-3.5 px-4">Arrival</th>
                     <th className="py-3.5 px-4">Visit Type</th>
-                    <th className="py-3.5 px-4">Clinical Alerts</th>
                     <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-6 text-right">Action</th>
                   </tr>
@@ -568,21 +493,6 @@ export default function NurseDashboard() {
                         <span className="px-2.5 py-1 bg-slate-100 text-slate-700 font-bold rounded-lg text-[10px] uppercase">
                           {patient.visitType}
                         </span>
-                      </td>
-
-                      {/* CLINICAL ALERT */}
-                      <td className="py-4 px-4">
-                        {patient.alertType === "urgent" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 font-bold rounded-full border border-rose-200/80 text-[11px]">
-                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-
-                            <span>{patient.clinicalAlert}</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs font-medium">
-                            {patient.clinicalAlert}
-                          </span>
-                        )}
                       </td>
 
                       {/* STATUS */}
@@ -711,24 +621,14 @@ export default function NurseDashboard() {
                 </span>
               </div>
 
-              <div className="bg-purple-50/50 p-3.5 rounded-2xl border border-purple-100">
-                <span className="text-purple-700 block font-bold text-[10px] uppercase tracking-wider mb-1">
-                  Primary Complaint
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                <span className="text-slate-400 block font-bold text-[10px] uppercase tracking-wider mb-1">
+                  Visit Information
                 </span>
 
-                <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                  {selectedPatient.vitalsData?.primaryComplaint ||
-                    "No primary complaint recorded."}
-                </p>
-              </div>
-
-              <div className="bg-amber-50/50 p-3.5 rounded-2xl border border-amber-100">
-                <span className="text-amber-700 block font-bold text-[10px] uppercase tracking-wider mb-1">
-                  Clinical Alert
-                </span>
-
-                <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                  {selectedPatient.clinicalAlert}
+                <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                  {selectedPatient.visitType} visit • Arrived{" "}
+                  {selectedPatient.arrivalTime}.
                 </p>
               </div>
 

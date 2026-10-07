@@ -8,6 +8,14 @@ export const VISUAL_ACUITY_OPTIONS = [
   "6/24",
   "6/36",
   "6/60",
+  "CF @ 5m",
+  "CF @ 4m",
+  "CF @ 3m",
+  "CF @ 2m",
+  "CF @ 1m",
+  "Hand Motion",
+  "Perception of Light",
+  "No Perception of Light",
 ] as const;
 
 export type VisualAcuity =

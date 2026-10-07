@@ -45,19 +45,22 @@ export async function POST(
       visualAcuityOD,
       visualAcuityOS,
       visualAcuityOU,
+
       withCorrection,
-      iopOD,
-      iopOS,
-      iopInstrument,
+
+      visualAcuityODNote,
+      visualAcuityOSNote,
+      visualAcuityOUNote,
+
+      gonioscopyOD,
+      gonioscopyOS,
+
       bpSystolic,
       bpDiastolic,
       pulse,
       temperature,
       spo2,
-      primaryComplaint,
-      symptoms,
-      severity,
-      durationText,
+      rbs,
     } = body ?? {};
 
     const patient = await getPatientByCode(patientCode);
@@ -73,25 +76,15 @@ export async function POST(
       );
     }
 
-    if (!visualAcuityOD && !visualAcuityOS) {
+    /*
+     * Visual acuity remains required for all three measurements
+     * because the triage form records OD, OS and OU.
+     */
+    if (!visualAcuityOD || !visualAcuityOS || !visualAcuityOU) {
       return NextResponse.json(
         {
           error:
-            "Visual acuity for at least one eye is required.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-    if (
-      typeof primaryComplaint !== "string" ||
-      !primaryComplaint.trim()
-    ) {
-      return NextResponse.json(
-        {
-          error: "Primary complaint is required.",
+            "Visual acuity for OD, OS and OU is required.",
         },
         {
           status: 400,
@@ -102,42 +95,72 @@ export async function POST(
     const { data: vitalsId, error: vitalsError } =
       await supabaseServer.rpc("record_patient_vitals", {
         p_patient_id: patient.id,
-        p_visual_acuity_od:
-          visualAcuityOD ?? null,
-        p_visual_acuity_os:
-          visualAcuityOS ?? null,
-        p_visual_acuity_ou:
-          visualAcuityOU ?? null,
+
+        p_visual_acuity_od: visualAcuityOD,
+
+        p_visual_acuity_os: visualAcuityOS,
+
+        p_visual_acuity_ou: visualAcuityOU,
+
         p_with_correction:
           withCorrection ?? false,
-        p_iop_od:
-          iopOD ?? null,
-        p_iop_os:
-          iopOS ?? null,
-        p_iop_instrument:
-          iopInstrument ?? null,
+
+        p_visual_acuity_od_note:
+          typeof visualAcuityODNote === "string"
+            ? visualAcuityODNote.trim() || null
+            : null,
+
+        p_visual_acuity_os_note:
+          typeof visualAcuityOSNote === "string"
+            ? visualAcuityOSNote.trim() || null
+            : null,
+
+        p_visual_acuity_ou_note:
+          typeof visualAcuityOUNote === "string"
+            ? visualAcuityOUNote.trim() || null
+            : null,
+
+        p_gonioscopy_od:
+          typeof gonioscopyOD === "string"
+            ? gonioscopyOD.trim() || null
+            : null,
+
+        p_gonioscopy_os:
+          typeof gonioscopyOS === "string"
+            ? gonioscopyOS.trim() || null
+            : null,
+
         p_bp_systolic:
-          bpSystolic ?? null,
+          bpSystolic !== "" && bpSystolic != null
+            ? Number(bpSystolic)
+            : null,
+
         p_bp_diastolic:
-          bpDiastolic ?? null,
+          bpDiastolic !== "" && bpDiastolic != null
+            ? Number(bpDiastolic)
+            : null,
+
         p_pulse:
-          pulse ?? null,
+          pulse !== "" && pulse != null
+            ? Number(pulse)
+            : null,
+
         p_temperature:
-          temperature ?? null,
+          temperature !== "" && temperature != null
+            ? Number(temperature)
+            : null,
+
         p_spo2:
-          spo2 ?? null,
-        p_primary_complaint:
-          primaryComplaint.trim(),
-        p_symptoms:
-          Array.isArray(symptoms)
-            ? symptoms.join(", ")
-            : symptoms ?? null,
-        p_severity:
-          severity ?? null,
-        p_duration_text:
-          durationText ?? null,
-        p_recorded_by:
-          staff.id,
+          spo2 !== "" && spo2 != null
+            ? Number(spo2)
+            : null,
+
+        p_rbs:
+          rbs !== "" && rbs != null
+            ? Number(rbs)
+            : null,
+
+        p_recorded_by: staff.id,
       });
 
     if (vitalsError) {
@@ -157,33 +180,10 @@ export async function POST(
     }
 
     /*
-     * Move the patient into the doctor's clinical queue only after
-     * the vitals transaction succeeds. This keeps the workflow:
-     * Reception → Nurse/Triage → Doctor.
+     * The database function already moves the patient to
+     * "in_consultation". We intentionally do not update the
+     * status again here.
      */
-    const { error: statusUpdateError } = await supabaseServer
-      .from("patients")
-      .update({
-        status: "in_consultation",
-      })
-      .eq("id", patient.id);
-
-    if (statusUpdateError) {
-      console.error(
-        "Patient workflow status update failed:",
-        statusUpdateError
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "Vitals were recorded, but the patient could not be moved to the doctor queue. Please refresh and try again.",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
 
     await addActivityLog(
       patient.id,

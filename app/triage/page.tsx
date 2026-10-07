@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -9,17 +10,13 @@ import {
   ArrowRight,
   Bell,
   CheckCircle2,
-  ChevronDown,
   Clock,
   Eye,
   Info,
   Loader2,
-  MessageSquare,
   User,
 } from "lucide-react";
 import { VISUAL_ACUITY_OPTIONS } from "@/lib/visual-acuity";
-
-type Severity = "Mild" | "Moderate" | "Severe";
 
 function TriageVitalsContent() {
   const router = useRouter();
@@ -28,17 +25,25 @@ function TriageVitalsContent() {
   const patientId = searchParams.get("patientId")?.trim() || "";
 
   // ------------------------------------------------------------
-  // EYE VITALS
+  // VISUAL ACUITY
   // ------------------------------------------------------------
 
   const [odVisual, setOdVisual] = useState("6/6");
   const [osVisual, setOsVisual] = useState("6/6");
   const [ouVisual, setOuVisual] = useState("6/6");
+
+  const [odVisualNote, setOdVisualNote] = useState("");
+  const [osVisualNote, setOsVisualNote] = useState("");
+  const [ouVisualNote, setOuVisualNote] = useState("");
+
   const [withCorrection, setWithCorrection] = useState(false);
 
-  const [odIop, setOdIop] = useState("16");
-  const [osIop, setOsIop] = useState("24");
-  const [instrument, setInstrument] = useState("Goldmann Applanation");
+  // ------------------------------------------------------------
+  // GONIOSCOPY
+  // ------------------------------------------------------------
+
+  const [gonioscopyOD, setGonioscopyOD] = useState("");
+  const [gonioscopyOS, setGonioscopyOS] = useState("");
 
   // ------------------------------------------------------------
   // GENERAL VITALS
@@ -49,15 +54,7 @@ function TriageVitalsContent() {
   const [pulse, setPulse] = useState("76");
   const [temp, setTemp] = useState("36.8");
   const [spo2, setSpo2] = useState("98");
-
-  // ------------------------------------------------------------
-  // CHIEF COMPLAINT
-  // ------------------------------------------------------------
-
-  const [complaintText, setComplaintText] = useState("");
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
-  const [severity, setSeverity] = useState<Severity>("Moderate");
-  const [duration, setDuration] = useState("2 weeks");
+  const [rbs, setRbs] = useState("");
 
   // ------------------------------------------------------------
   // SAVE STATE
@@ -66,33 +63,6 @@ function TriageVitalsContent() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState("");
-
-  const symptomsList = [
-    "Blurry Vision",
-    "Eye Pain",
-    "Redness",
-    "Floaters",
-    "Light Sensitivity",
-    "Discharge",
-  ];
-
-  const toggleSymptom = (symptom: string) => {
-    setSelectedSymptoms((current) =>
-      current.includes(symptom)
-        ? current.filter((item) => item !== symptom)
-        : [...current, symptom]
-    );
-  };
-
-  // ------------------------------------------------------------
-  // IOP FLAGS
-  // ------------------------------------------------------------
-
-  const numOdIop = Number.parseFloat(odIop) || 0;
-  const numOsIop = Number.parseFloat(osIop) || 0;
-
-  const isOdHigh = numOdIop > 21;
-  const isOsHigh = numOsIop > 21;
 
   // ------------------------------------------------------------
   // SUBMIT
@@ -114,12 +84,9 @@ function TriageVitalsContent() {
     }
 
     if (!odVisual || !osVisual || !ouVisual) {
-      setSaveError("Visual acuity for all required measurements is required.");
-      return;
-    }
-
-    if (!complaintText.trim()) {
-      setSaveError("Please enter the patient's chief complaint.");
+      setSaveError(
+        "Visual acuity for all required measurements is required."
+      );
       return;
     }
 
@@ -139,20 +106,19 @@ function TriageVitalsContent() {
             visualAcuityOU: ouVisual,
             withCorrection,
 
-            iopOD: odIop ? Number(odIop) : null,
-            iopOS: osIop ? Number(osIop) : null,
-            iopInstrument: instrument,
+            visualAcuityODNote: odVisualNote.trim() || null,
+            visualAcuityOSNote: osVisualNote.trim() || null,
+            visualAcuityOUNote: ouVisualNote.trim() || null,
+
+            gonioscopyOD: gonioscopyOD.trim() || null,
+            gonioscopyOS: gonioscopyOS.trim() || null,
 
             bpSystolic: bpSystolic ? Number(bpSystolic) : null,
             bpDiastolic: bpDiastolic ? Number(bpDiastolic) : null,
             pulse: pulse ? Number(pulse) : null,
             temperature: temp ? Number(temp) : null,
             spo2: spo2 ? Number(spo2) : null,
-
-            primaryComplaint: complaintText.trim(),
-            symptoms: selectedSymptoms,
-            severity,
-            durationText: duration,
+            rbs: rbs ? Number(rbs) : null,
           }),
         }
       );
@@ -191,8 +157,15 @@ function TriageVitalsContent() {
       <header className="bg-white border-b border-slate-200/80 px-6 md:px-8 py-3.5 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#6B21A8] text-white flex items-center justify-center font-bold shadow-xs">
-              <Eye className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-white border border-purple-100 flex items-center justify-center shadow-xs shrink-0">
+              <Image
+                src="/Logo.png"
+                alt="Sparkle Eye Specialist Hospital Logo"
+                width={36}
+                height={36}
+                className="w-full h-full object-contain p-1"
+                priority
+              />
             </div>
 
             <div>
@@ -337,17 +310,31 @@ function TriageVitalsContent() {
                       OD — Right Eye
                     </span>
 
-                    <select
-                      value={odVisual}
-                      onChange={(event) => setOdVisual(event.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
-                    >
-                      {VISUAL_ACUITY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={odVisual}
+                        onChange={(event) =>
+                          setOdVisual(event.target.value)
+                        }
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                      >
+                        {VISUAL_ACUITY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="text"
+                        value={odVisualNote}
+                        onChange={(event) =>
+                          setOdVisualNote(event.target.value)
+                        }
+                        placeholder="Additional"
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600"
+                      />
+                    </div>
 
                     <span className="text-[10px] text-slate-400">
                       Right eye
@@ -360,17 +347,31 @@ function TriageVitalsContent() {
                       OS — Left Eye
                     </span>
 
-                    <select
-                      value={osVisual}
-                      onChange={(event) => setOsVisual(event.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
-                    >
-                      {VISUAL_ACUITY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={osVisual}
+                        onChange={(event) =>
+                          setOsVisual(event.target.value)
+                        }
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                      >
+                        {VISUAL_ACUITY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="text"
+                        value={osVisualNote}
+                        onChange={(event) =>
+                          setOsVisualNote(event.target.value)
+                        }
+                        placeholder="Additional"
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600"
+                      />
+                    </div>
 
                     <span className="text-[10px] text-slate-400">
                       Left eye
@@ -383,17 +384,31 @@ function TriageVitalsContent() {
                       OU — Both Eyes
                     </span>
 
-                    <select
-                      value={ouVisual}
-                      onChange={(event) => setOuVisual(event.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
-                    >
-                      {VISUAL_ACUITY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        value={ouVisual}
+                        onChange={(event) =>
+                          setOuVisual(event.target.value)
+                        }
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
+                      >
+                        {VISUAL_ACUITY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+
+                      <input
+                        type="text"
+                        value={ouVisualNote}
+                        onChange={(event) =>
+                          setOuVisualNote(event.target.value)
+                        }
+                        placeholder="Additional"
+                        className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600"
+                      />
+                    </div>
 
                     <span className="text-[10px] text-slate-400">
                       Both eyes
@@ -438,101 +453,51 @@ function TriageVitalsContent() {
 
               <hr className="border-slate-100" />
 
-              {/* IOP */}
+              {/* GONIOSCOPY */}
               <div className="space-y-4">
                 <div>
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                    Intraocular Pressure
+                    Gonioscopy
                   </label>
 
                   <span className="text-[10px] text-slate-400">
-                    Tonometry reading in mmHg
+                    Record the gonioscopy findings for each eye
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {[
-                    {
-                      label: "OD — Right Eye",
-                      value: odIop,
-                      setValue: setOdIop,
-                      high: isOdHigh,
-                    },
-                    {
-                      label: "OS — Left Eye",
-                      value: osIop,
-                      setValue: setOsIop,
-                      high: isOsHigh,
-                    },
-                  ].map((eye) => (
-                    <div key={eye.label} className="space-y-1.5">
-                      <span className="text-xs font-bold text-slate-600 block">
-                        {eye.label}
-                      </span>
+                  {/* OD */}
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-600 block">
+                      OD — Right Eye
+                    </span>
 
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={eye.value}
-                          onChange={(event) =>
-                            eye.setValue(event.target.value)
-                          }
-                          className={`w-full border rounded-xl py-2.5 pl-3 pr-14 text-xs font-bold focus:outline-none ${
-                            eye.high
-                              ? "bg-rose-50 border-rose-400 text-rose-700"
-                              : "bg-slate-50 border-slate-200 text-slate-800 focus:border-purple-600"
-                          }`}
-                        />
-
-                        <span className="absolute right-3 top-2.5 text-xs font-semibold text-slate-400">
-                          mmHg
-                        </span>
-                      </div>
-
-                      {eye.high ? (
-                        <span className="text-[10px] font-bold text-rose-600 inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                          High reading
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-emerald-600">
-                          Within reference range
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* INSTRUMENT */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-600 block">
-                    Instrument Used
-                  </label>
-
-                  <div className="relative">
-                    <select
-                      value={instrument}
+                    <textarea
+                      rows={4}
+                      value={gonioscopyOD}
                       onChange={(event) =>
-                        setInstrument(event.target.value)
+                        setGonioscopyOD(event.target.value)
                       }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-3 pr-8 text-xs font-semibold text-slate-800 appearance-none focus:outline-none focus:border-purple-600"
-                    >
-                      <option value="Goldmann Applanation">
-                        Goldmann Applanation
-                      </option>
+                      placeholder="Enter gonioscopy finding..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600 resize-none"
+                    />
+                  </div>
 
-                      <option value="Non-Contact Tonometer">
-                        Non-Contact Tonometer
-                      </option>
+                  {/* OS */}
+                  <div className="space-y-1.5">
+                    <span className="text-xs font-bold text-slate-600 block">
+                      OS — Left Eye
+                    </span>
 
-                      <option value="Icare Tonometer">
-                        Icare Tonometer
-                      </option>
-                    </select>
-
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                    <textarea
+                      rows={4}
+                      value={gonioscopyOS}
+                      onChange={(event) =>
+                        setGonioscopyOS(event.target.value)
+                      }
+                      placeholder="Enter gonioscopy finding..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600 resize-none"
+                    />
                   </div>
                 </div>
               </div>
@@ -560,7 +525,7 @@ function TriageVitalsContent() {
                         onChange={(event) =>
                           setBpSystolic(event.target.value)
                         }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none focus:border-purple-600"
                       />
 
                       <span className="text-slate-300 font-bold">
@@ -574,7 +539,7 @@ function TriageVitalsContent() {
                         onChange={(event) =>
                           setBpDiastolic(event.target.value)
                         }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-center text-xs font-bold focus:outline-none focus:border-purple-600"
                       />
                     </div>
 
@@ -596,7 +561,7 @@ function TriageVitalsContent() {
                       onChange={(event) =>
                         setPulse(event.target.value)
                       }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none focus:border-purple-600"
                     />
 
                     <span className="text-[9px] text-slate-400">
@@ -618,7 +583,7 @@ function TriageVitalsContent() {
                       onChange={(event) =>
                         setTemp(event.target.value)
                       }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none focus:border-purple-600"
                     />
 
                     <span className="text-[9px] text-slate-400">
@@ -640,13 +605,36 @@ function TriageVitalsContent() {
                       onChange={(event) =>
                         setSpo2(event.target.value)
                       }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 px-2 text-xs font-bold focus:outline-none focus:border-purple-600"
                     />
 
                     <span className="text-[9px] text-slate-400">
                       %
                     </span>
                   </div>
+                </div>
+
+                {/* RBS */}
+                <div className="max-w-xs space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-600 block">
+                    RBS
+                  </span>
+
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={rbs}
+                    onChange={(event) =>
+                      setRbs(event.target.value)
+                    }
+                    placeholder="Enter RBS"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold focus:outline-none focus:border-purple-600"
+                  />
+
+                  <span className="text-[9px] text-slate-400">
+                    Random Blood Sugar
+                  </span>
                 </div>
               </div>
 
@@ -686,139 +674,26 @@ function TriageVitalsContent() {
               RIGHT COLUMN
               ===================================================== */}
           <div className="lg:col-span-5 space-y-6">
-            {/* CHIEF COMPLAINT */}
-            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-5">
-              <div className="flex items-center gap-2 text-[#6B21A8]">
-                <MessageSquare className="w-5 h-5" />
-
-                <h3 className="font-bold text-sm text-slate-900">
-                  Chief Complaint
-                </h3>
-              </div>
-
-              <textarea
-                rows={5}
-                value={complaintText}
-                onChange={(event) =>
-                  setComplaintText(event.target.value)
-                }
-                placeholder="Describe the patient's main complaint..."
-                className="w-full bg-slate-50/80 border border-slate-200 rounded-2xl p-3.5 text-xs font-medium text-slate-700 leading-relaxed focus:outline-none focus:border-purple-600 resize-none"
-              />
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Quick-Add Symptoms
-                </label>
-
-                <div className="flex flex-wrap gap-2">
-                  {symptomsList.map((symptom) => {
-                    const selected =
-                      selectedSymptoms.includes(symptom);
-
-                    return (
-                      <button
-                        key={symptom}
-                        type="button"
-                        onClick={() => toggleSymptom(symptom)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                          selected
-                            ? "bg-[#6B21A8] text-white"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        {symptom}
-                        {selected && " ✓"}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* SEVERITY + DURATION */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Severity
-                  </label>
-
-                  <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                    {(
-                      ["Mild", "Moderate", "Severe"] as Severity[]
-                    ).map((item) => (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => setSeverity(item)}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition ${
-                          severity === item
-                            ? "bg-white text-slate-900 shadow-xs"
-                            : "text-slate-500"
-                        }`}
-                      >
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Duration
-                  </label>
-
-                  <div className="relative">
-                    <select
-                      value={duration}
-                      onChange={(event) =>
-                        setDuration(event.target.value)
-                      }
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-3 pr-8 text-xs font-bold text-slate-800 appearance-none focus:outline-none"
-                    >
-                      <option value="Today">Today</option>
-                      <option value="3 days">3 days</option>
-                      <option value="1 week">1 week</option>
-                      <option value="2 weeks">2 weeks</option>
-                      <option value="1 month">1 month</option>
-                      <option value="More than 1 month">
-                        More than 1 month
-                      </option>
-                    </select>
-
-                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 top-2.5 pointer-events-none" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* CLINICAL FLAGS */}
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-rose-500" />
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
 
                 <h3 className="font-bold text-sm text-slate-900">
                   Clinical Flags
                 </h3>
               </div>
 
-              {isOdHigh || isOsHigh ? (
-                <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-                  <p className="text-xs font-bold text-rose-700">
-                    Elevated IOP detected.
-                  </p>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <p className="text-xs font-bold text-slate-700">
+                  No automatic clinical flags.
+                </p>
 
-                  <p className="text-[11px] text-rose-600 mt-1 leading-relaxed">
-                    The elevated reading will be included in the
-                    patient's clinical record for the doctor to review.
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
-                  <p className="text-xs font-bold text-emerald-700">
-                    No elevated IOP flag detected.
-                  </p>
-                </div>
-              )}
+                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                  The recorded measurements will be available to the
+                  doctor for clinical review.
+                </p>
+              </div>
             </div>
 
             {/* PATIENT FLOW */}

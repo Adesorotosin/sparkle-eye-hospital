@@ -101,10 +101,6 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     throw new Error("Patient ID is required.");
   }
 
-  /*
-   * Only an invoice that is still open for billing can receive
-   * new diagnostic or pharmacy items.
-   */
   const { data: existing, error: findError } = await supabaseServer
     .from("invoices")
     .select("*")
@@ -122,10 +118,6 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     return existing;
   }
 
-  /*
-   * No active invoice exists.
-   * Create a completely new draft invoice.
-   */
   const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(
     1000 + Math.random() * 9000
   )}`;
@@ -151,9 +143,6 @@ export async function getOrCreateDraftInvoice(patientId: string) {
 
 /**
  * Rounds a monetary value to two decimal places.
- *
- * Keeping currency values at two decimal places prevents floating-point
- * precision issues such as 228.349999999.
  */
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -161,17 +150,6 @@ function roundCurrency(value: number): number {
 
 /**
  * Reads the currently configured VAT percentage from system settings.
- *
- * The Admin Settings page stores the billing configuration in:
- * system_settings.billing
- *
- * Example:
- * {
- *   "vatRate": "5%",
- *   "invoiceDueDays": "30 Days"
- * }
- *
- * If the setting is missing or invalid, VAT defaults to 0%.
  */
 async function getConfiguredVatRate(): Promise<number> {
   const { data: settings, error } = await supabaseServer
@@ -232,17 +210,6 @@ async function getConfiguredVatRate(): Promise<number> {
 
 /**
  * Recalculates an invoice from its line items.
- *
- * Calculation order:
- *
- * 1. Sum invoice line items -> subtotal
- * 2. Apply existing discount
- * 3. Read current Admin VAT setting
- * 4. Calculate VAT on the discounted amount
- * 5. Add VAT -> grand total
- *
- * VAT rate and VAT amount are persisted on the invoice so the
- * invoice retains the actual tax information used during calculation.
  */
 export async function recalcInvoice(invoiceId: string) {
   if (!invoiceId?.trim()) {
@@ -355,9 +322,6 @@ function mapVitals(row: any): TriageVitals {
       ? Number(row.iop_os)
       : undefined;
 
-  /**
-   * Legacy IOP field retained for older UI components.
-   */
   const legacyIop =
     row.iop !== null && row.iop !== undefined
       ? Number(row.iop)
@@ -368,9 +332,7 @@ function mapVitals(row: any): TriageVitals {
   let symptoms: string[] | undefined;
 
   if (Array.isArray(rawSymptoms)) {
-    symptoms = rawSymptoms
-      .filter(Boolean)
-      .map(String);
+    symptoms = rawSymptoms.filter(Boolean).map(String);
   } else if (
     typeof rawSymptoms === "string" &&
     rawSymptoms.trim()
@@ -459,16 +421,6 @@ function mapVitals(row: any): TriageVitals {
 
 /**
  * Assembles the complete patient record from Supabase.
- *
- * Shared by:
- * - Doctor
- * - Nurse/Triage
- * - Diagnostics
- * - Laboratory
- * - Pharmacy
- * - Billing
- * - Cashier
- * - Patient EHR
  */
 export async function getPatientRecord(
   patientCode: string
@@ -521,12 +473,6 @@ export async function getPatientRecord(
         ascending: true,
       }),
 
-    /*
-     * Only completed laboratory orders are loaded here.
-     *
-     * The related lab_results rows are fetched with the order so
-     * the doctor receives the complete verified laboratory result.
-     */
     supabaseServer
       .from("lab_orders")
       .select(`
@@ -587,33 +533,13 @@ export async function getPatientRecord(
       }),
   ]);
 
-  if (vitalsRes.error) {
-    throw vitalsRes.error;
-  }
-
-  if (diagnosticsRes.error) {
-    throw diagnosticsRes.error;
-  }
-
-  if (laboratoryOrdersRes.error) {
-    throw laboratoryOrdersRes.error;
-  }
-
-  if (prescriptionsRes.error) {
-    throw prescriptionsRes.error;
-  }
-
-  if (invoiceRes.error) {
-    throw invoiceRes.error;
-  }
-
-  if (logsRes.error) {
-    throw logsRes.error;
-  }
-
-  if (encountersRes.error) {
-    throw encountersRes.error;
-  }
+  if (vitalsRes.error) throw vitalsRes.error;
+  if (diagnosticsRes.error) throw diagnosticsRes.error;
+  if (laboratoryOrdersRes.error) throw laboratoryOrdersRes.error;
+  if (prescriptionsRes.error) throw prescriptionsRes.error;
+  if (invoiceRes.error) throw invoiceRes.error;
+  if (logsRes.error) throw logsRes.error;
+  if (encountersRes.error) throw encountersRes.error;
 
   const vitals: TriageVitals | undefined =
     vitalsRes.data
@@ -652,15 +578,6 @@ export async function getPatientRecord(
       })
     );
 
-  /**
-   * Converts completed laboratory orders and their verified
-   * laboratory results into the application's LaboratoryResult shape.
-   *
-   * A result is only exposed to the doctor when:
-   *
-   * 1. The laboratory order is COMPLETED.
-   * 2. The laboratory result has been verified.
-   */
   const laboratoryResults: LaboratoryResult[] = (
     laboratoryOrdersRes.data ?? []
   ).flatMap((order: any) => {
@@ -935,9 +852,13 @@ export async function registerPatient(input: {
   fullName: string;
   coveragePlan?: string;
   age?: number;
+  dateOfBirth?: string;
   gender?: string;
   phone?: string;
   allergies?: string;
+  address?: string;
+  nextOfKin?: string;
+  nextOfKinPhone?: string;
   status?:
     | "waiting_triage"
     | "in_consultation"
@@ -977,6 +898,10 @@ export async function registerPatient(input: {
           input.age ??
           null,
 
+        date_of_birth:
+          input.dateOfBirth ??
+          null,
+
         gender:
           input.gender ??
           null,
@@ -987,6 +912,18 @@ export async function registerPatient(input: {
 
         allergies:
           input.allergies ??
+          null,
+
+        address:
+          input.address ??
+          null,
+
+        next_of_kin:
+          input.nextOfKin ??
+          null,
+
+        next_of_kin_phone:
+          input.nextOfKinPhone ??
           null,
 
         status:

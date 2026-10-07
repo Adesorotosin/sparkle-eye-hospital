@@ -59,9 +59,13 @@ export async function GET(request: NextRequest) {
       fullName: patient.full_name,
       coveragePlan: patient.coverage_plan,
       age: patient.age,
+      dateOfBirth: patient.date_of_birth ?? null,
       gender: patient.gender,
       phone: patient.phone,
       allergies: patient.allergies,
+      address: patient.address ?? null,
+      nextOfKin: patient.next_of_kin ?? null,
+      nextOfKinPhone: patient.next_of_kin_phone ?? null,
       status: patient.status,
       isWalkIn: patient.is_walk_in,
       lastVisitAt: patient.last_visit_at,
@@ -105,9 +109,13 @@ export async function POST(request: NextRequest) {
       fullName,
       coveragePlan,
       age,
+      dateOfBirth,
       gender,
       phone,
       allergies,
+      address,
+      nextOfKin,
+      nextOfKinPhone,
       status,
       isWalkIn,
     } = body ?? {};
@@ -136,6 +144,39 @@ export async function POST(request: NextRequest) {
       }
 
       normalizedAge = numericAge;
+    }
+
+    let normalizedDateOfBirth: string | undefined;
+
+    if (
+      dateOfBirth !== undefined &&
+      dateOfBirth !== null &&
+      dateOfBirth !== ""
+    ) {
+      if (typeof dateOfBirth !== "string") {
+        return NextResponse.json(
+          { error: "Date of birth must be a valid date." },
+          { status: 400 }
+        );
+      }
+
+      const parsedDate = new Date(`${dateOfBirth}T00:00:00`);
+
+      if (Number.isNaN(parsedDate.getTime())) {
+        return NextResponse.json(
+          { error: "Date of birth must be a valid date." },
+          { status: 400 }
+        );
+      }
+
+      if (parsedDate > new Date()) {
+        return NextResponse.json(
+          { error: "Date of birth cannot be in the future." },
+          { status: 400 }
+        );
+      }
+
+      normalizedDateOfBirth = dateOfBirth;
     }
 
     if (
@@ -183,6 +224,39 @@ export async function POST(request: NextRequest) {
     }
 
     if (
+      address !== undefined &&
+      address !== null &&
+      typeof address !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Address must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      nextOfKin !== undefined &&
+      nextOfKin !== null &&
+      typeof nextOfKin !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Next of kin must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      nextOfKinPhone !== undefined &&
+      nextOfKinPhone !== null &&
+      typeof nextOfKinPhone !== "string"
+    ) {
+      return NextResponse.json(
+        { error: "Next of kin phone must be a string." },
+        { status: 400 }
+      );
+    }
+
+    if (
       isWalkIn !== undefined &&
       typeof isWalkIn !== "boolean"
     ) {
@@ -215,23 +289,47 @@ export async function POST(request: NextRequest) {
 
     const patient = await registerPatient({
       fullName: fullName.trim(),
+
       coveragePlan:
         typeof coveragePlan === "string"
           ? coveragePlan.trim()
           : undefined,
+
       age: normalizedAge,
+
+      dateOfBirth:
+        normalizedDateOfBirth,
+
       gender:
         typeof gender === "string"
           ? gender.trim()
           : undefined,
+
       phone:
         typeof phone === "string"
           ? phone.trim()
           : undefined,
+
       allergies:
         typeof allergies === "string"
           ? allergies.trim()
           : undefined,
+
+      address:
+        typeof address === "string"
+          ? address.trim()
+          : undefined,
+
+      nextOfKin:
+        typeof nextOfKin === "string"
+          ? nextOfKin.trim()
+          : undefined,
+
+      nextOfKinPhone:
+        typeof nextOfKinPhone === "string"
+          ? nextOfKinPhone.trim()
+          : undefined,
+
       status:
         typeof status === "string"
           ? (status as
@@ -239,6 +337,7 @@ export async function POST(request: NextRequest) {
               | "in_consultation"
               | "completed_today")
           : undefined,
+
       isWalkIn,
     });
 
@@ -259,9 +358,13 @@ export async function POST(request: NextRequest) {
           fullName: patient.full_name,
           coveragePlan: patient.coverage_plan,
           age: patient.age,
+          dateOfBirth: patient.date_of_birth ?? null,
           gender: patient.gender,
           phone: patient.phone,
           allergies: patient.allergies,
+          address: patient.address ?? null,
+          nextOfKin: patient.next_of_kin ?? null,
+          nextOfKinPhone: patient.next_of_kin_phone ?? null,
           status: patient.status,
           isWalkIn: patient.is_walk_in,
           lastVisitAt: patient.last_visit_at,
