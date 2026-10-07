@@ -162,8 +162,19 @@ export type ActivityLog = {
 
 export type Encounter = {
   id: string;
+  presentingComplaint?: string;
+  historyOfPresentingComplaint?: string;
+  pastMedicalHistory?: string;
+  pastOcularHistory?: string;
+  familyOcularHistory?: string;
+  ocularExamOD?: string;
+  ocularExamOS?: string;
   slitLampOD?: string;
   slitLampOS?: string;
+  otherExaminationFindings?: string;
+  iopOD?: number;
+  iopOS?: number;
+  iopInstrument?: string;
   refractionOD?: {
     sphere: string;
     cylinder: string;
@@ -175,6 +186,7 @@ export type Encounter = {
     axis: string;
   };
   diagnosis?: string;
+  treatmentPlan?: string;
   status: "draft" | "completed";
   createdAt: string;
 };
