@@ -369,7 +369,7 @@ function PharmacyContent() {
    * We don't fabricate patients here anymore.
    */
 
-  const readyOrders = pharmacyQueue.map(
+  const pharmacyOrders = pharmacyQueue.map(
     (item) => ({
       id: item.patientId,
       name: item.fullName,
@@ -379,8 +379,23 @@ function PharmacyContent() {
         hour: "2-digit",
         minute: "2-digit",
       }),
+      status: item.status,
     })
   );
+
+  const readyOrders =
+    pharmacyOrders.filter(
+      (item) =>
+        item.status ===
+        "ready_for_dispensing"
+    );
+
+  const awaitingPaymentOrders =
+    pharmacyOrders.filter(
+      (item) =>
+        item.status ===
+        "pending_payment"
+    );
 
   /*
    * Patients with the currently selected patient
@@ -1272,6 +1287,55 @@ function PharmacyContent() {
 
           <div className="flex-1 overflow-y-auto p-3">
             <div className="flex items-center gap-2 px-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+
+              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                AWAITING PAYMENT (
+                {isLoadingQueue
+                  ? "..."
+                  : awaitingPaymentOrders.length}
+                )
+              </h2>
+            </div>
+
+            {awaitingPaymentOrders.length === 0 ? (
+              <p className="px-2 py-3 text-xs text-slate-500">
+                No prescriptions are awaiting payment.
+              </p>
+            ) : (
+              <div className="space-y-1 mb-5">
+                {awaitingPaymentOrders.map(
+                  (item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() =>
+                        handlePatientSelect(
+                          item.id,
+                          item.name
+                        )
+                      }
+                      className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between"
+                    >
+                      <div>
+                        <strong className="text-xs font-bold block">
+                          {item.name}
+                        </strong>
+
+                        <span className="text-[10px] text-amber-400 font-medium block mt-0.5">
+                          Awaiting Cashier payment •{" "}
+                          {item.time}
+                        </span>
+                      </div>
+
+                      <ChevronRight className="w-4 h-4 text-slate-500" />
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 px-2 mb-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
 
               <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
@@ -1284,9 +1348,8 @@ function PharmacyContent() {
             </div>
 
             {readyOrders.length === 0 ? (
-              <p className="px-2 py-4 text-xs text-slate-500">
-                No prescriptions are ready
-                for pickup.
+              <p className="px-2 py-3 text-xs text-slate-500">
+                No prescriptions are ready for pickup.
               </p>
             ) : (
               <div className="space-y-1">
@@ -1308,8 +1371,8 @@ function PharmacyContent() {
                           {item.name}
                         </strong>
 
-                        <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                          Received:{" "}
+                        <span className="text-[10px] text-emerald-400 font-medium block mt-0.5">
+                          Ready for dispensing •{" "}
                           {item.time}
                         </span>
                       </div>
