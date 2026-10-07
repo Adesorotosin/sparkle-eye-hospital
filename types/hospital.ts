@@ -39,7 +39,12 @@ export interface TriageVitals {
   visualAcuityOD: string;
   visualAcuityOS: string;
   visualAcuityOU?: string;
+  visualAcuityODNote?: string;
+  visualAcuityOSNote?: string;
+  visualAcuityOUNote?: string;
   withCorrection?: boolean;
+  gonioscopyOD?: string;
+  gonioscopyOS?: string;
   iop: number;
   iopOD?: number;
   iopOS?: number;
