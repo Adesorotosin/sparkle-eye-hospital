@@ -297,7 +297,7 @@ export async function createLabOrder(
         .from("invoice_items")
         .insert({
           invoice_id: invoice.id,
-          category: "diagnostic",
+          category: "laboratory",
           name: testName,
           quantity: 1,
           unit_price: price,
