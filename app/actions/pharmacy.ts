@@ -52,6 +52,7 @@ export interface PharmacyQueueItem {
   prescriptionCount: number;
   totalAmount: number;
   createdAt: string;
+  status: "pending_payment" | "ready_for_dispensing";
 }
 
 export async function getPharmacyPatient(
@@ -215,9 +216,12 @@ export async function getPharmacyQueue() {
       await supabaseServer
         .from("prescriptions")
         .select(
-          "id, patient_id, quantity, total_price, created_at"
+          "id, patient_id, quantity, total_price, created_at, status"
         )
-        .eq("status", "ready_for_dispensing")
+        .in("status", [
+          "pending_payment",
+          "ready_for_dispensing",
+        ])
         .order("created_at", {
           ascending: true,
         });
@@ -312,6 +316,12 @@ export async function getPharmacyQueue() {
 
             createdAt:
               prescription.created_at,
+
+            status:
+              prescription.status ===
+              "pending_payment"
+                ? "pending_payment"
+                : "ready_for_dispensing",
           }
         );
       }
