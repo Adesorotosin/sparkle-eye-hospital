@@ -26,9 +26,6 @@ export interface ConsultationFormData {
 
   treatmentPlan: string;
 
-  slitLampOD: string;
-  slitLampOS: string;
-
   refractionOD: {
     sphere: string;
     cylinder: string;
