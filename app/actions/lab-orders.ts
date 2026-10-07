@@ -1375,8 +1375,14 @@ export async function receiveLabSample(input: {
         input.sampleCondition,
 
       status: isAcceptable
-        ? "RECEIVED"
+        ? "PROCESSING"
         : "REJECTED",
+
+      processing_started_at:
+        isAcceptable ? now : null,
+
+      processing_started_by:
+        isAcceptable ? staff.id : null,
 
       rejection_reason:
         isAcceptable
@@ -1430,6 +1436,17 @@ export async function receiveLabSample(input: {
       status: isAcceptable
         ? ("PROCESSING" as const)
         : ("RECOLLECTION" as const),
+
+      processing_at:
+        isAcceptable ? now : null,
+
+      processed_by:
+        isAcceptable ? staff.id : null,
+
+      processing_notes:
+        isAcceptable
+          ? "Processing started automatically after acceptable sample reception."
+          : null,
 
       recollection_reason:
         isAcceptable
@@ -1496,7 +1513,7 @@ export async function receiveLabSample(input: {
     return {
       success: true,
       message: isAcceptable
-        ? "Sample received and accepted for processing."
+        ? "Sample received, accepted, and processing started."
         : "Sample rejected and marked for recollection.",
       id: labOrderId,
     };
