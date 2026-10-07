@@ -674,6 +674,11 @@ export async function processBillingPayment(input: {
         (item) => item.category === "pharmacy"
       );
 
+    const laboratoryItems =
+      (invoiceItems ?? []).filter(
+        (item) => item.category === "laboratory"
+      );
+
     const diagnosticItems =
       (invoiceItems ?? []).filter(
         (item) => item.category === "diagnostic"
@@ -842,6 +847,93 @@ export async function processBillingPayment(input: {
 
         prescriptionsUnlocked =
           prescriptionIdsToUnlock.length;
+      }
+    }
+
+    /*
+     * Verify laboratory invoice items against laboratory
+     * orders belonging to this patient.
+     *
+     * Laboratory orders use their own workflow and remain
+     * PENDING after payment so the laboratory team can
+     * collect and process the specimen.
+     */
+    if (laboratoryItems.length > 0) {
+      const {
+        data: labOrders,
+        error: labLookupError,
+      } = await supabaseServer
+        .from("lab_orders")
+        .select(
+          "id, test_name, status, ordered_at"
+        )
+        .eq("patient_id", patient.id)
+        .eq("status", "PENDING")
+        .order("ordered_at", {
+          ascending: true,
+        });
+
+      if (labLookupError) {
+        console.error(
+          "Laboratory order lookup failed:",
+          labLookupError
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because laboratory orders could not be verified.",
+          grandTotal,
+        };
+      }
+
+      const unmatchedLabOrders = [
+        ...(labOrders ?? []),
+      ];
+
+      for (const invoiceItem of laboratoryItems) {
+        const invoiceName = String(
+          invoiceItem.name ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+        const matchIndex =
+          unmatchedLabOrders.findIndex(
+            (labOrder) =>
+              String(labOrder.test_name ?? "")
+                .trim()
+                .toLowerCase() === invoiceName
+          );
+
+        if (matchIndex !== -1) {
+          unmatchedLabOrders.splice(
+            matchIndex,
+            1
+          );
+        }
+      }
+
+      if (
+        unmatchedLabOrders.length !==
+          (labOrders ?? []).length -
+            laboratoryItems.length
+      ) {
+        console.error(
+          "Invoice/laboratory order mismatch:",
+          {
+            invoiceId: invoice.id,
+            laboratoryItems,
+            laboratoryOrders: labOrders,
+          }
+        );
+
+        return {
+          success: false,
+          message:
+            "Payment could not be completed because one or more laboratory items could not be matched to a laboratory order.",
+          grandTotal,
+        };
       }
     }
 
@@ -1128,6 +1220,7 @@ export async function processBillingPayment(input: {
     revalidatePath("/billing");
     revalidatePath("/cashier");
     revalidatePath("/pharmacy");
+    revalidatePath("/laboratory");
 
     revalidatePath(
       `/doctor/patients/${patient.patient_code}/encounter`
