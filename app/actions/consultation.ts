@@ -8,6 +8,24 @@ import { requireRole } from "@/lib/server-auth";
 export interface ConsultationFormData {
   patientId: string;
 
+  presentingComplaint: string;
+  historyOfPresentingComplaint: string;
+  pastMedicalHistory: string;
+  pastOcularHistory: string;
+  familyOcularHistory: string;
+
+  ocularExamOD: string;
+  ocularExamOS: string;
+  slitLampOD: string;
+  slitLampOS: string;
+  otherExaminationFindings: string;
+
+  iopOD: number | null;
+  iopOS: number | null;
+  iopInstrument: string;
+
+  treatmentPlan: string;
+
   slitLampOD: string;
   slitLampOS: string;
 
@@ -117,8 +135,40 @@ export async function saveConsultationEncounter(
         .insert({
           patient_id: patient.id,
 
-          slit_lamp_od: formData.slitLampOD.trim() || null,
-          slit_lamp_os: formData.slitLampOS.trim() || null,
+          presenting_complaint:
+            formData.presentingComplaint.trim() || null,
+
+          history_of_presenting_complaint:
+            formData.historyOfPresentingComplaint.trim() || null,
+
+          past_medical_history:
+            formData.pastMedicalHistory.trim() || null,
+
+          past_ocular_history:
+            formData.pastOcularHistory.trim() || null,
+
+          family_ocular_history:
+            formData.familyOcularHistory.trim() || null,
+
+          ocular_exam_od:
+            formData.ocularExamOD.trim() || null,
+
+          ocular_exam_os:
+            formData.ocularExamOS.trim() || null,
+
+          slit_lamp_od:
+            formData.slitLampOD.trim() || null,
+
+          slit_lamp_os:
+            formData.slitLampOS.trim() || null,
+
+          other_examination_findings:
+            formData.otherExaminationFindings.trim() || null,
+
+          iop_od: formData.iopOD,
+          iop_os: formData.iopOS,
+          iop_instrument:
+            formData.iopInstrument.trim() || null,
 
           refraction_od: {
             sphere: formData.refractionOD.sphere.trim(),
@@ -133,6 +183,9 @@ export async function saveConsultationEncounter(
           },
 
           diagnosis: formData.diagnosis.trim() || null,
+
+          treatment_plan:
+            formData.treatmentPlan.trim() || null,
 
           status: formData.status,
           recorded_by: staff.id,
