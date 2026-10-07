@@ -23,6 +23,8 @@ import { saveConsultationEncounter } from "@/app/actions/consultation";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
+import { createOpticalOrder } from "@/app/actions/optician";
+import { getOptometryPatient } from "@/app/actions/optometry";
 
 type Refraction = {
   sphere: string;
@@ -260,6 +262,7 @@ export default function DoctorEncounterPage() {
   const [requesting, setRequesting] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
+  const [optometryResult, setOptometryResult] = useState<any>(null);
 
   const latestEncounter = patient?.encounters?.[0];
 
@@ -277,6 +280,15 @@ export default function DoctorEncounterPage() {
       .then((data) => {
         if (cancelled) return;
         setPatient(data);
+
+        try {
+          const optometry = await getOptometryPatient(patientCode);
+          if (optometry.success) {
+            setOptometryResult(optometry.patient ?? null);
+          }
+        } catch {
+          setOptometryResult(null);
+        }
 
         const encounter = data.encounters?.[0];
         if (encounter) {
@@ -423,6 +435,23 @@ export default function DoctorEncounterPage() {
       const response = await referPatientToOptometry(patientCode);
       if (!response.success) setError(response.message);
       else setMessage(response.message);
+      setRequesting("");
+    });
+  };
+
+  const referOptician = () => {
+    setRequesting("optician");
+    setMessage("");
+    setError("");
+
+    startTransition(async () => {
+      const response = await createOpticalOrder(patientCode);
+      if (!response.success) {
+        setError(response.message);
+      } else {
+        setMessage(response.message);
+        await refreshPatient();
+      }
       setRequesting("");
     });
   };
@@ -810,10 +839,10 @@ export default function DoctorEncounterPage() {
                 <h3 className="mt-2 font-semibold">Investigation Room</h3>
                 <p className="mt-1 text-xs text-gray-500">Use the Investigation section above to send a named test.</p>
               </div>
-              <button onClick={() => router.push(`/optician/${encodeURIComponent(patientCode)}`)} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50">
-                <Hospital className="h-5 w-5 text-blue-600" />
+              <button onClick={referOptician} disabled={isPending || requesting === "optician"} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50">
+                {requesting === "optician" ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : <Hospital className="h-5 w-5 text-blue-600" />}
                 <h3 className="mt-2 font-semibold">Optician</h3>
-                <p className="mt-1 text-xs text-gray-500">Open the patient's optical workflow. Optical dispensing follows Optometry measurements.</p>
+                <p className="mt-1 text-xs text-gray-500">Send the patient to the Optician queue after a completed Optometry assessment.</p>
               </button>
             </div>
           </Section>
@@ -866,6 +895,20 @@ export default function DoctorEncounterPage() {
                   <p className="rounded-xl border border-dashed p-4 text-sm text-gray-500">No verified laboratory results yet.</p>
                 )}
               </div>
+
+              {optometryResult?.previousOptometryEncounter && (
+                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Optometry result / feedback</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div><p className="text-xs text-violet-600">Visual acuity</p><p className="text-sm font-medium">{optometryResult.previousOptometryEncounter.visualAcuityOD || "—"} OD · {optometryResult.previousOptometryEncounter.visualAcuityOS || "—"} OS · {optometryResult.previousOptometryEncounter.visualAcuityOU || "—"} OU</p></div>
+                    <div><p className="text-xs text-violet-600">Clinical impression</p><p className="text-sm font-medium">{optometryResult.previousOptometryEncounter.diagnosis || "—"}</p></div>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg bg-white/70 p-3 text-sm"><strong>Refraction OD:</strong> {resultText(optometryResult.previousOptometryEncounter.refractionOD)}</div>
+                    <div className="rounded-lg bg-white/70 p-3 text-sm"><strong>Refraction OS:</strong> {resultText(optometryResult.previousOptometryEncounter.refractionOS)}</div>
+                  </div>
+                </div>
+              )}
 
               {latestEncounter && (
                 <div className="rounded-xl border bg-gray-50 p-4">
