@@ -766,12 +766,60 @@ export async function getPatientRecord(
       (encounter) => ({
         id: encounter.id,
 
+        presentingComplaint:
+          encounter.presenting_complaint ??
+          undefined,
+
+        historyOfPresentingComplaint:
+          encounter.history_of_presenting_complaint ??
+          undefined,
+
+        pastMedicalHistory:
+          encounter.past_medical_history ??
+          undefined,
+
+        pastOcularHistory:
+          encounter.past_ocular_history ??
+          undefined,
+
+        familyOcularHistory:
+          encounter.family_ocular_history ??
+          undefined,
+
+        ocularExamOD:
+          encounter.ocular_exam_od ??
+          undefined,
+
+        ocularExamOS:
+          encounter.ocular_exam_os ??
+          undefined,
+
         slitLampOD:
           encounter.slit_lamp_od ??
           undefined,
 
         slitLampOS:
           encounter.slit_lamp_os ??
+          undefined,
+
+        otherExaminationFindings:
+          encounter.other_examination_findings ??
+          undefined,
+
+        iopOD:
+          encounter.iop_od !== null &&
+          encounter.iop_od !== undefined
+            ? Number(encounter.iop_od)
+            : undefined,
+
+        iopOS:
+          encounter.iop_os !== null &&
+          encounter.iop_os !== undefined
+            ? Number(encounter.iop_os)
+            : undefined,
+
+        iopInstrument:
+          encounter.iop_instrument ??
           undefined,
 
         refractionOD:
@@ -784,6 +832,10 @@ export async function getPatientRecord(
 
         diagnosis:
           encounter.diagnosis ??
+          undefined,
+
+        treatmentPlan:
+          encounter.treatment_plan ??
           undefined,
 
         status:
