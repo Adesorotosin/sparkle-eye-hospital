@@ -1178,7 +1178,7 @@ export default function DoctorDashboard() {
             </div>
 
             <p className="text-2xl font-extrabold text-white">
-              Optometry Room 03
+              Consulting Room 03
             </p>
           </div>
 
