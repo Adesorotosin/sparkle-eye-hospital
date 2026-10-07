@@ -277,7 +277,7 @@ export default function DoctorEncounterPage() {
         if (!response.ok) throw new Error(data?.error ?? "Unable to load patient.");
         return data.patient as Patient;
       })
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
         setPatient(data);
 
