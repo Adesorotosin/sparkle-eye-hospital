@@ -347,6 +347,15 @@ function mapVitals(row: any): TriageVitals {
     visualAcuityOD,
     visualAcuityOS,
 
+    visualAcuityODNote:
+      row.visual_acuity_od_note ?? undefined,
+
+    visualAcuityOSNote:
+      row.visual_acuity_os_note ?? undefined,
+
+    visualAcuityOUNote:
+      row.visual_acuity_ou_note ?? undefined,
+
     visualAcuityOU:
       row.visual_acuity_ou ?? undefined,
 
@@ -366,6 +375,12 @@ function mapVitals(row: any): TriageVitals {
 
     iopInstrument:
       row.iop_instrument ?? undefined,
+
+    gonioscopyOD:
+      row.gonioscopy_od ?? undefined,
+
+    gonioscopyOS:
+      row.gonioscopy_os ?? undefined,
 
     bpSystolic:
       row.bp_systolic !== null &&
