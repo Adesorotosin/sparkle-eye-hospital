@@ -202,14 +202,14 @@ export default function DiagnosticsPage() {
 
           {/* Header controls */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {/* Back to Nurse Dashboard */}
+            {/* Back to Doctor Dashboard */}
             <button
               type="button"
-              onClick={() => router.push("/nurse")}
+              onClick={() => router.push("/doctor")}
               className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Nurse Dashboard
+              Back to Doctor Dashboard
             </button>
 
             {/* Search */}
