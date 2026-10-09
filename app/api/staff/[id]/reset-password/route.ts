@@ -123,14 +123,38 @@ export async function POST(
       );
     }
 
+    let requestedPassword: unknown = undefined;
+
+    try {
+      const body = await request.json();
+      requestedPassword = body?.password;
+    } catch {
+      // An empty request body means the administrator chose a generated password.
+    }
+
+    let temporaryPassword: string;
+
+    if (requestedPassword !== undefined) {
+      if (
+        typeof requestedPassword !== "string" ||
+        requestedPassword.length < 12 ||
+        requestedPassword.length > 128
+      ) {
+        return NextResponse.json(
+          { error: "A custom password must be between 12 and 128 characters." },
+          { status: 400 }
+        );
+      }
+
+      temporaryPassword = requestedPassword;
+    } else {
+      temporaryPassword = generateTemporaryPassword();
+    }
+
     /*
-     * Generate a new temporary password.
-     *
      * The plaintext password exists only in memory
      * and is returned once to the IT administrator.
      */
-    const temporaryPassword =
-      generateTemporaryPassword();
 
     const passwordHash =
       await bcrypt.hash(
