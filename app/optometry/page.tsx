@@ -158,7 +158,7 @@ export default function OptometryDashboard() {
         return "IN EXAMINATION";
 
       case "completed":
-        return "COMPLETED";
+        return "SENT TO DOCTOR";
 
       default:
         return "UNKNOWN";
@@ -232,7 +232,7 @@ export default function OptometryDashboard() {
 
           <div>
             <h1 className="text-sm font-black text-slate-900">
-              Optometry Dashboard
+              Dashboard
             </h1>
 
             <p className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
@@ -346,7 +346,7 @@ export default function OptometryDashboard() {
             className="text-left"
           >
             <Stat
-              label="Completed Today"
+              label="Sent to Doctor"
               value={completed}
               icon={CheckCircle2}
               className="text-emerald-600"
