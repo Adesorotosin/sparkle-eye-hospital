@@ -268,32 +268,54 @@ export default function LoginPage() {
       </div>
       {isLoading && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-md"
           role="status"
           aria-live="polite"
           aria-label="Signing in"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-2xl">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#6D4AFF]/10">
-              <Loader2 className="h-8 w-8 animate-spin text-[#6D4AFF]" />
+          <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-white/70 bg-white p-8 text-center shadow-2xl shadow-slate-950/20">
+            <div className="relative mx-auto mb-6 flex h-28 w-28 items-center justify-center">
+              <div className="absolute inset-1 rounded-full border-2 border-[#6D4AFF]/15" />
+              <div className="absolute inset-1 rounded-full border-2 border-transparent border-t-[#6D4AFF] border-r-[#0B7285] animate-spin" />
+              <div className="absolute inset-3 rounded-full bg-gradient-to-br from-[#6D4AFF]/15 to-[#0B7285]/10 animate-pulse" />
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-lg shadow-[#6D4AFF]/10">
+                <Image
+                  src="/Logo.png"
+                  alt="Sparkle Eye Specialist Hospital"
+                  width={72}
+                  height={72}
+                  priority
+                  className="h-16 w-16 object-contain animate-pulse"
+                />
+              </div>
+              <span className="absolute right-2 top-3 h-2.5 w-2.5 rounded-full bg-[#0B7285] ring-4 ring-white animate-ping" />
             </div>
 
-            <h2 className="text-lg font-bold text-slate-900">
-              Signing you in
+            <p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#6D4AFF]">
+              Sparkle Eye Specialist Hospital
+            </p>
+            <h2 className="text-xl font-bold tracking-tight text-slate-900">
+              Preparing your workspace
             </h2>
-
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Verifying your credentials and preparing your secure workspace.
+              Securely verifying your credentials. You’ll be redirected as soon as your account is ready.
             </p>
 
-            <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full w-1/2 animate-pulse rounded-full bg-[#6D4AFF]" />
+            <div className="mt-7 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-[#6D4AFF] via-[#8B5CF6] to-[#0B7285] animate-[loading-progress_1.6s_ease-in-out_infinite]" />
             </div>
 
             <p className="mt-4 text-xs font-medium text-slate-400">
-              Please wait. Do not refresh this page.
+              Please wait and keep this page open.
             </p>
           </div>
+          <style jsx>{`
+            @keyframes loading-progress {
+              0% { transform: translateX(-120%); width: 35%; }
+              50% { transform: translateX(90%); width: 65%; }
+              100% { transform: translateX(300%); width: 35%; }
+            }
+          `}</style>
         </div>
       )}
     </main>
