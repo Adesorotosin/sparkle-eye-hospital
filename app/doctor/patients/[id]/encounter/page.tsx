@@ -246,6 +246,9 @@ export default function DoctorEncounterPage() {
   const [slitLampOD, setSlitLampOD] = useState("");
   const [slitLampOS, setSlitLampOS] = useState("");
   const [otherFindings, setOtherFindings] = useState("");
+  const [gonioscopyOD, setGonioscopyOD] = useState("");
+  const [gonioscopyOS, setGonioscopyOS] = useState("");
+  const [savingGonioscopy, setSavingGonioscopy] = useState(false);
   const [iopOD, setIopOD] = useState("");
   const [iopOS, setIopOS] = useState("");
   const [iopInstrument, setIopInstrument] = useState("Goldmann");
@@ -280,6 +283,8 @@ export default function DoctorEncounterPage() {
       .then(async (data) => {
         if (cancelled) return;
         setPatient(data);
+        setGonioscopyOD(data.vitals?.gonioscopyOD ?? "");
+        setGonioscopyOS(data.vitals?.gonioscopyOS ?? "");
 
         try {
           const optometry = await getOptometryPatient(patientCode);
@@ -568,6 +573,7 @@ export default function DoctorEncounterPage() {
               ["nurse", "Nurse documentation"],
               ["history", "History"],
               ["exam", "Ocular examination"],
+              ["gonioscopy", "Gonioscopy"],
               ["slit-lamp", "Slit lamp"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
@@ -676,6 +682,83 @@ export default function DoctorEncounterPage() {
               <Field label="Right eye (OD)" value={ocularExamOD} onChange={setOcularExamOD} rows={5} placeholder="Document ocular examination findings..." />
               <Field label="Left eye (OS)" value={ocularExamOS} onChange={setOcularExamOS} rows={5} placeholder="Document ocular examination findings..." />
             </div>
+          </Section>
+
+          <Section id="gonioscopy" title="Gonioscopy" icon={<Activity className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">
+              Record the gonioscopy findings for each eye. These findings are saved to the patient's clinical record.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field
+                label="OD — Right eye"
+                value={gonioscopyOD}
+                onChange={setGonioscopyOD}
+                rows={4}
+                placeholder="Enter right-eye gonioscopy findings..."
+              />
+              <Field
+                label="OS — Left eye"
+                value={gonioscopyOS}
+                onChange={setGonioscopyOS}
+                rows={4}
+                placeholder="Enter left-eye gonioscopy findings..."
+              />
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                disabled={savingGonioscopy || loading || !patient?.vitals}
+                onClick={async () => {
+                  setSavingGonioscopy(true);
+                  setMessage("");
+                  setError("");
+                  try {
+                    const response = await fetch(
+                      `/api/patients/${encodeURIComponent(patientCode)}/gonioscopy`,
+                      {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          gonioscopyOD: gonioscopyOD.trim() || null,
+                          gonioscopyOS: gonioscopyOS.trim() || null,
+                        }),
+                      }
+                    );
+                    const result = await response.json();
+                    if (!response.ok) {
+                      throw new Error(result?.error || "Unable to save gonioscopy findings.");
+                    }
+                    setPatient((current) =>
+                      current
+                        ? {
+                            ...current,
+                            vitals: current.vitals
+                              ? {
+                                  ...current.vitals,
+                                  gonioscopyOD: gonioscopyOD.trim(),
+                                  gonioscopyOS: gonioscopyOS.trim(),
+                                }
+                              : current.vitals,
+                          }
+                        : current
+                    );
+                    setMessage("Gonioscopy findings saved successfully.");
+                  } catch (saveError) {
+                    setError(saveError instanceof Error ? saveError.message : "Unable to save gonioscopy findings.");
+                  } finally {
+                    setSavingGonioscopy(false);
+                  }
+                }}
+                className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {savingGonioscopy ? "Saving findings..." : "Save Gonioscopy Findings"}
+              </button>
+            </div>
+            {!patient?.vitals && (
+              <p className="mt-3 text-xs text-amber-700">
+                Nurse triage measurements must be recorded before gonioscopy findings can be saved.
+              </p>
+            )}
           </Section>
 
           <Section id="slit-lamp" title="Slit-lamp examination" icon={<Activity className="h-5 w-5" />}>
