@@ -66,7 +66,7 @@ export default function AdminSidebar({
           >
             <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
               <Image
-                src="/logo.png"
+                src="/Logo.png"
                 alt="Sparkle Eye Specialist Hospital Logo"
                 width={36}
                 height={36}
