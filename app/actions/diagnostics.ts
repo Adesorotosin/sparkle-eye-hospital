@@ -15,15 +15,17 @@ export type DiagnosticQueueItem = {
   createdAt: string;
   findings?: string;
   interpretation?: string;
+  referralSource?: string | null;
+  externalReferral?: boolean;
 };
 
 export async function getDiagnosticQueue() {
   try {
-    await requireRole(["IT_ADMIN", "NURSE", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requireRole(["IT_ADMIN", "NURSE", "RECEPTIONIST", "DOCTOR", "OPHTHALMOLOGIST"]);
 
     const { data, error } = await supabaseServer
       .from("diagnostic_orders")
-      .select("id, patient_id, name, price, status, findings, interpretation, created_at, patients!inner(patient_code, full_name)")
+      .select("id, patient_id, name, price, status, findings, interpretation, created_at, referral_source, external_referral, patients!inner(patient_code, full_name)")
       .in("status", ["ready_for_test", "completed"])
       .order("created_at", { ascending: true });
 
@@ -40,6 +42,8 @@ export async function getDiagnosticQueue() {
         status: row.status,
         findings: row.findings ?? "",
         interpretation: row.interpretation ?? "",
+        referralSource: row.referral_source ?? null,
+        externalReferral: Boolean(row.external_referral),
         createdAt: row.created_at,
       })) as DiagnosticQueueItem[],
     };
