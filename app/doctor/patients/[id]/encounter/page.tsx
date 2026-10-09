@@ -137,11 +137,14 @@ const LAB_REQUESTS: LabRequest[] = [
   { code: "HBSAG", name: "HBsAg", specimenType: "Blood" },
   { code: "FBS", name: "Fasting Blood Sugar", specimenType: "Blood" },
   { code: "PPBS2H", name: "2 Hours Post-Prandial Blood Sugar", specimenType: "Blood" },
+  { code: "HBA1C", name: "Glycated Haemoglobin (HbA1c)", specimenType: "Blood" },
 ];
 
 const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
   { name: "Perimetry", price: 12000 },
-  { name: "Optical Coherence Tomography (OCT)", price: 18000 },
+  { name: "OCT Macula", price: 18000 },
+  { name: "OCT RNFL / ONH", price: 18000 },
+  { name: "Pachymetry", price: 0 },
   { name: "Keratometry K1/K2", price: 0 },
   { name: "B-scan", price: 0 },
   { name: "A-scan", price: 0 },
