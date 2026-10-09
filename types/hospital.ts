@@ -39,6 +39,8 @@ export interface TriageVitals {
   visualAcuityOD: string;
   visualAcuityOS: string;
   visualAcuityOU?: string;
+  visualAcuityODPinhole?: string;
+  visualAcuityOSPinhole?: string;
   visualAcuityODNote?: string;
   visualAcuityOSNote?: string;
   visualAcuityOUNote?: string;
