@@ -19,7 +19,6 @@ import {
 
 import { getOptometryPatient } from "@/app/actions/optometry";
 import { saveOptometryEncounter } from "@/app/actions/optometry-encounter";
-import { createOpticalOrder } from "@/app/actions/optician";
 import { VISUAL_ACUITY_OPTIONS } from "@/lib/visual-acuity";
 
 type Refraction = {
@@ -28,6 +27,45 @@ type Refraction = {
   axis: string;
   add: string;
 };
+
+type RefractionSet = {
+  objective: Refraction;
+  subjective: Refraction;
+};
+
+function emptyRefractionSet(): RefractionSet {
+  return {
+    objective: emptyRefraction(),
+    subjective: emptyRefraction(),
+  };
+}
+
+function normalizeRefraction(value: unknown): Refraction {
+  if (!value || typeof value !== "object") return emptyRefraction();
+  const data = value as Partial<Refraction>;
+  return {
+    sphere: String(data.sphere ?? ""),
+    cylinder: String(data.cylinder ?? ""),
+    axis: String(data.axis ?? ""),
+    add: String(data.add ?? ""),
+  };
+}
+
+function normalizeRefractionSet(value: unknown): RefractionSet {
+  if (value && typeof value === "object" && ("objective" in value || "subjective" in value)) {
+    const data = value as Partial<RefractionSet>;
+    return {
+      objective: normalizeRefraction(data.objective),
+      subjective: normalizeRefraction(data.subjective),
+    };
+  }
+
+  // Older records stored one set of values; retain them as subjective refraction.
+  return {
+    objective: emptyRefraction(),
+    subjective: normalizeRefraction(value),
+  };
+}
 
 type PatientData = {
   id: string;
@@ -69,8 +107,8 @@ type PatientData = {
     slitLampOD: string;
     slitLampOS: string;
 
-    refractionOD: Refraction | null;
-    refractionOS: Refraction | null;
+    refractionOD: RefractionSet | Refraction | null;
+    refractionOS: RefractionSet | Refraction | null;
 
     diagnosis: string;
     status: "draft" | "completed";
@@ -99,7 +137,6 @@ export default function OptometryExaminationPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
-  const [opticianSent, setOpticianSent] = useState(false);
 
   const [isPending, startTransition] =
     useTransition();
@@ -118,10 +155,10 @@ export default function OptometryExaminationPage() {
     useState<boolean>(false);
 
   const [refractionOD, setRefractionOD] =
-    useState<Refraction>(emptyRefraction());
+    useState<RefractionSet>(emptyRefractionSet());
 
   const [refractionOS, setRefractionOS] =
-    useState<Refraction>(emptyRefraction());
+    useState<RefractionSet>(emptyRefractionSet());
 
   const [slitLampOD, setSlitLampOD] =
     useState("");
@@ -129,10 +166,7 @@ export default function OptometryExaminationPage() {
   const [slitLampOS, setSlitLampOS] =
     useState("");
 
-  const [
-    clinicalImpression,
-    setClinicalImpression,
-  ] = useState("");
+
 
   async function loadPatient() {
     setLoading(true);
@@ -199,31 +233,13 @@ export default function OptometryExaminationPage() {
           previous.slitLampOS || ""
         );
 
-        setClinicalImpression(
-          previous.diagnosis || ""
+        setRefractionOD(
+          normalizeRefractionSet(previous.refractionOD)
         );
 
-        setRefractionOD({
-          sphere:
-            previous.refractionOD?.sphere ?? "",
-          cylinder:
-            previous.refractionOD?.cylinder ?? "",
-          axis:
-            previous.refractionOD?.axis ?? "",
-          add:
-            previous.refractionOD?.add ?? "",
-        });
-
-        setRefractionOS({
-          sphere:
-            previous.refractionOS?.sphere ?? "",
-          cylinder:
-            previous.refractionOS?.cylinder ?? "",
-          axis:
-            previous.refractionOS?.axis ?? "",
-          add:
-            previous.refractionOS?.add ?? "",
-        });
+        setRefractionOS(
+          normalizeRefractionSet(previous.refractionOS)
+        );
       } else if (data.vitals) {
         /*
          * First-time Optometry examination:
@@ -258,7 +274,6 @@ export default function OptometryExaminationPage() {
 
         setSlitLampOD("");
         setSlitLampOS("");
-        setClinicalImpression("");
       } else {
         /*
          * No previous Optometry encounter and
@@ -279,7 +294,6 @@ export default function OptometryExaminationPage() {
 
         setSlitLampOD("");
         setSlitLampOS("");
-        setClinicalImpression("");
       }
     } catch (loadError) {
       console.error(
@@ -303,19 +317,22 @@ export default function OptometryExaminationPage() {
 
   function updateRefraction(
     eye: "OD" | "OS",
+    method: "objective" | "subjective",
     field: keyof Refraction,
     value: string
   ) {
+    const update = (current: RefractionSet): RefractionSet => ({
+      ...current,
+      [method]: {
+        ...current[method],
+        [field]: value,
+      },
+    });
+
     if (eye === "OD") {
-      setRefractionOD((current) => ({
-        ...current,
-        [field]: value,
-      }));
+      setRefractionOD(update);
     } else {
-      setRefractionOS((current) => ({
-        ...current,
-        [field]: value,
-      }));
+      setRefractionOS(update);
     }
   }
 
@@ -324,16 +341,6 @@ export default function OptometryExaminationPage() {
   ) {
     setFeedback("");
     setError("");
-
-    if (
-      status === "completed" &&
-      !clinicalImpression.trim()
-    ) {
-      setError(
-        "Clinical impression is required before completing the assessment."
-      );
-      return;
-    }
 
     startTransition(async () => {
       try {
@@ -353,7 +360,7 @@ export default function OptometryExaminationPage() {
             slitLampOD,
             slitLampOS,
 
-            clinicalImpression,
+            clinicalImpression: "",
 
             status,
           });
@@ -366,12 +373,8 @@ export default function OptometryExaminationPage() {
         setFeedback(result.message);
 
         /*
-         * Do not immediately leave the patient page
-         * after completing the assessment.
-         *
-         * The Optometrist must now have the option
-         * to send the completed assessment to the
-         * Optician.
+         * The completed assessment is now available
+         * to the doctor for clinical review.
          */
         await loadPatient();
       } catch (saveError) {
@@ -382,39 +385,6 @@ export default function OptometryExaminationPage() {
 
         setError(
           "Unable to save the Optometry assessment."
-        );
-      }
-    });
-  }
-
-  function handleSendToOptician() {
-    setFeedback("");
-    setError("");
-
-    startTransition(async () => {
-      try {
-        const result =
-          await createOpticalOrder(patientCode);
-
-        if (!result.success) {
-          setError(result.message);
-          return;
-        }
-
-        setFeedback(
-          result.message ??
-            "Patient has been sent to the Optician successfully."
-        );
-
-        setOpticianSent(true);
-      } catch (sendError) {
-        console.error(
-          "Failed to send patient to Optician:",
-          sendError
-        );
-
-        setError(
-          "Unable to send the patient to the Optician."
         );
       }
     });
@@ -587,111 +557,9 @@ export default function OptometryExaminationPage() {
           </div>
         )}
 
-        {assessmentCompleted && (
-          <section className="rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
-                  <Eye className="h-5 w-5" />
-                </div>
 
-                <div>
-                  <h3 className="text-sm font-black text-violet-900">
-                    Optometry Assessment Completed
-                  </h3>
 
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-violet-700">
-                    The clinical assessment is complete. Send this
-                    patient to Optician to begin optical measurements,
-                    frame selection and lens preparation.
-                  </p>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={handleSendToOptician}
-                disabled={
-                  isPending || opticianSent
-                }
-                className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-xs font-black text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : opticianSent ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-
-                {opticianSent
-                  ? "Sent to Optician"
-                  : "Send to Optician"}
-              </button>
-            </div>
-          </section>
-        )}
-
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <SectionHeader
-            icon={ClipboardList}
-            title="Clinical Presentation"
-            description="Information captured during triage and referral."
-          />
-
-          <div className="grid gap-5 p-5 md:grid-cols-2">
-            <ReadOnlyField
-              label="Primary Complaint"
-              value={
-                patient.vitals
-                  ?.primaryComplaint ||
-                "Not recorded"
-              }
-            />
-
-            <ReadOnlyField
-              label="Duration"
-              value={
-                patient.vitals
-                  ?.durationText ||
-                "Not recorded"
-              }
-            />
-
-            <ReadOnlyField
-              label="Severity"
-              value={
-                patient.vitals?.severity ||
-                "Not recorded"
-              }
-            />
-
-            <ReadOnlyField
-              label="IOP"
-              value={
-                patient.vitals?.iopOD !== null ||
-                patient.vitals?.iopOS !== null
-                  ? `OD ${
-                      patient.vitals
-                        ?.iopOD ?? "—"
-                    } mmHg · OS ${
-                      patient.vitals
-                        ?.iopOS ?? "—"
-                    } mmHg`
-                  : "Not recorded"
-              }
-            />
-
-            <div className="md:col-span-2">
-              <ReadOnlyField
-                label="Symptoms"
-                value={formatSymptoms(
-                  patient.vitals?.symptoms
-                )}
-              />
-            </div>
-          </div>
-        </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <SectionHeader
@@ -753,78 +621,51 @@ export default function OptometryExaminationPage() {
           <SectionHeader
             icon={FileText}
             title="Refraction"
-            description="Record objective or subjective refraction findings for each eye."
+            description="Record objective and subjective refraction separately for each eye."
           />
 
-          <div className="grid gap-6 p-5 lg:grid-cols-2">
+          <div className="grid gap-6 p-5 xl:grid-cols-2">
             <RefractionCard
               eye="OD"
-              refraction={refractionOD}
+              method="objective"
+              refraction={refractionOD.objective}
               onChange={(field, value) =>
-                updateRefraction(
-                  "OD",
-                  field,
-                  value
-                )
+                updateRefraction("OD", "objective", field, value)
+              }
+            />
+
+            <RefractionCard
+              eye="OD"
+              method="subjective"
+              refraction={refractionOD.subjective}
+              onChange={(field, value) =>
+                updateRefraction("OD", "subjective", field, value)
               }
             />
 
             <RefractionCard
               eye="OS"
-              refraction={refractionOS}
+              method="objective"
+              refraction={refractionOS.objective}
               onChange={(field, value) =>
-                updateRefraction(
-                  "OS",
-                  field,
-                  value
-                )
+                updateRefraction("OS", "objective", field, value)
+              }
+            />
+
+            <RefractionCard
+              eye="OS"
+              method="subjective"
+              refraction={refractionOS.subjective}
+              onChange={(field, value) =>
+                updateRefraction("OS", "subjective", field, value)
               }
             />
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <SectionHeader
-            icon={Eye}
-            title="Preliminary Examination"
-            description="Document the observed external and slit-lamp findings."
-          />
 
-          <div className="grid gap-5 p-5 md:grid-cols-2">
-            <TextAreaField
-              label="Right Eye (OD)"
-              value={slitLampOD}
-              onChange={setSlitLampOD}
-              placeholder="Record preliminary / slit-lamp findings for OD..."
-            />
 
-            <TextAreaField
-              label="Left Eye (OS)"
-              value={slitLampOS}
-              onChange={setSlitLampOS}
-              placeholder="Record preliminary / slit-lamp findings for OS..."
-            />
-          </div>
-        </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <SectionHeader
-            icon={ClipboardList}
-            title="Clinical Impression"
-            description="Record the Optometrist's clinical impression and relevant assessment."
-          />
-
-          <div className="p-5">
-            <TextAreaField
-              label="Clinical Impression"
-              value={clinicalImpression}
-              onChange={setClinicalImpression}
-              placeholder="Enter clinical impression..."
-              rows={5}
-              required
-            />
-          </div>
-        </section>
 
         <div className="sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-[#F4F6FB]/95 px-4 py-4 backdrop-blur md:-mx-8 md:px-8">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:justify-end">
@@ -1014,10 +855,12 @@ function TextAreaField({
 
 function RefractionCard({
   eye,
+  method,
   refraction,
   onChange,
 }: {
   eye: "OD" | "OS";
+  method: "objective" | "subjective";
   refraction: Refraction;
   onChange: (
     field: keyof Refraction,
@@ -1033,8 +876,8 @@ function RefractionCard({
             : "Left Eye — OS"}
         </p>
 
-        <p className="mt-0.5 text-[11px] text-slate-500">
-          Refraction values
+        <p className="mt-0.5 text-[11px] font-semibold capitalize text-blue-700">
+          {method} refraction
         </p>
       </div>
 
