@@ -5,9 +5,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   getOrCreateDraftInvoice,
   recalcInvoice,
+  registerPatient,
 } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { registerPatient } from "@/lib/patient-flow";
 import { requireRole } from "@/lib/server-auth";
 
 export type DiagnosticOrderInput = {
