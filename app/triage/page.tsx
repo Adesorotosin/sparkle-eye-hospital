@@ -103,6 +103,10 @@ function TriageVitalsContent() {
             visualAcuityOSNote: osVisualNote.trim() || null,
             visualAcuityOUNote: ouVisualNote.trim() || null,
 
+            // Gonioscopy is recorded by the doctor, not during nurse triage.
+            gonioscopyOD: null,
+            gonioscopyOS: null,
+
             bpSystolic: bpSystolic ? Number(bpSystolic) : null,
             bpDiastolic: bpDiastolic ? Number(bpDiastolic) : null,
             pulse: pulse ? Number(pulse) : null,
