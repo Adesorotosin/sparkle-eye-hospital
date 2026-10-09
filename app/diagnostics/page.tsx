@@ -17,6 +17,7 @@ import {
   getDiagnosticQueue,
   type DiagnosticQueueItem,
 } from "@/app/actions/diagnostics";
+import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
 
 export default function DiagnosticsPage() {
   const router = useRouter();
@@ -28,6 +29,15 @@ export default function DiagnosticsPage() {
   const [findings, setFindings] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [message, setMessage] = useState("");
+  const [externalFormOpen, setExternalFormOpen] = useState(false);
+  const [externalName, setExternalName] = useState("");
+  const [externalAge, setExternalAge] = useState("");
+  const [externalGender, setExternalGender] = useState("");
+  const [externalPhone, setExternalPhone] = useState("");
+  const [referringCenter, setReferringCenter] = useState("");
+  const [externalTestName, setExternalTestName] = useState("OCT Macula");
+  const [externalPrice, setExternalPrice] = useState("");
+
   const [isPending, startTransition] = useTransition();
 
   const load = () => {
@@ -83,6 +93,36 @@ export default function DiagnosticsPage() {
     setSelected(null);
     setFindings("");
     setInterpretation("");
+  };
+
+  const registerExternalPatient = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage("");
+
+    startTransition(async () => {
+      const result = await createExternalDiagnosticOrder({
+        fullName: externalName.trim(),
+        age: externalAge ? Number(externalAge) : undefined,
+        gender: externalGender || undefined,
+        phone: externalPhone.trim() || undefined,
+        referringCenter: referringCenter.trim(),
+        testName: externalTestName,
+        price: Number(externalPrice),
+      });
+
+      setMessage(result.message);
+      if (result.success) {
+        setExternalName("");
+        setExternalAge("");
+        setExternalGender("");
+        setExternalPhone("");
+        setReferringCenter("");
+        setExternalPrice("");
+        setExternalFormOpen(false);
+        const next = await getDiagnosticQueue();
+        setOrders(next.orders);
+      }
+    });
   };
 
   const saveResult = () => {
@@ -212,6 +252,14 @@ export default function DiagnosticsPage() {
               Back to Doctor Dashboard
             </button>
 
+            <button
+              type="button"
+              onClick={() => setExternalFormOpen((open) => !open)}
+              className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-purple-700 text-white text-xs font-bold hover:bg-purple-800 transition"
+            >
+              {externalFormOpen ? "Close External Intake" : "External Patient Intake"}
+            </button>
+
             {/* Search */}
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -244,6 +292,61 @@ export default function DiagnosticsPage() {
 
       {/* Main content */}
       <main className="p-4 md:p-6 lg:p-8">
+        {externalFormOpen && (
+          <form onSubmit={registerExternalPatient} className="mb-6 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
+            <div className="mb-4">
+              <h2 className="text-sm font-extrabold text-slate-900">External Centre — Investigation Only</h2>
+              <p className="mt-1 text-xs text-slate-500">Register a walk-in referred by another centre without starting a doctor consultation. The investigation will be billed and must be paid before testing.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Patient full name *</span>
+                <input required value={externalName} onChange={(e) => setExternalName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Full name" />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Age</span>
+                <input type="number" min="0" max="150" value={externalAge} onChange={(e) => setExternalAge(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Age in years" />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Gender</span>
+                <select value={externalGender} onChange={(e) => setExternalGender(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+                  <option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Phone</span>
+                <input value={externalPhone} onChange={(e) => setExternalPhone(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Phone number" />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Referring centre *</span>
+                <input required value={referringCenter} onChange={(e) => setReferringCenter(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Hospital / clinic name" />
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Investigation *</span>
+                <select required value={externalTestName} onChange={(e) => setExternalTestName(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+                  <option>OCT Macula</option>
+                  <option>OCT RNFL / ONH</option>
+                  <option>Pachymetry</option>
+                  <option>Perimetry</option>
+                  <option>Keratometry K1/K2</option>
+                  <option>B-scan</option>
+                  <option>A-scan</option>
+                  <option>Fundus Photograph</option>
+                  <option>Autorefraction</option>
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block text-xs font-bold text-slate-600">Price (₦) *</span>
+                <input required type="number" min="0" step="0.01" value={externalPrice} onChange={(e) => setExternalPrice(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Enter approved price" />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button type="submit" disabled={isPending} className="rounded-xl bg-purple-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-purple-800 disabled:opacity-50">
+                {isPending ? "Registering..." : "Register Patient & Create Bill"}
+              </button>
+            </div>
+          </form>
+        )}
         {/* Summary cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-5">
