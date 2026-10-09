@@ -174,6 +174,11 @@ export default function DiagnosticsPage() {
           <p className="text-[11px] text-slate-400">
             {order.patientId}
           </p>
+          {order.externalReferral && (
+            <p className="mt-1 text-[10px] font-bold text-purple-700">
+              External referral{order.referralSource ? ` • ${order.referralSource}` : ""}
+            </p>
+          )}
         </div>
 
         {done ? (
