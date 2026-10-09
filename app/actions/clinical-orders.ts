@@ -266,7 +266,7 @@ export async function createExternalDiagnosticOrder(input: {
       return { success: false, message: "Enter a valid investigation price." };
     }
 
-    const age = input.age == null || input.age === "" ? undefined : Number(input.age);
+    const age = input.age == null ? undefined : Number(input.age);
     if (age !== undefined && (!Number.isInteger(age) || age < 0 || age > 150)) {
       return { success: false, message: "Age must be a whole number between 0 and 150." };
     }
