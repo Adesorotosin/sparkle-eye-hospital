@@ -401,6 +401,24 @@ export default function AccessControlPage() {
   const [resettingPassword, setResettingPassword] =
     useState(false);
 
+  const [resetDialogOpen, setResetDialogOpen] =
+    useState(false);
+
+  const [resetMode, setResetMode] =
+    useState<"generated" | "custom">("generated");
+
+  const [customPassword, setCustomPassword] =
+    useState("");
+
+  const [showCustomPassword, setShowCustomPassword] =
+    useState(false);
+
+  const [resetDialogError, setResetDialogError] =
+    useState<string | null>(null);
+
+  const [resetPasswordMode, setResetPasswordMode] =
+    useState<"generated" | "custom">("generated");
+
   const [resetPassword, setResetPassword] =
     useState<string | null>(null);
 
@@ -763,17 +781,30 @@ export default function AccessControlPage() {
     }
   }
 
-  async function handleResetPassword() {
+  function handleResetPassword() {
     if (!selectedStaff) {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Reset the password for ${selectedStaff.name}?\n\n` +
-        "This will invalidate the staff member's existing sessions."
-    );
+    setResetMode("generated");
+    setCustomPassword("");
+    setShowCustomPassword(false);
+    setResetDialogError(null);
+    setResetDialogOpen(true);
+  }
 
-    if (!confirmed) {
+  async function confirmResetPassword() {
+    if (!selectedStaff) {
+      return;
+    }
+
+    if (resetMode === "custom" && customPassword.length < 12) {
+      setResetDialogError("Choose a password with at least 12 characters.");
+      return;
+    }
+
+    if (resetMode === "custom" && customPassword.length > 128) {
+      setResetDialogError("The password must be 128 characters or fewer.");
       return;
     }
 
@@ -781,6 +812,7 @@ export default function AccessControlPage() {
     setResetPassword(null);
     setShowResetPassword(false);
     setResetPasswordCopied(false);
+    setResetDialogError(null);
     setNotification(null);
     setErrorMessage(null);
 
@@ -789,43 +821,33 @@ export default function AccessControlPage() {
         `/api/staff/${selectedStaff.id}/reset-password`,
         {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            resetMode === "custom" ? { password: customPassword } : {}
+          ),
         }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data?.error ||
-            "Failed to reset staff password."
-        );
+        throw new Error(data?.error || "Failed to reset staff password.");
       }
 
       if (!data?.temporaryPassword) {
-        throw new Error(
-          "The server did not return the new temporary password."
-        );
+        throw new Error("The server did not return the new password.");
       }
 
-      setResetPassword(
-        data.temporaryPassword
-      );
-
+      setResetPasswordMode(resetMode);
+      setResetPassword(data.temporaryPassword);
       setShowResetPassword(true);
-
-      setNotification(
-        `Password reset successfully for ${selectedStaff.name}.`
-      );
+      setResetDialogOpen(false);
+      setCustomPassword("");
+      setNotification(`Password reset successfully for ${selectedStaff.name}.`);
     } catch (error) {
-      console.error(
-        "Password reset failed:",
-        error
-      );
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to reset staff password."
+      console.error("Password reset failed:", error);
+      setResetDialogError(
+        error instanceof Error ? error.message : "Failed to reset staff password."
       );
     } finally {
       setResettingPassword(false);
@@ -1561,6 +1583,147 @@ export default function AccessControlPage() {
           </div>
         )}
 
+      {/* RESET PASSWORD OPTIONS */}
+      {resetDialogOpen && selectedStaff && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close password reset options"
+            onClick={() => {
+              if (!resettingPassword) {
+                setResetDialogOpen(false);
+                setResetDialogError(null);
+              }
+            }}
+            className="absolute inset-0 bg-slate-900/50"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-password-title"
+            className="relative w-full max-w-lg rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-2xl"
+          >
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <KeyRound className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 id="reset-password-title" className="text-lg font-bold text-slate-900">Reset password</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Choose how to set a new password for <strong>{selectedStaff.name}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
+                <input
+                  type="radio"
+                  name="reset-password-mode"
+                  value="generated"
+                  checked={resetMode === "generated"}
+                  onChange={() => {
+                    setResetMode("generated");
+                    setResetDialogError(null);
+                  }}
+                  className="mt-1"
+                  disabled={resettingPassword}
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Generate a secure password</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    Recommended. The system creates a strong random password for you to copy and give to the staff member securely.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 hover:bg-slate-50">
+                <input
+                  type="radio"
+                  name="reset-password-mode"
+                  value="custom"
+                  checked={resetMode === "custom"}
+                  onChange={() => {
+                    setResetMode("custom");
+                    setResetDialogError(null);
+                  }}
+                  className="mt-1"
+                  disabled={resettingPassword}
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Set a password myself</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    Enter a password of at least 12 characters. Avoid reusing passwords from other systems.
+                  </span>
+                </span>
+              </label>
+
+              {resetMode === "custom" && (
+                <div>
+                  <label htmlFor="admin-custom-password" className="mb-2 block text-xs font-semibold text-slate-700">New password</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="admin-custom-password"
+                      type={showCustomPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={customPassword}
+                      onChange={(event) => {
+                        setCustomPassword(event.target.value);
+                        setResetDialogError(null);
+                      }}
+                      minLength={12}
+                      maxLength={128}
+                      disabled={resettingPassword}
+                      placeholder="Enter at least 12 characters"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomPassword((value) => !value)}
+                      aria-label={showCustomPassword ? "Hide new password" : "Show new password"}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-50"
+                    >
+                      {showCustomPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-xs leading-5 text-amber-800">
+                For security, the staff member's existing sessions will be signed out after the password changes. This helps prevent access through an old session.
+              </p>
+            </div>
+
+            {resetDialogError && (
+              <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{resetDialogError}</p>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetDialogOpen(false);
+                  setResetDialogError(null);
+                }}
+                disabled={resettingPassword}
+                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >Cancel</button>
+              <button
+                type="button"
+                onClick={confirmResetPassword}
+                disabled={resettingPassword || (resetMode === "custom" && customPassword.length < 12)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {resettingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                {resettingPassword ? "Resetting..." : "Reset password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* RESET PASSWORD MODAL */}
       {resetPassword &&
         selectedStaff && (
@@ -1586,8 +1749,9 @@ export default function AccessControlPage() {
                   </h2>
 
                   <p className="text-sm text-[#64748B] mt-2">
-                    A new temporary password has
-                    been generated for{" "}
+                    {resetPasswordMode === "generated"
+                      ? "A new temporary password has been generated for "
+                      : "A new password has been set for "}
                     <strong>
                       {selectedStaff.name}
                     </strong>
@@ -1598,7 +1762,7 @@ export default function AccessControlPage() {
 
               <div className="mt-5">
                 <label className="block text-xs font-semibold text-[#475569] mb-2">
-                  Temporary Password
+                  {resetPasswordMode === "generated" ? "Temporary Password" : "New Password"}
                 </label>
 
                 <div className="flex items-center gap-2">
@@ -1650,11 +1814,10 @@ export default function AccessControlPage() {
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
                 <p className="text-xs leading-5 text-amber-800">
                   <strong>Important:</strong> This
-                  password is shown only because it
-                  was just generated. Save or copy it
-                  before closing this window. The
-                  system stores only the encrypted
-                  password.
+                  password is shown only once. Save or
+                  copy it before closing this window.
+                  The system stores only a password
+                  hash, not the readable password.
                 </p>
               </div>
 
