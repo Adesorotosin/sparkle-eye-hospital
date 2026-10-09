@@ -18,17 +18,33 @@ export type SaveOptometryEncounterInput = {
   withCorrection: boolean;
 
   refractionOD: {
-    sphere: string;
-    cylinder: string;
-    axis: string;
-    add: string;
+    objective: {
+      sphere: string;
+      cylinder: string;
+      axis: string;
+      add: string;
+    };
+    subjective: {
+      sphere: string;
+      cylinder: string;
+      axis: string;
+      add: string;
+    };
   };
 
   refractionOS: {
-    sphere: string;
-    cylinder: string;
-    axis: string;
-    add: string;
+    objective: {
+      sphere: string;
+      cylinder: string;
+      axis: string;
+      add: string;
+    };
+    subjective: {
+      sphere: string;
+      cylinder: string;
+      axis: string;
+      add: string;
+    };
   };
 
   slitLampOD: string;
@@ -51,14 +67,23 @@ function emptyToNull(value: string | undefined) {
   return normalized ? normalized : null;
 }
 
-function normalizeRefraction(
-  refraction: SaveOptometryEncounterInput["refractionOD"]
+function normalizeRefractionValues(
+  refraction: SaveOptometryEncounterInput["refractionOD"]["objective"]
 ) {
   return {
     sphere: emptyToNull(refraction.sphere),
     cylinder: emptyToNull(refraction.cylinder),
     axis: emptyToNull(refraction.axis),
     add: emptyToNull(refraction.add),
+  };
+}
+
+function normalizeRefraction(
+  refraction: SaveOptometryEncounterInput["refractionOD"]
+) {
+  return {
+    objective: normalizeRefractionValues(refraction.objective),
+    subjective: normalizeRefractionValues(refraction.subjective),
   };
 }
 
@@ -87,17 +112,6 @@ export async function saveOptometryEncounter(
       return {
         success: false,
         message: "Invalid encounter status.",
-      };
-    }
-
-    if (
-      input.status === "completed" &&
-      !input.clinicalImpression.trim()
-    ) {
-      return {
-        success: false,
-        message:
-          "Clinical impression is required before completing the assessment.",
       };
     }
 
@@ -283,7 +297,7 @@ export async function saveOptometryEncounter(
       category: "CLINICAL",
       action:
         input.status === "completed"
-          ? "Optometry assessment completed"
+          ? "Optometry assessment completed and forwarded to doctor"
           : "Optometry assessment saved as draft",
       performedBy: staff.name,
       staffId: staff.id,
@@ -321,7 +335,7 @@ export async function saveOptometryEncounter(
       success: true,
       message:
         input.status === "completed"
-          ? "Optometry assessment completed successfully."
+          ? "Optometry assessment completed and sent to the doctor for review."
           : "Optometry assessment saved as draft.",
       encounterId,
     };
