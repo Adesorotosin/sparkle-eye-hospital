@@ -792,46 +792,6 @@ function SelectField({
   );
 }
 
-function TextAreaField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  rows?: number;
-  required?: boolean;
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold text-slate-700">
-        {label}
-
-        {required && (
-          <span className="ml-1 text-rose-500">
-            *
-          </span>
-        )}
-      </span>
-
-      <textarea
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        placeholder={placeholder}
-        rows={rows}
-        className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-      />
-    </label>
-  );
-}
-
 function RefractionCard({
   eye,
   method,
@@ -945,7 +905,7 @@ function StatusBadge({
       : status === "in_examination"
         ? "IN EXAMINATION"
         : status === "completed"
-          ? "COMPLETED"
+          ? "SENT TO DOCTOR"
           : "NOT REFERRED";
 
   const classes =
