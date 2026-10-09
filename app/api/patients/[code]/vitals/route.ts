@@ -47,6 +47,12 @@ export async function POST(
       visualAcuityOU,
       visualAcuityODPinhole,
       visualAcuityOSPinhole,
+      visualAcuityODGlasses,
+      visualAcuityOSGlasses,
+      visualAcuityOUGlasses,
+      visualAcuityODNear,
+      visualAcuityOSNear,
+      visualAcuityOUNear,
 
       withCorrection,
 
@@ -181,26 +187,27 @@ export async function POST(
       );
     }
 
-    // Store pinhole readings on the vitals row created by the existing RPC.
-    if (vitalsId && (visualAcuityODPinhole || visualAcuityOSPinhole)) {
-      const { error: pinholeError } = await supabaseServer
+    // Save the additional visual-acuity methods on the same vitals record.
+    // The migration adds these columns without changing the existing RPC.
+    if (vitalsId) {
+      const { error: visualAcuityError } = await supabaseServer
         .from("vitals")
         .update({
-          visual_acuity_od_pinhole:
-            typeof visualAcuityODPinhole === "string"
-              ? visualAcuityODPinhole.trim() || null
-              : null,
-          visual_acuity_os_pinhole:
-            typeof visualAcuityOSPinhole === "string"
-              ? visualAcuityOSPinhole.trim() || null
-              : null,
+          visual_acuity_od_pinhole: typeof visualAcuityODPinhole === "string" ? visualAcuityODPinhole.trim() || null : null,
+          visual_acuity_os_pinhole: typeof visualAcuityOSPinhole === "string" ? visualAcuityOSPinhole.trim() || null : null,
+          visual_acuity_od_glasses: typeof visualAcuityODGlasses === "string" ? visualAcuityODGlasses.trim() || null : null,
+          visual_acuity_os_glasses: typeof visualAcuityOSGlasses === "string" ? visualAcuityOSGlasses.trim() || null : null,
+          visual_acuity_ou_glasses: typeof visualAcuityOUGlasses === "string" ? visualAcuityOUGlasses.trim() || null : null,
+          visual_acuity_od_near: typeof visualAcuityODNear === "string" ? visualAcuityODNear.trim() || null : null,
+          visual_acuity_os_near: typeof visualAcuityOSNear === "string" ? visualAcuityOSNear.trim() || null : null,
+          visual_acuity_ou_near: typeof visualAcuityOUNear === "string" ? visualAcuityOUNear.trim() || null : null,
         })
         .eq("id", vitalsId);
 
-      if (pinholeError) {
-        console.error("Failed to save pinhole visual acuity:", pinholeError);
+      if (visualAcuityError) {
+        console.error("Failed to save additional visual acuity:", visualAcuityError);
         return NextResponse.json(
-          { error: "Vitals were recorded, but pinhole results could not be saved. Please contact an administrator." },
+          { error: "Vitals were recorded, but additional visual-acuity results could not be saved. Please contact an administrator." },
           { status: 500 }
         );
       }
