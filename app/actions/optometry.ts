@@ -345,6 +345,14 @@ export async function getOptometryPatient(
             visual_acuity_od,
             visual_acuity_os,
             visual_acuity_ou,
+            visual_acuity_od_pinhole,
+            visual_acuity_os_pinhole,
+            visual_acuity_od_glasses,
+            visual_acuity_os_glasses,
+            visual_acuity_ou_glasses,
+            visual_acuity_od_near,
+            visual_acuity_os_near,
+            visual_acuity_ou_near,
             with_correction,
             iop_od,
             iop_os,
@@ -457,6 +465,14 @@ export async function getOptometryPatient(
               visualAcuityOU:
                 vitals.visual_acuity_ou ??
                 "",
+              visualAcuityODPinhole: vitals.visual_acuity_od_pinhole ?? "",
+              visualAcuityOSPinhole: vitals.visual_acuity_os_pinhole ?? "",
+              visualAcuityODGlasses: vitals.visual_acuity_od_glasses ?? "",
+              visualAcuityOSGlasses: vitals.visual_acuity_os_glasses ?? "",
+              visualAcuityOUGlasses: vitals.visual_acuity_ou_glasses ?? "",
+              visualAcuityODNear: vitals.visual_acuity_od_near ?? "",
+              visualAcuityOSNear: vitals.visual_acuity_os_near ?? "",
+              visualAcuityOUNear: vitals.visual_acuity_ou_near ?? "",
               withCorrection:
                 Boolean(
                   vitals.with_correction
