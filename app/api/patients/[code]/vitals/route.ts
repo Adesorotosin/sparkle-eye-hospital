@@ -45,6 +45,8 @@ export async function POST(
       visualAcuityOD,
       visualAcuityOS,
       visualAcuityOU,
+      visualAcuityODPinhole,
+      visualAcuityOSPinhole,
 
       withCorrection,
 
@@ -177,6 +179,31 @@ export async function POST(
           status: 500,
         }
       );
+    }
+
+    // Store pinhole readings on the vitals row created by the existing RPC.
+    if (vitalsId && (visualAcuityODPinhole || visualAcuityOSPinhole)) {
+      const { error: pinholeError } = await supabaseServer
+        .from("vitals")
+        .update({
+          visual_acuity_od_pinhole:
+            typeof visualAcuityODPinhole === "string"
+              ? visualAcuityODPinhole.trim() || null
+              : null,
+          visual_acuity_os_pinhole:
+            typeof visualAcuityOSPinhole === "string"
+              ? visualAcuityOSPinhole.trim() || null
+              : null,
+        })
+        .eq("id", vitalsId);
+
+      if (pinholeError) {
+        console.error("Failed to save pinhole visual acuity:", pinholeError);
+        return NextResponse.json(
+          { error: "Vitals were recorded, but pinhole results could not be saved. Please contact an administrator." },
+          { status: 500 }
+        );
+      }
     }
 
     /*
