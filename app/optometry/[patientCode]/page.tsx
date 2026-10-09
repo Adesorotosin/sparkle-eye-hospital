@@ -9,7 +9,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
-  ClipboardList,
   Eye,
   FileText,
   Loader2,
@@ -756,26 +755,6 @@ function SectionHeader({
   );
 }
 
-function ReadOnlyField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
-
-      <div className="mt-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700">
-        {value}
-      </div>
-    </div>
-  );
-}
-
 function SelectField({
   label,
   value,
@@ -987,25 +966,3 @@ function StatusBadge({
   );
 }
 
-function formatSymptoms(
-  symptoms: unknown
-): string {
-  if (Array.isArray(symptoms)) {
-    const values = symptoms
-      .filter(Boolean)
-      .map(String);
-
-    return values.length > 0
-      ? values.join(", ")
-      : "Not recorded";
-  }
-
-  if (
-    typeof symptoms === "string" &&
-    symptoms.trim()
-  ) {
-    return symptoms;
-  }
-
-  return "Not recorded";
-}
