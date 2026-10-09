@@ -627,10 +627,13 @@ export default function DoctorEncounterPage() {
           <Section id="nurse" title="Nurse documentation" icon={<HeartPulse className="h-5 w-5" />}>
             {patient.vitals ? (
               <div className="space-y-4">
-                <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Presenting complaint from triage</p>
-                  <p className="mt-1 text-sm text-blue-950">{patient.vitals.primaryComplaint || "Not recorded"}</p>
-                </div>
+                {patient.vitals.primaryComplaint?.trim() &&
+                  patient.vitals.primaryComplaint.trim().toLowerCase() !== "not recorded" && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Presenting complaint from triage</p>
+                      <p className="mt-1 text-sm text-blue-950">{patient.vitals.primaryComplaint}</p>
+                    </div>
+                  )}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {[
                     ["VA OD", patient.vitals.visualAcuityOD],
@@ -647,23 +650,34 @@ export default function DoctorEncounterPage() {
                     ["SpO₂", patient.vitals.spo2 !== undefined ? `${patient.vitals.spo2}%` : undefined],
                     ["Correction", patient.vitals.withCorrection ? "With correction" : "Without correction"],
                     ["Severity", patient.vitals.severity],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-xl bg-gray-50 p-3">
-                      <p className="text-xs text-gray-500">{label}</p>
-                      <p className="mt-1 text-sm font-medium">{value || "—"}</p>
-                    </div>
-                  ))}
+                  ]
+                    .filter(([, value]) => {
+                      const displayValue = value == null ? "" : String(value).trim();
+                      return displayValue !== "" && displayValue !== "—" && displayValue !== "-";
+                    })
+                    .map(([label, value]) => (
+                      <div key={label} className="rounded-xl bg-gray-50 p-3">
+                        <p className="text-xs text-gray-500">{label}</p>
+                        <p className="mt-1 text-sm font-medium">{value}</p>
+                      </div>
+                    ))}
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-xl border p-4">
-                    <p className="text-xs font-semibold text-gray-500">Symptoms</p>
-                    <p className="mt-1 text-sm">{patient.vitals.symptoms?.join(", ") || "—"}</p>
+                {(patient.vitals.symptoms?.length || patient.vitals.durationText?.trim()) && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {patient.vitals.symptoms && patient.vitals.symptoms.length > 0 && (
+                      <div className="rounded-xl border p-4">
+                        <p className="text-xs font-semibold text-gray-500">Symptoms</p>
+                        <p className="mt-1 text-sm">{patient.vitals.symptoms.join(", ")}</p>
+                      </div>
+                    )}
+                    {patient.vitals.durationText?.trim() && (
+                      <div className="rounded-xl border p-4">
+                        <p className="text-xs font-semibold text-gray-500">Duration</p>
+                        <p className="mt-1 text-sm">{patient.vitals.durationText}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="rounded-xl border p-4">
-                    <p className="text-xs font-semibold text-gray-500">Duration</p>
-                    <p className="mt-1 text-sm">{patient.vitals.durationText || "—"}</p>
-                  </div>
-                </div>
+                )}
                 <p className="text-xs text-gray-500">Recorded {formatDate(patient.vitals.recordedAt)}</p>
               </div>
             ) : (
