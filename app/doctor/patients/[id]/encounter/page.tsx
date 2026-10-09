@@ -227,6 +227,39 @@ function resultText(value: unknown): string {
   }
 }
 
+function formatOptometryRefraction(
+  value: unknown,
+  method: "objective" | "subjective",
+): string {
+  if (!value || typeof value !== "object") return "—";
+
+  const record = value as Record<string, unknown>;
+  const selected = record[method];
+
+  // Older records stored a single refraction set; display it as subjective.
+  const values =
+    selected && typeof selected === "object"
+      ? (selected as Record<string, unknown>)
+      : method === "subjective" && "sphere" in record
+        ? record
+        : null;
+
+  if (!values) return "—";
+
+  const fields = [
+    ["Sphere", values.sphere],
+    ["Cylinder", values.cylinder],
+    ["Axis", values.axis],
+    ["Add", values.add],
+  ] as const;
+
+  const summary = fields
+    .filter(([, fieldValue]) => fieldValue !== null && fieldValue !== undefined && fieldValue !== "")
+    .map(([label, fieldValue]) => `${label}: ${String(fieldValue)}`);
+
+  return summary.length ? summary.join(" · ") : "—";
+}
+
 export default function DoctorEncounterPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -270,6 +303,8 @@ export default function DoctorEncounterPage() {
   const [optometryResult, setOptometryResult] = useState<any>(null);
 
   const latestEncounter = patient?.encounters?.[0];
+  const optometryAssessmentCompleted =
+    optometryResult?.previousOptometryEncounter?.status === "completed";
 
   useEffect(() => {
     if (!patientCode) return;
@@ -940,10 +975,14 @@ export default function DoctorEncounterPage() {
                 <h3 className="mt-2 font-semibold">Investigation Room</h3>
                 <p className="mt-1 text-xs text-gray-500">Use the Investigation section above to send a named test.</p>
               </div>
-              <button onClick={referOptician} disabled={isPending || requesting === "optician"} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50">
+              <button onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
                 {requesting === "optician" ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : <Hospital className="h-5 w-5 text-blue-600" />}
                 <h3 className="mt-2 font-semibold">Optician</h3>
-                <p className="mt-1 text-xs text-gray-500">Send the patient to the Optician queue after a completed Optometry assessment.</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {optometryAssessmentCompleted
+                    ? "Review the optometry results above, then forward the patient to the Optician queue."
+                    : "Available after the Optometrist completes and sends the assessment to the doctor."}
+                </p>
               </button>
             </div>
           </Section>
@@ -1005,8 +1044,16 @@ export default function DoctorEncounterPage() {
                     <div><p className="text-xs text-violet-600">Clinical impression</p><p className="text-sm font-medium">{optometryResult.previousOptometryEncounter.diagnosis || "—"}</p></div>
                   </div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <div className="rounded-lg bg-white/70 p-3 text-sm"><strong>Refraction OD:</strong> {resultText(optometryResult.previousOptometryEncounter.refractionOD)}</div>
-                    <div className="rounded-lg bg-white/70 p-3 text-sm"><strong>Refraction OS:</strong> {resultText(optometryResult.previousOptometryEncounter.refractionOS)}</div>
+                    <div className="rounded-lg bg-white/70 p-3 text-sm">
+                      <p className="font-semibold">Right eye (OD)</p>
+                      <p className="mt-1"><strong>Objective:</strong> {formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "objective")}</p>
+                      <p className="mt-1"><strong>Subjective:</strong> {formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "subjective")}</p>
+                    </div>
+                    <div className="rounded-lg bg-white/70 p-3 text-sm">
+                      <p className="font-semibold">Left eye (OS)</p>
+                      <p className="mt-1"><strong>Objective:</strong> {formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "objective")}</p>
+                      <p className="mt-1"><strong>Subjective:</strong> {formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "subjective")}</p>
+                    </div>
                   </div>
                 </div>
               )}
