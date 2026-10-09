@@ -407,7 +407,7 @@ export default function PatientDirectoryPage() {
         {/* BREADCRUMB ROUTING NAVIGATION */}
         <nav className="flex items-center gap-2 text-xs font-semibold text-slate-400">
           <Link
-            href="/doctor/dashboard"
+            href="/doctor"
             className="hover:text-slate-700 transition"
           >
             Home
