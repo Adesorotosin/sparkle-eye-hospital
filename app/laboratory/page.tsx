@@ -234,7 +234,59 @@ const TEST_TEMPLATES: Record<string, ResultParameter[]> = {
       flag: "NORMAL",
     },
   ],
+  RVS: [
+    { name: "RVS", result: "", unit: "", referenceRange: "Non-reactive", flag: "NORMAL" },
+  ],
+  HCV: [
+    { name: "HCV", result: "", unit: "", referenceRange: "Negative", flag: "NORMAL" },
+  ],
+  HBsAg: [
+    { name: "HBsAg", result: "", unit: "", referenceRange: "Negative", flag: "NORMAL" },
+  ],
+  "Glycated Haemoglobin": [
+    { name: "HbA1c", result: "", unit: "%", referenceRange: "4.0 - 5.6", flag: "NORMAL" },
+  ],
+  "Glycated Haemoglobin (HbA1c)": [
+    { name: "HbA1c", result: "", unit: "%", referenceRange: "4.0 - 5.6", flag: "NORMAL" },
+  ],
+  HbA1c: [
+    { name: "HbA1c", result: "", unit: "%", referenceRange: "4.0 - 5.6", flag: "NORMAL" },
+  ],
 };
+
+function inferNumericFlag(result: string, referenceRange: string): ResultFlag | null {
+  const value = Number(result.trim().replace(/,/g, ""));
+  if (!result.trim() || !Number.isFinite(value)) return null;
+
+  const range = referenceRange.trim().replace(/,/g, "");
+  const comparator = range.match(/^(<=|>=|<|>|≤|≥)\s*(-?\d+(?:\.\d+)?)/);
+  if (comparator) {
+    const limit = Number(comparator[2]);
+    const operator = comparator[1];
+    if (operator === "<" || operator === "<=" || operator === "≤") {
+      return value < limit || (operator !== "<" && value === limit) ? "NORMAL" : "HIGH";
+    }
+    return value > limit || (operator !== ">" && value === limit) ? "NORMAL" : "LOW";
+  }
+
+  const bounds = range.match(/(-?\d+(?:\.\d+)?)\s*(?:-|to)\s*(-?\d+(?:\.\d+)?)/i);
+  if (bounds) {
+    const low = Number(bounds[1]);
+    const high = Number(bounds[2]);
+    if (value < low) return "LOW";
+    if (value > high) return "HIGH";
+    return "NORMAL";
+  }
+  return null;
+}
+
+function qualitativeOptions(parameterName: string): string[] | null {
+  const name = parameterName.trim().toLowerCase();
+  if (name === "rvs" || name.includes("hiv")) return ["Reactive", "Non-reactive"];
+  if (name === "hcv") return ["Positive", "Negative"];
+  if (name === "hbsag" || name.includes("hepatitis b surface")) return ["Positive", "Negative"];
+  return null;
+}
 
 function statusLabel(status: LabStatus) {
   switch (status) {
@@ -779,14 +831,18 @@ export default function LaboratoryPage() {
     value: string
   ) {
     setResultParameters((current) =>
-      current.map((parameter, parameterIndex) =>
-        parameterIndex === index
-          ? {
-              ...parameter,
-              [field]: value,
-            }
-          : parameter
-      )
+      current.map((parameter, parameterIndex) => {
+        if (parameterIndex !== index) return parameter;
+        const updated = { ...parameter, [field]: value };
+        if (field === "result" || field === "referenceRange") {
+          const inferred = inferNumericFlag(
+            String(updated.result ?? ""),
+            String(updated.referenceRange ?? "")
+          );
+          if (inferred) updated.flag = inferred;
+        }
+        return updated;
+      })
     );
   }
 
@@ -2499,18 +2555,27 @@ function ResultEntryForm({
                 </FormField>
 
                 <FormField label="Result">
-                  <input
-                    value={parameter.result}
-                    onChange={(event) =>
-                      onParameterChange(
-                        index,
-                        "result",
-                        event.target.value
-                      )
-                    }
-                    className={inputClass}
-                    placeholder="Value"
-                  />
+                  {qualitativeOptions(parameter.name) ? (
+                    <select
+                      value={parameter.result}
+                      onChange={(event) => onParameterChange(index, "result", event.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">Select result</option>
+                      {qualitativeOptions(parameter.name)!.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={parameter.result}
+                      onChange={(event) =>
+                        onParameterChange(index, "result", event.target.value)
+                      }
+                      className={inputClass}
+                      placeholder="Enter measured result"
+                    />
+                  )}
                 </FormField>
 
                 <FormField label="Unit">
@@ -2528,7 +2593,7 @@ function ResultEntryForm({
                   />
                 </FormField>
 
-                <FormField label="Reference Range">
+                <FormField label="Normal Range / Reference">
                   <input
                     value={
                       parameter.referenceRange
