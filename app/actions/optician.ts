@@ -458,7 +458,7 @@ export async function getOpticianQueue(): Promise<{
  * Creates an Optical Order from the patient's
  * latest completed Optometry assessment.
  *
- * Optometry → Optician
+ * Optometry → Doctor review → Optician
  */
 export async function createOpticalOrder(
   patientCode: string
@@ -466,8 +466,6 @@ export async function createOpticalOrder(
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "OPTICIAN",
-      "OPTOMETRIST",
       "DOCTOR",
       "OPHTHALMOLOGIST",
     ]);
