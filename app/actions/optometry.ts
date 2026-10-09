@@ -311,6 +311,8 @@ export async function getOptometryPatient(
     await requireRole([
       "IT_ADMIN",
       "OPTOMETRIST",
+      "DOCTOR",
+      "OPHTHALMOLOGIST",
     ]);
 
     const normalizedCode =
