@@ -36,6 +36,18 @@ function TriageVitalsContent() {
   const [odPinhole, setOdPinhole] = useState("");
   const [osPinhole, setOsPinhole] = useState("");
 
+  // Visual acuity with the patient's glasses and near vision.
+  const [odGlasses, setOdGlasses] = useState("");
+  const [osGlasses, setOsGlasses] = useState("");
+  const [ouGlasses, setOuGlasses] = useState("");
+  const [odNear, setOdNear] = useState("");
+  const [osNear, setOsNear] = useState("");
+  const [ouNear, setOuNear] = useState("");
+
+  const NEAR_VISION_OPTIONS = [
+    "N5", "N6", "N8", "N10", "N12", "N18", "N24", "N36", "N48",
+  ];
+
   const [odVisualNote, setOdVisualNote] = useState("");
   const [osVisualNote, setOsVisualNote] = useState("");
   const [ouVisualNote, setOuVisualNote] = useState("");
@@ -103,7 +115,13 @@ function TriageVitalsContent() {
             visualAcuityOU: ouVisual,
             visualAcuityODPinhole: odPinhole || null,
             visualAcuityOSPinhole: osPinhole || null,
-            withCorrection,
+            visualAcuityODGlasses: odGlasses || null,
+            visualAcuityOSGlasses: osGlasses || null,
+            visualAcuityOUGlasses: ouGlasses || null,
+            visualAcuityODNear: odNear || null,
+            visualAcuityOSNear: osNear || null,
+            visualAcuityOUNear: ouNear || null,
+            withCorrection: false,
 
             visualAcuityODNote: odVisualNote.trim() || null,
             visualAcuityOSNote: osVisualNote.trim() || null,
@@ -297,7 +315,7 @@ function TriageVitalsContent() {
               <div className="space-y-4">
                 <div className="flex items-center gap-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Visual Acuity
+                    Visual Acuity — Unaided
                   </label>
 
                   <Info className="w-3.5 h-3.5 text-slate-400" />
@@ -444,38 +462,50 @@ function TriageVitalsContent() {
                   </div>
                 </div>
 
-                {/* CORRECTION */}
-                <div className="flex items-center justify-between pt-2">
+                {/* VISUAL ACUITY WITH GLASSES */}
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                   <div>
-                    <span className="text-xs font-bold text-slate-700 block">
-                      With Correction
-                    </span>
-
-                    <span className="text-[10px] text-slate-400">
-                      Glasses or contact lenses
-                    </span>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Visual Acuity With Glasses</h3>
+                    <p className="mt-1 text-[11px] text-slate-500">Record the measured distance vision while wearing the patient's glasses.</p>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { label: "OD — Right Eye", value: odGlasses, setter: setOdGlasses },
+                      { label: "OS — Left Eye", value: osGlasses, setter: setOsGlasses },
+                      { label: "OU — Both Eyes", value: ouGlasses, setter: setOuGlasses },
+                    ].map((field) => (
+                      <label key={field.label} className="space-y-1.5">
+                        <span className="text-xs font-bold text-slate-600 block">{field.label}</span>
+                        <select value={field.value} onChange={(event) => field.setter(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600">
+                          <option value="">Not recorded</option>
+                          {VISUAL_ACUITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setWithCorrection((current) => !current)
-                    }
-                    aria-pressed={withCorrection}
-                    className={`w-11 h-6 rounded-full transition-colors relative p-0.5 ${
-                      withCorrection
-                        ? "bg-[#6B21A8]"
-                        : "bg-slate-200"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                        withCorrection
-                          ? "translate-x-5"
-                          : "translate-x-0"
-                      }`}
-                    />
-                  </button>
+                {/* NEAR VISUAL ACUITY */}
+                <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Near Visual Acuity</h3>
+                    <p className="mt-1 text-[11px] text-slate-500">Select the near-vision result for each eye or both eyes.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { label: "OD — Right Eye", value: odNear, setter: setOdNear },
+                      { label: "OS — Left Eye", value: osNear, setter: setOsNear },
+                      { label: "OU — Both Eyes", value: ouNear, setter: setOuNear },
+                    ].map((field) => (
+                      <label key={field.label} className="space-y-1.5">
+                        <span className="text-xs font-bold text-slate-600 block">{field.label}</span>
+                        <select value={field.value} onChange={(event) => field.setter(event.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600">
+                          <option value="">Not recorded</option>
+                          {NEAR_VISION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
 
