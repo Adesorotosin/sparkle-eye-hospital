@@ -87,6 +87,8 @@ type Patient = {
     visualAcuityOD: string;
     visualAcuityOS: string;
     visualAcuityOU?: string;
+    visualAcuityODPinhole?: string;
+    visualAcuityOSPinhole?: string;
     visualAcuityODNote?: string;
     visualAcuityOSNote?: string;
     visualAcuityOUNote?: string;
@@ -632,7 +634,9 @@ export default function DoctorEncounterPage() {
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {[
                     ["VA OD", patient.vitals.visualAcuityOD],
+                    ["VA OD (PH)", patient.vitals.visualAcuityODPinhole],
                     ["VA OS", patient.vitals.visualAcuityOS],
+                    ["VA OS (PH)", patient.vitals.visualAcuityOSPinhole],
                     ["VA OU", patient.vitals.visualAcuityOU],
                     ["IOP OD", patient.vitals.iopOD !== undefined ? `${patient.vitals.iopOD} mmHg` : undefined],
                     ["IOP OS", patient.vitals.iopOS !== undefined ? `${patient.vitals.iopOS} mmHg` : undefined],
