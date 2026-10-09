@@ -39,13 +39,6 @@ function TriageVitalsContent() {
   const [withCorrection, setWithCorrection] = useState(false);
 
   // ------------------------------------------------------------
-  // GONIOSCOPY
-  // ------------------------------------------------------------
-
-  const [gonioscopyOD, setGonioscopyOD] = useState("");
-  const [gonioscopyOS, setGonioscopyOS] = useState("");
-
-  // ------------------------------------------------------------
   // GENERAL VITALS
   // ------------------------------------------------------------
 
@@ -109,9 +102,6 @@ function TriageVitalsContent() {
             visualAcuityODNote: odVisualNote.trim() || null,
             visualAcuityOSNote: osVisualNote.trim() || null,
             visualAcuityOUNote: ouVisualNote.trim() || null,
-
-            gonioscopyOD: gonioscopyOD.trim() || null,
-            gonioscopyOS: gonioscopyOS.trim() || null,
 
             bpSystolic: bpSystolic ? Number(bpSystolic) : null,
             bpDiastolic: bpDiastolic ? Number(bpDiastolic) : null,
@@ -452,55 +442,6 @@ function TriageVitalsContent() {
               </div>
 
               <hr className="border-slate-100" />
-
-              {/* GONIOSCOPY */}
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700 block">
-                    Gonioscopy
-                  </label>
-
-                  <span className="text-[10px] text-slate-400">
-                    Record the gonioscopy findings for each eye
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* OD */}
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-bold text-slate-600 block">
-                      OD — Right Eye
-                    </span>
-
-                    <textarea
-                      rows={4}
-                      value={gonioscopyOD}
-                      onChange={(event) =>
-                        setGonioscopyOD(event.target.value)
-                      }
-                      placeholder="Enter gonioscopy finding..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600 resize-none"
-                    />
-                  </div>
-
-                  {/* OS */}
-                  <div className="space-y-1.5">
-                    <span className="text-xs font-bold text-slate-600 block">
-                      OS — Left Eye
-                    </span>
-
-                    <textarea
-                      rows={4}
-                      value={gonioscopyOS}
-                      onChange={(event) =>
-                        setGonioscopyOS(event.target.value)
-                      }
-                      placeholder="Enter gonioscopy finding..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-600 resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
 
               <hr className="border-slate-100" />
 
