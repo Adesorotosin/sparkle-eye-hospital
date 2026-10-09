@@ -85,6 +85,14 @@ type PatientData = {
     visualAcuityOD: string;
     visualAcuityOS: string;
     visualAcuityOU: string;
+    visualAcuityODPinhole: string;
+    visualAcuityOSPinhole: string;
+    visualAcuityODGlasses: string;
+    visualAcuityOSGlasses: string;
+    visualAcuityOUGlasses: string;
+    visualAcuityODNear: string;
+    visualAcuityOSNear: string;
+    visualAcuityOUNear: string;
     withCorrection: boolean;
     iopOD: number | null;
     iopOS: number | null;
@@ -559,6 +567,34 @@ export default function OptometryExaminationPage() {
 
 
 
+
+        <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
+          <SectionHeader
+            icon={Eye}
+            title="Visual Acuity Recorded by Nurse"
+            description="Read-only triage measurements received from the nurse."
+          />
+          <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { label: "Unaided OD", value: patient?.vitals?.visualAcuityOD },
+              { label: "Unaided OS", value: patient?.vitals?.visualAcuityOS },
+              { label: "Unaided OU", value: patient?.vitals?.visualAcuityOU },
+              { label: "Pinhole OD", value: patient?.vitals?.visualAcuityODPinhole },
+              { label: "Pinhole OS", value: patient?.vitals?.visualAcuityOSPinhole },
+              { label: "With glasses OD", value: patient?.vitals?.visualAcuityODGlasses },
+              { label: "With glasses OS", value: patient?.vitals?.visualAcuityOSGlasses },
+              { label: "With glasses OU", value: patient?.vitals?.visualAcuityOUGlasses },
+              { label: "Near OD", value: patient?.vitals?.visualAcuityODNear },
+              { label: "Near OS", value: patient?.vitals?.visualAcuityOSNear },
+              { label: "Near OU", value: patient?.vitals?.visualAcuityOUNear },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-purple-100 bg-white px-4 py-3">
+                <p className="text-xs font-medium text-slate-500">{item.label}</p>
+                <p className="mt-1 text-sm font-bold text-slate-900">{item.value || "Not recorded"}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <SectionHeader
