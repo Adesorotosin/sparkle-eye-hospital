@@ -32,6 +32,10 @@ function TriageVitalsContent() {
   const [osVisual, setOsVisual] = useState("6/6");
   const [ouVisual, setOuVisual] = useState("6/6");
 
+  // Pinhole visual acuity is recorded separately for each eye.
+  const [odPinhole, setOdPinhole] = useState("");
+  const [osPinhole, setOsPinhole] = useState("");
+
   const [odVisualNote, setOdVisualNote] = useState("");
   const [osVisualNote, setOsVisualNote] = useState("");
   const [ouVisualNote, setOuVisualNote] = useState("");
@@ -97,6 +101,8 @@ function TriageVitalsContent() {
             visualAcuityOD: odVisual,
             visualAcuityOS: osVisual,
             visualAcuityOU: ouVisual,
+            visualAcuityODPinhole: odPinhole || null,
+            visualAcuityOSPinhole: osPinhole || null,
             withCorrection,
 
             visualAcuityODNote: odVisualNote.trim() || null,
@@ -407,6 +413,34 @@ function TriageVitalsContent() {
                     <span className="text-[10px] text-slate-400">
                       Both eyes
                     </span>
+                  </div>
+                </div>
+
+                {/* VISUAL ACUITY WITH PINHOLE */}
+                <div className="space-y-3 rounded-2xl border border-purple-100 bg-purple-50/50 p-4">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Visual Acuity with Pinhole (PH)
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Record the measured result for each eye when pinhole testing is performed.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-bold text-slate-600 block">OD — Right Eye (PH)</span>
+                      <select value={odPinhole} onChange={(event) => setOdPinhole(event.target.value)} className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600">
+                        <option value="">Not tested / Not recorded</option>
+                        {VISUAL_ACUITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-bold text-slate-600 block">OS — Left Eye (PH)</span>
+                      <select value={osPinhole} onChange={(event) => setOsPinhole(event.target.value)} className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600">
+                        <option value="">Not tested / Not recorded</option>
+                        {VISUAL_ACUITY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
                   </div>
                 </div>
 
