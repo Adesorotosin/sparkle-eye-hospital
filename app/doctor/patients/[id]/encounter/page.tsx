@@ -1036,7 +1036,7 @@ export default function DoctorEncounterPage() {
                 )}
               </div>
 
-              {optometryResult?.previousOptometryEncounter && (
+              {optometryAssessmentCompleted && optometryResult?.previousOptometryEncounter && (
                 <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Optometry result / feedback</p>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
