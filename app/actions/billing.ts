@@ -71,6 +71,8 @@ export async function getBillingPatient(
   patientCode?: string
 ): Promise<BillingPatientResponse> {
   try {
+    // Billing records are restricted to cashiers and administrators.
+    await requireRole(["IT_ADMIN", "CASHIER"]);
     if (patientCode?.trim()) {
       const { data: patient, error } = await supabaseServer
         .from("patients")
