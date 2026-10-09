@@ -955,11 +955,16 @@ export default function DoctorEncounterPage() {
                 <h3 className="mt-2 font-semibold">Laboratory</h3>
                 <p className="mt-1 text-xs text-gray-500">Orders are sent directly into the Laboratory queue.</p>
               </div>
-              <button onClick={() => router.push(`/cashier?patientCode=${encodeURIComponent(patientCode)}`)} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50">
-                <Wallet className="h-5 w-5 text-blue-600" />
-                <h3 className="mt-2 font-semibold">Cashier</h3>
-                <p className="mt-1 text-xs text-gray-500">Open the patient's billing/payment workflow.</p>
-              </button>
+              <div
+                aria-disabled="true"
+                className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left"
+              >
+                <Wallet className="h-5 w-5 text-gray-400" />
+                <h3 className="mt-2 font-semibold text-gray-700">Cashier</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Billing and payments are handled by the Cashier. Doctors cannot open the cashier workflow.
+                </p>
+              </div>
               <div className="rounded-2xl border p-4">
                 <Pill className="h-5 w-5 text-blue-600" />
                 <h3 className="mt-2 font-semibold">Pharmacy</h3>
