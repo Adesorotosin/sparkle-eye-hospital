@@ -346,6 +346,8 @@ function mapVitals(row: any): TriageVitals {
   return {
     visualAcuityOD,
     visualAcuityOS,
+    visualAcuityODPinhole: row.visual_acuity_od_pinhole ?? undefined,
+    visualAcuityOSPinhole: row.visual_acuity_os_pinhole ?? undefined,
 
     visualAcuityODNote:
       row.visual_acuity_od_note ?? undefined,
