@@ -52,7 +52,6 @@ function TriageVitalsContent() {
   const [osVisualNote, setOsVisualNote] = useState("");
   const [ouVisualNote, setOuVisualNote] = useState("");
 
-  const [withCorrection, setWithCorrection] = useState(false);
 
   // ------------------------------------------------------------
   // GENERAL VITALS
