@@ -110,8 +110,54 @@ export default function CashierDashboard() {
   };
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    let cancelled = false;
+
+    const verifyCashierAccess = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          router.replace("/");
+          return;
+        }
+
+        const data = await response.json();
+        const role = String(data?.user?.role ?? "")
+          .trim()
+          .toUpperCase()
+          .replace(/[\\s-]+/g, "_");
+
+        if (!data?.success || !data?.user) {
+          router.replace("/");
+          return;
+        }
+
+        if (role !== "CASHIER" && role !== "IT_ADMIN") {
+          router.replace("/unauthorized");
+          return;
+        }
+
+        if (!cancelled) {
+          loadDashboard();
+        }
+      } catch (error) {
+        console.error("Cashier access verification failed:", error);
+
+        if (!cancelled) {
+          router.replace("/unauthorized");
+        }
+      }
+    };
+
+    verifyCashierAccess();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const filteredQueue = useMemo(() => {
     const query =
