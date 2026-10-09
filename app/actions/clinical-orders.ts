@@ -7,6 +7,7 @@ import {
   recalcInvoice,
 } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
+import { registerPatient } from "@/lib/patient-flow";
 import { requireRole } from "@/lib/server-auth";
 
 export type DiagnosticOrderInput = {
@@ -224,6 +225,135 @@ export async function createDiagnosticOrder(
       message:
         "An unexpected error occurred while creating the diagnostic order.",
     };
+  }
+}
+
+/**
+ * Register a walk-in referred by another centre for investigation only.
+ * The order still goes through the existing cashier payment workflow.
+ */
+export async function createExternalDiagnosticOrder(input: {
+  fullName: string;
+  age?: number | null;
+  gender?: string;
+  phone?: string;
+  referringCenter: string;
+  testName: string;
+  price: number;
+}): Promise<ClinicalOrderResponse> {
+  try {
+    const staff = await requireRole([
+      "IT_ADMIN",
+      "RECEPTIONIST",
+      "NURSE",
+      "DOCTOR",
+      "OPHTHALMOLOGIST",
+    ]);
+
+    const fullName = input.fullName?.trim();
+    const referringCenter = input.referringCenter?.trim();
+    const name = input.testName?.trim();
+    const price = Number(input.price);
+
+    if (!fullName || !referringCenter || !name) {
+      return {
+        success: false,
+        message: "Patient name, referring centre, and investigation are required.",
+      };
+    }
+
+    if (!Number.isFinite(price) || price < 0) {
+      return { success: false, message: "Enter a valid investigation price." };
+    }
+
+    const age = input.age == null || input.age === "" ? undefined : Number(input.age);
+    if (age !== undefined && (!Number.isInteger(age) || age < 0 || age > 150)) {
+      return { success: false, message: "Age must be a whole number between 0 and 150." };
+    }
+
+    const patient = await registerPatient({
+      fullName,
+      age,
+      gender: input.gender?.trim() || undefined,
+      phone: input.phone?.trim() || undefined,
+      status: "completed_today",
+      isWalkIn: true,
+    });
+
+    const { data: diagnostic, error: diagnosticError } = await supabaseServer
+      .from("diagnostic_orders")
+      .insert({
+        patient_id: patient.id,
+        name,
+        price,
+        status: "ordered",
+        ordered_by: staff.id,
+        referral_source: referringCenter,
+        external_referral: true,
+      })
+      .select("id")
+      .single();
+
+    if (diagnosticError) throw diagnosticError;
+
+    const invoice = await getOrCreateDraftInvoice(patient.id);
+    const { error: itemError } = await supabaseServer
+      .from("invoice_items")
+      .insert({
+        invoice_id: invoice.id,
+        category: "diagnostic",
+        name,
+        quantity: 1,
+        unit_price: price,
+        total_price: price,
+      });
+
+    if (itemError) {
+      console.error("External diagnostic invoice item creation failed:", itemError);
+      return {
+        success: false,
+        message: "Patient and investigation were registered, but the bill item could not be created. Please contact an administrator.",
+        id: diagnostic.id,
+      };
+    }
+
+    await recalcInvoice(invoice.id);
+    await logActivity({
+      module: "Diagnostics",
+      category: "CLINICAL",
+      action: "External investigation registered: " + name,
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: patient.id,
+      details: JSON.stringify({
+        diagnosticOrderId: diagnostic.id,
+        patientCode: patient.patient_code,
+        testName: name,
+        price,
+        referringCenter,
+        externalReferral: true,
+      }),
+      financialAmount: price,
+    });
+
+    revalidatePath("/diagnostics");
+    revalidatePath("/cashier");
+    revalidatePath("/billing");
+
+    return {
+      success: true,
+      message: patient.full_name + " has been registered for investigation only. Please complete payment at the cashier before testing.",
+      id: diagnostic.id,
+    };
+  } catch (error) {
+    console.error("External diagnostic registration failed:", error);
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return { success: false, message: "Please sign in again to continue." };
+    }
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return { success: false, message: "You are not authorized to register external investigation patients." };
+    }
+    return { success: false, message: "Unable to register the external investigation patient. Ensure the database migration has been applied and try again." };
   }
 }
 
