@@ -266,6 +266,36 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      {isLoading && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+          aria-label="Signing in"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-2xl">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#6D4AFF]/10">
+              <Loader2 className="h-8 w-8 animate-spin text-[#6D4AFF]" />
+            </div>
+
+            <h2 className="text-lg font-bold text-slate-900">
+              Signing you in
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Verifying your credentials and preparing your secure workspace.
+            </p>
+
+            <div className="mt-6 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-[#6D4AFF]" />
+            </div>
+
+            <p className="mt-4 text-xs font-medium text-slate-400">
+              Please wait. Do not refresh this page.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
