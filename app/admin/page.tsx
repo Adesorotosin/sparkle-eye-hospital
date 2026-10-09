@@ -184,8 +184,8 @@ export default function ExecutiveOverviewDashboard() {
           ) : (
             <>
               {chart.values.some((item) => item.revenue > 0) ? (
-                <div className="h-56 w-full">
-                  <svg className="h-full w-full" viewBox="0 0 500 180" preserveAspectRatio="none" role="img" aria-label="Revenue by week for the last 30 days">
+                <div className="w-full">
+                  <svg className="h-56 w-full" viewBox="0 0 500 180" preserveAspectRatio="none" role="img" aria-label="Revenue by week for the last 30 days">
                     {[30, 70, 110, 150].map((y) => <line key={y} x1="0" y1={y} x2="500" y2={y} stroke="#e2e8f0" strokeDasharray="4 4" />)}
                     <polygon points={chart.area} fill="#6d4aff" fillOpacity="0.12" />
                     <polyline points={chart.line} fill="none" stroke="#6d4aff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
