@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 
 type Patient = {
   id: string;
@@ -42,6 +43,19 @@ type Appointment = {
   endTime: string;
   status: string;
   notes?: string | null;
+};
+
+type ProcedureRegistration = {
+  id: string;
+  procedureName: string;
+  referralType: string;
+  orderReference: string;
+  scheduledDate?: string | null;
+  price: number;
+  status: string;
+  patientCode: string;
+  registrationNumber?: string | null;
+  patientName: string;
 };
 
 const inputClass =
@@ -108,6 +122,18 @@ export default function ReceptionistPage() {
 
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showProcedureModal, setShowProcedureModal] = useState(false);
+  const [savingProcedure, setSavingProcedure] = useState(false);
+  const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
+  const [procedureForm, setProcedureForm] = useState({
+    patientCode: "",
+    procedureName: "Minor eye procedure",
+    referralType: "doctor_order" as "doctor_order" | "external_referral",
+    orderReference: "",
+    scheduledDate: todayIso(),
+    price: "",
+    notes: "",
+  });
 
   const [patientForm, setPatientForm] = useState({
     fullName: "",
@@ -161,6 +187,8 @@ export default function ReceptionistPage() {
 
       setAppointments(appointmentData.appointments ?? []);
       setPatients(patientData.patients ?? []);
+      const procedureData = await getRecentProcedures();
+      setProcedures(procedureData.procedures ?? []);
     } catch (err) {
       setError(
         err instanceof Error
@@ -277,6 +305,49 @@ export default function ReceptionistPage() {
       );
     } finally {
       setSavingPatient(false);
+    }
+  }
+
+  async function handleRegisterProcedure(event: FormEvent) {
+    event.preventDefault();
+    setSavingProcedure(true);
+    setError("");
+
+    try {
+      const result = await registerProcedure({
+        patientCode: procedureForm.patientCode,
+        procedureName: procedureForm.procedureName === "Other clinician-approved procedure"
+          ? procedureForm.notes.split("\n")[0].trim()
+          : procedureForm.procedureName,
+        referralType: procedureForm.referralType,
+        orderReference: procedureForm.orderReference,
+        scheduledDate: procedureForm.scheduledDate || undefined,
+        price: Number(procedureForm.price),
+        notes: procedureForm.notes,
+      });
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      setShowProcedureModal(false);
+      setProcedureForm({
+        patientCode: "",
+        procedureName: "Minor eye procedure",
+        referralType: "doctor_order",
+        orderReference: "",
+        scheduledDate: date,
+        price: "",
+        notes: "",
+      });
+      notify(result.message);
+      const refreshed = await getRecentProcedures();
+      setProcedures(refreshed.procedures ?? []);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not register procedure.");
+    } finally {
+      setSavingProcedure(false);
     }
   }
 
@@ -788,6 +859,17 @@ export default function ReceptionistPage() {
 
               <button
                 onClick={() => {
+                  setProcedureForm((current) => ({ ...current, scheduledDate: date }));
+                  setShowProcedureModal(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-xs font-extrabold text-purple-700 transition hover:bg-purple-100"
+              >
+                <FilePlus2 className="h-4 w-4" />
+                Register procedure
+              </button>
+
+              <button
+                onClick={() => {
                   setAppointmentForm((current) => ({
                     ...current,
                     date,
@@ -810,7 +892,129 @@ export default function ReceptionistPage() {
             </div>
           </div>
         </section>
+
+        {/* RECENT PROCEDURES */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
+            <div>
+              <h2 className="font-extrabold text-slate-950">Recent procedure registrations</h2>
+              <p className="mt-1 text-xs text-slate-500">Procedures registered by reception. The cashier handles payment; clinical staff confirm readiness and perform the procedure.</p>
+            </div>
+            <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">{procedures.length} recent</span>
+          </div>
+          {procedures.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">No procedures registered yet.</div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {procedures.map((procedure) => (
+                <div key={procedure.id} className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{procedure.procedureName}</p>
+                    <p className="mt-1 text-xs text-slate-500">{procedure.patientName} · Reg. No. {procedure.registrationNumber || procedure.patientCode}</p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {procedure.referralType === "doctor_order" ? "Doctor's order" : "External referral"} · Ref: {procedure.orderReference}
+                      {procedure.scheduledDate ? ` · Date: ${procedure.scheduledDate}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-extrabold text-slate-900">₦{procedure.price.toLocaleString()}</p>
+                    <span className="mt-1 inline-block rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold capitalize text-amber-700">{procedure.status.replace(/_/g, " ")}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </main>
+
+      {/* REGISTER PROCEDURE MODAL */}
+      {showProcedureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
+          <form onSubmit={handleRegisterProcedure} className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div>
+                <h2 className="font-extrabold text-slate-950">Register a procedure</h2>
+                <p className="mt-1 text-xs text-slate-500">Use only for a clinician-approved procedure or an external referral.</p>
+              </div>
+              <button type="button" onClick={() => setShowProcedureModal(false)} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close procedure form"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
+                Reception records the request and appointment only. Do not choose a procedure on the patient's behalf. A clinician's order/reference is required.
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Patient *</span>
+                <select required value={procedureForm.patientCode} onChange={(event) => setProcedureForm({ ...procedureForm, patientCode: event.target.value })} className={inputClass}>
+                  <option value="">Select a patient</option>
+                  {patients.map((patient) => (
+                    <option key={patient.patientId} value={patient.patientId}>
+                      {patient.fullName} · {patient.registrationNumber || patient.patientId}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[11px] text-slate-400">Can’t find the patient? Search for them on the receptionist page first.</span>
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure *</span>
+                <select required value={procedureForm.procedureName} onChange={(event) => setProcedureForm({ ...procedureForm, procedureName: event.target.value })} className={inputClass}>
+                  <option>Minor eye procedure</option>
+                  <option>Foreign body removal</option>
+                  <option>Eyelid procedure</option>
+                  <option>Intravitreal injection</option>
+                  <option>Other clinician-approved procedure</option>
+                </select>
+              </label>
+
+              {procedureForm.procedureName === "Other clinician-approved procedure" && (
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure name (enter as first line in notes) *</span>
+                  <input required value={procedureForm.notes.split("\n")[0] || ""} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value + procedureForm.notes.slice(procedureForm.notes.indexOf("\n") >= 0 ? procedureForm.notes.indexOf("\n") : procedureForm.notes.length) })} className={inputClass} placeholder="Name written on the clinician's order" />
+                </label>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Request source *</span>
+                  <select value={procedureForm.referralType} onChange={(event) => setProcedureForm({ ...procedureForm, referralType: event.target.value as "doctor_order" | "external_referral" })} className={inputClass}>
+                    <option value="doctor_order">Doctor's order</option>
+                    <option value="external_referral">External referral</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Appointment date</span>
+                  <input type="date" value={procedureForm.scheduledDate} onChange={(event) => setProcedureForm({ ...procedureForm, scheduledDate: event.target.value })} className={inputClass} />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Clinician's order / referral reference *</span>
+                <input required value={procedureForm.orderReference} onChange={(event) => setProcedureForm({ ...procedureForm, orderReference: event.target.value })} className={inputClass} placeholder="Enter the order number or referring clinician/centre" />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Approved price (₦) *</span>
+                <input required type="number" min="0" step="0.01" value={procedureForm.price} onChange={(event) => setProcedureForm({ ...procedureForm, price: event.target.value })} className={inputClass} placeholder="Enter the approved price" />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
+                <textarea rows={3} value={procedureForm.notes.split("\n").slice(1).join("\n")} onChange={(event) => setProcedureForm({ ...procedureForm, notes: procedureForm.procedureName === "Other clinician-approved procedure" ? (procedureForm.notes.split("\n")[0] || "") + "\n" + event.target.value : event.target.value })} className={inputClass} placeholder="Scheduling details or referral notes" />
+              </label>
+            </div>
+
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+              <button type="button" onClick={() => setShowProcedureModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold hover:bg-slate-50">Cancel</button>
+              <button disabled={savingProcedure} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-purple-700 disabled:opacity-50">
+                {savingProcedure && <Loader2 className="h-4 w-4 animate-spin" />}
+                {savingProcedure ? "Registering..." : "Register and send bill to cashier"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* REGISTER PATIENT MODAL */}
       {showPatientModal && (
