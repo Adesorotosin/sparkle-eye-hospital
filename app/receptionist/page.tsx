@@ -132,7 +132,6 @@ export default function ReceptionistPage() {
     referralType: "doctor_order" as "doctor_order" | "external_referral",
     orderReference: "",
     scheduledDate: todayIso(),
-    price: "",
     notes: "",
   });
 
@@ -339,7 +338,6 @@ export default function ReceptionistPage() {
         referralType: "doctor_order",
         orderReference: "",
         scheduledDate: date,
-        price: "",
         notes: "",
       });
       notify(result.message);
