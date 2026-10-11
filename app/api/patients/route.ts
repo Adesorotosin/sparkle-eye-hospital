@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       query = query.or(
-        `patient_code.ilike.%${search}%,full_name.ilike.%${search}%,phone.ilike.%${search}%`
+        `patient_code.ilike.%${search}%,registration_number.ilike.%${search}%,full_name.ilike.%${search}%,phone.ilike.%${search}%`
       );
     }
 
@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
     const patients = (data ?? []).map((patient) => ({
       id: patient.id,
       patientId: patient.patient_code,
+      registrationNumber: patient.registration_number ?? null,
       fullName: patient.full_name,
       coveragePlan: patient.coverage_plan,
       age: patient.age,
@@ -345,7 +346,7 @@ export async function POST(request: NextRequest) {
       patientId: patient.id,
       module: "Patients",
       category: "CLINICAL",
-      action: `Patient registered: ${patient.full_name} (${patient.patient_code})`,
+      action: `Patient registered: ${patient.full_name} (${patient.registration_number ?? patient.patient_code})`,
       performedBy: staff.name,
     });
 
@@ -355,6 +356,7 @@ export async function POST(request: NextRequest) {
         patient: {
           id: patient.id,
           patientId: patient.patient_code,
+          registrationNumber: patient.registration_number ?? null,
           fullName: patient.full_name,
           coveragePlan: patient.coverage_plan,
           age: patient.age,
