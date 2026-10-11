@@ -940,14 +940,14 @@ export default function ReceptionistPage() {
             <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
               <div>
                 <h2 className="font-extrabold text-slate-950">Register a procedure</h2>
-                <p className="mt-1 text-xs text-slate-500">Use only for a clinician-approved procedure or an external referral.</p>
+                <p className="mt-1 text-xs text-slate-500">Register an in-house procedure after the doctor has reviewed and approved it.</p>
               </div>
               <button type="button" onClick={() => setShowProcedureModal(false)} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close procedure form"><X className="h-5 w-5" /></button>
             </div>
 
             <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
-                Reception records the request and appointment only. Do not choose a procedure on the patient's behalf. A clinician's order/reference is required.
+                Register the procedure here only after the doctor has reviewed the patient and approved it. Reception selects the approved procedure, and the fixed catalogue price is added to the patient's bill.
               </div>
 
               <label className="block">
