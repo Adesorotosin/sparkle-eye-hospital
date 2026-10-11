@@ -196,12 +196,27 @@ export async function recalcInvoice(invoiceId: string) {
 
   const { data: invoice, error: invoiceError } = await supabaseServer
     .from("invoices")
-    .select("discount_amount")
+    .select("status, discount_amount, vat_rate, vat_amount, subtotal, grand_total")
     .eq("id", invoiceId)
     .single();
 
   if (invoiceError) {
     throw invoiceError;
+  }
+
+  // Finalized invoices are immutable: a policy change must never rewrite
+  // the VAT rate or amount already recorded on a paid invoice.
+  if (invoice.status === "paid" || invoice.status === "cancelled") {
+    const subtotal = Number(invoice.subtotal ?? 0);
+    const discountAmount = Number(invoice.discount_amount ?? 0);
+    return {
+      subtotal,
+      discountAmount,
+      taxableAmount: Math.max(0, subtotal - discountAmount),
+      vatRate: Number(invoice.vat_rate ?? 0),
+      vatAmount: Number(invoice.vat_amount ?? 0),
+      grandTotal: Number(invoice.grand_total ?? 0),
+    };
   }
 
   const subtotal = roundCurrency(
@@ -222,7 +237,8 @@ export async function recalcInvoice(invoiceId: string) {
     Math.max(0, subtotal - discountAmount)
   );
 
-  const vatRate = await getConfiguredVatRate();
+  const vatPolicy = await getConfiguredVatPolicy();
+  const vatRate = vatPolicy.enabled ? vatPolicy.rate : 0;
 
   const vatAmount = roundCurrency(
     taxableAmount * (vatRate / 100)
