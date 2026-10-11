@@ -11,6 +11,7 @@ import {
   BarChart3,
   Bell,
   Settings,
+  Tags,
   LogOut,
   ChevronLeft,
   ChevronRight,
