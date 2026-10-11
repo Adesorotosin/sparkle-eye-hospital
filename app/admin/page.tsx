@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Calendar, Download, ArrowUpRight } from "lucide-react";
+import { Calendar, Download, ArrowUpRight, Settings2 } from "lucide-react";
 
 interface AdminStats {
   totalRevenue: number;
@@ -131,6 +131,10 @@ export default function ExecutiveOverviewDashboard() {
           <Link href="/admin/reports" className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
             <Download className="h-3.5 w-3.5 text-slate-500" />
             Export Reports
+          </Link>
+          <Link href="/admin/billing-settings" className="flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-xs font-bold text-violet-800 transition hover:bg-violet-100">
+            <Settings2 className="h-3.5 w-3.5" />
+            Billing & VAT Settings
           </Link>
         </div>
       </header>
