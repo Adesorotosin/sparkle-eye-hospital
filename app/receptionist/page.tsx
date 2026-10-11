@@ -129,8 +129,6 @@ export default function ReceptionistPage() {
   const [procedureForm, setProcedureForm] = useState({
     patientCode: "",
     procedureCode: "refraction",
-    referralType: "doctor_order" as "doctor_order" | "external_referral",
-    orderReference: "",
     scheduledDate: todayIso(),
     notes: "",
   });
@@ -321,8 +319,6 @@ export default function ReceptionistPage() {
       const result = await registerProcedure({
         patientCode: procedureForm.patientCode,
         procedureCode: procedureForm.procedureCode,
-        referralType: procedureForm.referralType,
-        orderReference: procedureForm.orderReference,
         scheduledDate: procedureForm.scheduledDate || undefined,
         notes: procedureForm.notes,
       });
@@ -335,8 +331,6 @@ export default function ReceptionistPage() {
       setProcedureForm({
         patientCode: "",
         procedureCode: "refraction",
-        referralType: "doctor_order",
-        orderReference: "",
         scheduledDate: date,
         notes: "",
       });
@@ -604,7 +598,7 @@ export default function ReceptionistPage() {
               </span>
               <span>
                 <span className="block text-sm font-extrabold">Register procedure</span>
-                <span className="mt-1 block text-xs font-medium text-purple-700">Schedule a clinician-ordered or referred procedure.</span>
+                <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor's review.</span>
               </span>
             </button>
 
@@ -982,22 +976,13 @@ export default function ReceptionistPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Request source *</span>
-                  <select value={procedureForm.referralType} onChange={(event) => setProcedureForm({ ...procedureForm, referralType: event.target.value as "doctor_order" | "external_referral" })} className={inputClass}>
-                    <option value="doctor_order">Doctor's order</option>
-                    <option value="external_referral">External referral</option>
-                  </select>
+
                 </label>
                 <label className="block">
                   <span className="mb-1.5 block text-xs font-bold text-slate-600">Appointment date</span>
                   <input type="date" value={procedureForm.scheduledDate} onChange={(event) => setProcedureForm({ ...procedureForm, scheduledDate: event.target.value })} className={inputClass} />
                 </label>
               </div>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Clinician's order / referral reference *</span>
-                <input required value={procedureForm.orderReference} onChange={(event) => setProcedureForm({ ...procedureForm, orderReference: event.target.value })} className={inputClass} placeholder="Enter the order number or referring clinician/centre" />
-              </label>
 
               <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
                 <p className="text-xs font-bold text-purple-700">Fixed procedure price</p>
@@ -1007,7 +992,7 @@ export default function ReceptionistPage() {
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
-                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Scheduling details or referral notes" />
+                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Optional scheduling details or notes from the doctor's review" />
               </label>
             </div>
 
