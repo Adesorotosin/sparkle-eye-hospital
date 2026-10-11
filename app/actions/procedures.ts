@@ -86,8 +86,6 @@ export async function updateProcedurePrice(input: {
 export type ProcedureRegistrationInput = {
   patientCode: string;
   procedureCode: string;
-  referralType: "doctor_order" | "external_referral";
-  orderReference: string;
   scheduledDate?: string;
   notes?: string;
 };
@@ -97,13 +95,9 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
     const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
     const patientCode = input.patientCode?.trim();
     const procedureCode = input.procedureCode?.trim();
-    const orderReference = input.orderReference?.trim();
 
-    if (!patientCode || !procedureCode || !orderReference) {
-      return { success: false, message: "Choose a patient, select a procedure, and provide the clinician's order/reference." };
-    }
-    if (!["doctor_order", "external_referral"].includes(input.referralType)) {
-      return { success: false, message: "Choose a valid referral source." };
+    if (!patientCode || !procedureCode) {
+      return { success: false, message: "Choose a patient and select a procedure." };
     }
     if (input.scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledDate)) {
       return { success: false, message: "Choose a valid procedure date." };
@@ -141,8 +135,8 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
       .insert({
         patient_id: patient.id,
         procedure_name: procedureName,
-        referral_type: input.referralType,
-        order_reference: orderReference,
+        referral_type: "doctor_order",
+        order_reference: "In-house after doctor's review",
         scheduled_date: input.scheduledDate || null,
         notes: input.notes?.trim() || null,
         price,
@@ -183,8 +177,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
       details: JSON.stringify({
         procedureOrderId: procedure.id,
         patientCode: patient.patient_code,
-        referralType: input.referralType,
-        orderReference,
+        workflow: "in_house_after_doctors_review",
         scheduledDate: input.scheduledDate || null,
         price,
       }),
