@@ -124,6 +124,7 @@ export default function ReceptionistPage() {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [savingProcedure, setSavingProcedure] = useState(false);
+  const [customProcedureName, setCustomProcedureName] = useState("");
   const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
   const [procedureForm, setProcedureForm] = useState({
     patientCode: "",
@@ -317,7 +318,7 @@ export default function ReceptionistPage() {
       const result = await registerProcedure({
         patientCode: procedureForm.patientCode,
         procedureName: procedureForm.procedureName === "Other clinician-approved procedure"
-          ? procedureForm.notes.split("\n")[0].trim()
+          ? customProcedureName.trim()
           : procedureForm.procedureName,
         referralType: procedureForm.referralType,
         orderReference: procedureForm.orderReference,
@@ -331,6 +332,7 @@ export default function ReceptionistPage() {
       }
 
       setShowProcedureModal(false);
+      setCustomProcedureName("");
       setProcedureForm({
         patientCode: "",
         procedureName: "Minor eye procedure",
@@ -970,8 +972,8 @@ export default function ReceptionistPage() {
 
               {procedureForm.procedureName === "Other clinician-approved procedure" && (
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure name (enter as first line in notes) *</span>
-                  <input required value={procedureForm.notes.split("\n")[0] || ""} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value + procedureForm.notes.slice(procedureForm.notes.indexOf("\n") >= 0 ? procedureForm.notes.indexOf("\n") : procedureForm.notes.length) })} className={inputClass} placeholder="Name written on the clinician's order" />
+                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure name *</span>
+                  <input required value={customProcedureName} onChange={(event) => setCustomProcedureName(event.target.value)} className={inputClass} placeholder="Name written on the clinician's order" />
                 </label>
               )}
 
@@ -1001,7 +1003,7 @@ export default function ReceptionistPage() {
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
-                <textarea rows={3} value={procedureForm.notes.split("\n").slice(1).join("\n")} onChange={(event) => setProcedureForm({ ...procedureForm, notes: procedureForm.procedureName === "Other clinician-approved procedure" ? (procedureForm.notes.split("\n")[0] || "") + "\n" + event.target.value : event.target.value })} className={inputClass} placeholder="Scheduling details or referral notes" />
+                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Scheduling details or referral notes" />
               </label>
             </div>
 
