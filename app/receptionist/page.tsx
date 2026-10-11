@@ -15,6 +15,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 
@@ -483,6 +484,13 @@ export default function ReceptionistPage() {
     setShowAppointmentModal(true);
   }
 
+  const statCards: Array<{ label: string; value: number; Icon: LucideIcon }> = [
+    { label: "Today's Appointments", value: stats.total, Icon: CalendarDays },
+    { label: "Checked In", value: stats.checkedIn, Icon: CheckCircle2 },
+    { label: "Remaining", value: stats.remaining, Icon: Clock3 },
+    { label: "Completed", value: stats.completed, Icon: FilePlus2 },
+  ];
+
   return (
     <div className="min-h-screen bg-[#F4F6FB] text-slate-800">
       {/* HEADER */}
@@ -635,12 +643,7 @@ export default function ReceptionistPage() {
 
         {/* STATS */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ["Today's Appointments", stats.total, CalendarDays],
-            ["Checked In", stats.checkedIn, CheckCircle2],
-            ["Remaining", stats.remaining, Clock3],
-            ["Completed", stats.completed, FilePlus2],
-          ].map(([label, value, Icon]) => (
+          {statCards.map(({ label, value, Icon }) => (
             <div
               key={String(label)}
               className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"
