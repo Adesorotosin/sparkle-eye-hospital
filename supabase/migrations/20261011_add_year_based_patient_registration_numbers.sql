@@ -27,7 +27,7 @@ WHERE p.registration_number ~ '^[0-9]+/[0-9]{2}$'
 GROUP BY 1
 ON CONFLICT (registration_year) DO UPDATE
 SET last_number = GREATEST(
-  public.patient_registration_counters.last_number,
+  patient_registration_counters.last_number,
   EXCLUDED.last_number
 );
 
@@ -60,7 +60,7 @@ BEGIN
   INSERT INTO public.patient_registration_counters (registration_year, last_number)
   VALUES (registration_year, 1)
   ON CONFLICT (registration_year) DO UPDATE
-    SET last_number = public.patient_registration_counters.last_number + 1
+    SET last_number = patient_registration_counters.last_number + 1
   RETURNING last_number INTO next_number;
 
   NEW.registration_number :=
