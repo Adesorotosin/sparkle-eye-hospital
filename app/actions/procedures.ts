@@ -6,36 +6,124 @@ import { getOrCreateDraftInvoice, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
 
+export type ProcedurePrice = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  price: number;
+  active: boolean;
+};
+
+export async function getProcedurePriceCatalog() {
+  try {
+    await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    const { data, error } = await supabaseServer
+      .from("procedure_price_catalog")
+      .select("id, code, name, category, price, active")
+      .order("category", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (error) throw error;
+    return {
+      success: true,
+      procedures: (data ?? []).map((row: any) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        category: row.category,
+        price: Number(row.price ?? 0),
+        active: Boolean(row.active),
+      })) as ProcedurePrice[],
+    };
+  } catch (error) {
+    console.error("Loading procedure price catalogue failed:", error);
+    return {
+      success: false,
+      procedures: [] as ProcedurePrice[],
+      message: "Unable to load procedure prices. Confirm that the procedure price catalogue migration has been applied.",
+    };
+  }
+}
+
+export async function updateProcedurePrice(input: {
+  id: string;
+  price: number;
+  active: boolean;
+}) {
+  try {
+    await requireRole(["IT_ADMIN"]);
+    const price = Number(input.price);
+    if (!input.id || !Number.isFinite(price) || price < 0) {
+      return { success: false, message: "Enter a valid price." };
+    }
+
+    const { error } = await supabaseServer
+      .from("procedure_price_catalog")
+      .update({
+        price,
+        active: Boolean(input.active),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.id);
+
+    if (error) throw error;
+    revalidatePath("/admin/procedure-prices");
+    revalidatePath("/receptionist");
+    return { success: true, message: "Procedure price updated." };
+  } catch (error) {
+    console.error("Updating procedure price failed:", error);
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return { success: false, message: "Please sign in again to continue." };
+    }
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return { success: false, message: "Only an administrator can change procedure prices." };
+    }
+    return { success: false, message: "Could not update this procedure price." };
+  }
+}
+
 export type ProcedureRegistrationInput = {
   patientCode: string;
-  procedureName: string;
+  procedureCode: string;
   referralType: "doctor_order" | "external_referral";
   orderReference: string;
   scheduledDate?: string;
   notes?: string;
-  price: number;
 };
 
 export async function registerProcedure(input: ProcedureRegistrationInput) {
   try {
     const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
     const patientCode = input.patientCode?.trim();
-    const procedureName = input.procedureName?.trim();
+    const procedureCode = input.procedureCode?.trim();
     const orderReference = input.orderReference?.trim();
-    const price = Number(input.price);
 
-    if (!patientCode || !procedureName || !orderReference) {
-      return { success: false, message: "Choose a patient, enter the procedure, and provide the clinician's order/reference." };
+    if (!patientCode || !procedureCode || !orderReference) {
+      return { success: false, message: "Choose a patient, select a procedure, and provide the clinician's order/reference." };
     }
     if (!["doctor_order", "external_referral"].includes(input.referralType)) {
       return { success: false, message: "Choose a valid referral source." };
     }
-    if (!Number.isFinite(price) || price < 0) {
-      return { success: false, message: "Enter a valid approved procedure price." };
-    }
     if (input.scheduledDate && !/^\d{4}-\d{2}-\d{2}$/.test(input.scheduledDate)) {
       return { success: false, message: "Choose a valid procedure date." };
     }
+
+    // Always obtain the name and price from the server-side catalogue.
+    // Never trust a price sent by the browser.
+    const { data: catalogueItem, error: catalogueError } = await supabaseServer
+      .from("procedure_price_catalog")
+      .select("code, name, price, active")
+      .eq("code", procedureCode)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (catalogueError || !catalogueItem) {
+      return { success: false, message: "That procedure is unavailable. Refresh the form or ask the administrator to review the price catalogue." };
+    }
+
+    const procedureName = String(catalogueItem.name);
+    const price = Number(catalogueItem.price);
 
     const { data: patient, error: patientError } = await supabaseServer
       .from("patients")
@@ -67,7 +155,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
 
     if (procedureError || !procedure) {
       console.error("Procedure registration failed:", procedureError);
-      return { success: false, message: "Could not register the procedure. Check that the procedure database migration has been applied." };
+      return { success: false, message: "Could not register the procedure. Check that the procedure database migrations have been applied." };
     }
 
     const { error: itemError } = await supabaseServer.from("invoice_items").insert({
@@ -107,7 +195,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
     revalidatePath("/billing");
     revalidatePath("/cashier");
 
-    return { success: true, message: `${procedureName} registered for ${patient.full_name}. The bill is ready for the cashier; clinical staff must confirm the procedure before performing it.` };
+    return { success: true, message: `${procedureName} registered for ${patient.full_name} at ₦${price.toLocaleString("en-NG")}. The bill is ready for the cashier; clinical staff must confirm the procedure before performing it.` };
   } catch (error) {
     console.error("Procedure registration error:", error);
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
