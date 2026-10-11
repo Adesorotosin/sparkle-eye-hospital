@@ -25,11 +25,19 @@ create index if not exists idx_procedure_orders_invoice
 
 alter table public.procedure_orders enable row level security;
 
--- Procedures are managed by the authenticated server-side application.
--- Extend the existing invoice category constraint without changing other categories.
+-- Preserve the existing billing categories, including laboratory,
+-- and allow optical and procedure items for their respective workflows.
 alter table public.invoice_items
   drop constraint if exists invoice_items_category_check;
 
 alter table public.invoice_items
   add constraint invoice_items_category_check
-  check (category in ('consultation', 'diagnostic', 'pharmacy', 'consumable', 'optical', 'procedure'));
+  check (category in (
+    'consultation',
+    'consumable',
+    'diagnostic',
+    'laboratory',
+    'pharmacy',
+    'optical',
+    'procedure'
+  ));
