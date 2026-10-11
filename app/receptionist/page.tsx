@@ -571,6 +571,76 @@ export default function ReceptionistPage() {
           </div>
         )}
 
+        {/* RECEPTION ACTIONS */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5">
+            <h2 className="font-extrabold text-slate-950">Reception actions</h2>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Start the patient journey from one place.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              onClick={() => setShowPatientModal(true)}
+              className="flex min-h-20 items-center gap-3 rounded-xl bg-purple-600 p-4 text-left text-white transition hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
+                <UserPlus className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-extrabold">Register patient</span>
+                <span className="mt-1 block text-xs font-medium text-purple-100">Create a new patient record.</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setProcedureForm((current) => ({ ...current, scheduledDate: date }));
+                setShowProcedureModal(true);
+              }}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4 text-left text-purple-800 transition hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white">
+                <FilePlus2 className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-extrabold">Register procedure</span>
+                <span className="mt-1 block text-xs font-medium text-purple-700">Schedule a clinician-ordered or referred procedure.</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setAppointmentForm((current) => ({ ...current, date }));
+                setShowAppointmentModal(true);
+              }}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                <CalendarDays className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-extrabold text-slate-900">Book appointment</span>
+                <span className="mt-1 block text-xs font-medium text-slate-500">Schedule a patient visit.</span>
+              </span>
+            </button>
+
+            <button
+              onClick={() => router.push("/triage")}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                <CheckCircle2 className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-extrabold text-slate-900">Open triage queue</span>
+                <span className="mt-1 block text-xs font-medium text-slate-500">View patients awaiting initial assessment.</span>
+              </span>
+            </button>
+          </div>
+        </section>
+
         {/* STATS */}
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
@@ -833,64 +903,6 @@ export default function ReceptionistPage() {
                   ))
                 )}
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* RECEPTION ACTIONS */}
-        <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-extrabold text-slate-950">
-                Reception actions
-              </h2>
-
-              <p className="mt-1 text-xs font-medium text-slate-400">
-                Start the patient journey from one place.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setShowPatientModal(true)}
-                className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-purple-700"
-              >
-                <UserPlus className="h-4 w-4" />
-                Register patient
-              </button>
-
-              <button
-                onClick={() => {
-                  setProcedureForm((current) => ({ ...current, scheduledDate: date }));
-                  setShowProcedureModal(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-4 py-2.5 text-xs font-extrabold text-purple-700 transition hover:bg-purple-100"
-              >
-                <FilePlus2 className="h-4 w-4" />
-                Register procedure
-              </button>
-
-              <button
-                onClick={() => {
-                  setAppointmentForm((current) => ({
-                    ...current,
-                    date,
-                  }));
-
-                  setShowAppointmentModal(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
-              >
-                <CalendarDays className="h-4 w-4" />
-                Book appointment
-              </button>
-
-              <button
-                onClick={() => router.push("/triage")}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-extrabold text-slate-700 transition hover:bg-slate-50"
-              >
-                Open triage queue
-              </button>
             </div>
           </div>
         </section>
