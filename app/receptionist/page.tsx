@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
+import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 
 type Patient = {
   id: string;
@@ -124,11 +124,11 @@ export default function ReceptionistPage() {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [savingProcedure, setSavingProcedure] = useState(false);
-  const [customProcedureName, setCustomProcedureName] = useState("");
   const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
+  const [procedurePrices, setProcedurePrices] = useState<Array<{ id: string; code: string; name: string; category: string; price: number; active: boolean }>>([]);
   const [procedureForm, setProcedureForm] = useState({
     patientCode: "",
-    procedureName: "Minor eye procedure",
+    procedureCode: "refraction",
     referralType: "doctor_order" as "doctor_order" | "external_referral",
     orderReference: "",
     scheduledDate: todayIso(),
@@ -188,8 +188,12 @@ export default function ReceptionistPage() {
 
       setAppointments(appointmentData.appointments ?? []);
       setPatients(patientData.patients ?? []);
-      const procedureData = await getRecentProcedures();
+      const [procedureData, priceCatalog] = await Promise.all([
+        getRecentProcedures(),
+        getProcedurePriceCatalog(),
+      ]);
       setProcedures(procedureData.procedures ?? []);
+      setProcedurePrices((priceCatalog.procedures ?? []).filter((item) => item.active));
     } catch (err) {
       setError(
         err instanceof Error
@@ -317,13 +321,10 @@ export default function ReceptionistPage() {
     try {
       const result = await registerProcedure({
         patientCode: procedureForm.patientCode,
-        procedureName: procedureForm.procedureName === "Other clinician-approved procedure"
-          ? customProcedureName.trim()
-          : procedureForm.procedureName,
+        procedureCode: procedureForm.procedureCode,
         referralType: procedureForm.referralType,
         orderReference: procedureForm.orderReference,
         scheduledDate: procedureForm.scheduledDate || undefined,
-        price: Number(procedureForm.price),
         notes: procedureForm.notes,
       });
 
@@ -332,10 +333,9 @@ export default function ReceptionistPage() {
       }
 
       setShowProcedureModal(false);
-      setCustomProcedureName("");
       setProcedureForm({
         patientCode: "",
-        procedureName: "Minor eye procedure",
+        procedureCode: "refraction",
         referralType: "doctor_order",
         orderReference: "",
         scheduledDate: date,
@@ -973,21 +973,14 @@ export default function ReceptionistPage() {
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure *</span>
-                <select required value={procedureForm.procedureName} onChange={(event) => setProcedureForm({ ...procedureForm, procedureName: event.target.value })} className={inputClass}>
-                  <option>Minor eye procedure</option>
-                  <option>Foreign body removal</option>
-                  <option>Eyelid procedure</option>
-                  <option>Intravitreal injection</option>
-                  <option>Other clinician-approved procedure</option>
+                <select required value={procedureForm.procedureCode} onChange={(event) => setProcedureForm({ ...procedureForm, procedureCode: event.target.value })} className={inputClass}>
+                  {procedurePrices.length === 0 && <option value="">No active procedures available</option>}
+                  {procedurePrices.map((item) => (
+                    <option key={item.code} value={item.code}>{item.name} — ₦{item.price.toLocaleString("en-NG")}</option>
+                  ))}
                 </select>
+                <span className="mt-1 block text-[11px] text-slate-400">Prices are fixed by the administrator and cannot be changed at reception.</span>
               </label>
-
-              {procedureForm.procedureName === "Other clinician-approved procedure" && (
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure name *</span>
-                  <input required value={customProcedureName} onChange={(event) => setCustomProcedureName(event.target.value)} className={inputClass} placeholder="Name written on the clinician's order" />
-                </label>
-              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
@@ -1008,10 +1001,11 @@ export default function ReceptionistPage() {
                 <input required value={procedureForm.orderReference} onChange={(event) => setProcedureForm({ ...procedureForm, orderReference: event.target.value })} className={inputClass} placeholder="Enter the order number or referring clinician/centre" />
               </label>
 
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Approved price (₦) *</span>
-                <input required type="number" min="0" step="0.01" value={procedureForm.price} onChange={(event) => setProcedureForm({ ...procedureForm, price: event.target.value })} className={inputClass} placeholder="Enter the approved price" />
-              </label>
+              <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
+                <p className="text-xs font-bold text-purple-700">Fixed procedure price</p>
+                <p className="mt-1 text-2xl font-extrabold text-purple-950">₦{(procedurePrices.find((item) => item.code === procedureForm.procedureCode)?.price ?? 0).toLocaleString("en-NG")}</p>
+                <p className="mt-1 text-[11px] text-purple-700">This amount is applied automatically to the patient's bill. Only an administrator can change the catalogue price.</p>
+              </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
