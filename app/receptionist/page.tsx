@@ -974,15 +974,10 @@ export default function ReceptionistPage() {
                 <span className="mt-1 block text-[11px] text-slate-400">Prices are fixed by the administrator and cannot be changed at reception.</span>
               </label>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-
-                </label>
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-bold text-slate-600">Appointment date</span>
-                  <input type="date" value={procedureForm.scheduledDate} onChange={(event) => setProcedureForm({ ...procedureForm, scheduledDate: event.target.value })} className={inputClass} />
-                </label>
-              </div>
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure date</span>
+                <input type="date" value={procedureForm.scheduledDate} onChange={(event) => setProcedureForm({ ...procedureForm, scheduledDate: event.target.value })} className={inputClass} />
+              </label>
 
               <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
                 <p className="text-xs font-bold text-purple-700">Fixed procedure price</p>
