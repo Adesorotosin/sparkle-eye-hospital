@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 type Patient = {
   id: string;
   patientId: string;
+  registrationNumber?: string | null;
   fullName: string;
   coveragePlan?: string | null;
   age?: number | null;
@@ -264,7 +265,7 @@ export default function ReceptionistPage() {
       });
 
       notify(
-        `Patient ${data.patient.patientId} registered successfully.`
+        `Patient registered successfully. Registration No.: ${data.patient.registrationNumber ?? 'assigned after database migration'} (Patient code: ${data.patient.patientId}).`
       );
 
       await loadData();
@@ -670,7 +671,7 @@ export default function ReceptionistPage() {
                 </h2>
 
                 <p className="mt-1 text-xs font-medium text-slate-400">
-                  Find an existing patient by code, name or phone.
+                  Find an existing patient by registration number, code, name or phone.
                 </p>
               </div>
 
@@ -709,7 +710,10 @@ export default function ReceptionistPage() {
                           </p>
 
                           <p className="mt-1 text-[11px] font-bold text-purple-600">
-                            {patient.patientId}
+                            Reg. No.: {patient.registrationNumber || "Legacy record"}
+                          </p>
+                          <p className="mt-1 text-[10px] font-medium text-slate-400">
+                            Patient code: {patient.patientId}
                           </p>
 
                           <p className="mt-1 text-[11px] text-slate-400">
@@ -823,7 +827,7 @@ export default function ReceptionistPage() {
                 </h2>
 
                 <p className="mt-1 text-xs font-medium text-slate-400">
-                  A patient code will be generated automatically.
+                  A registration number and internal patient code will be generated automatically.
                 </p>
               </div>
 
