@@ -34,6 +34,7 @@ export default function AdminSidebar({
     { name: "Reports & Analytics", href: "/admin/reports", icon: BarChart3 },
     { name: "Notifications & Alerts", href: "/admin/notifications", icon: Bell },
     { name: "Settings", href: "/admin/settings", icon: Settings },
+    { name: "Procedure Prices", href: "/admin/procedure-prices", icon: Tags },
   ];
 
   const isActive = (href: string) => {
