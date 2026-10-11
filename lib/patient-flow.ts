@@ -149,65 +149,34 @@ function roundCurrency(value: number): number {
 }
 
 /**
- * Reads the currently configured VAT percentage from system settings.
+ * Reads the hospital-wide VAT policy. Older settings without vatEnabled
+ * remain compatible: a positive configured rate means VAT is enabled.
  */
-async function getConfiguredVatRate(): Promise<number> {
+export async function getConfiguredVatPolicy(): Promise<{ enabled: boolean; rate: number }> {
   const { data: settings, error } = await supabaseServer
     .from("system_settings")
     .select("billing")
     .eq("id", "default")
     .maybeSingle();
 
-  if (error) {
-    console.error("Failed to load billing settings:", error);
-    throw error;
+  if (error) throw error;
+
+  const billing = settings?.billing;
+  if (typeof billing !== "object" || billing === null || Array.isArray(billing)) {
+    return { enabled: false, rate: 0 };
   }
 
-  if (!settings) {
-    console.warn(
-      "Default system settings were not found. VAT will default to 0%."
-    );
-    return 0;
-  }
+  const values = billing as Record<string, unknown>;
+  const parsedRate = Number(String(values.vatRate ?? "0").trim().replace(/%/g, ""));
+  const rate = Number.isFinite(parsedRate) && parsedRate >= 0 && parsedRate <= 100
+    ? roundCurrency(parsedRate)
+    : 0;
+  const enabled = typeof values.vatEnabled === "boolean"
+    ? values.vatEnabled
+    : rate > 0;
 
-  const billing = settings.billing;
-
-  if (
-    typeof billing !== "object" ||
-    billing === null ||
-    Array.isArray(billing)
-  ) {
-    console.warn(
-      "Billing settings are not stored as an object. VAT will default to 0%."
-    );
-    return 0;
-  }
-
-  const rawVatRate = (billing as Record<string, unknown>).vatRate;
-
-  if (rawVatRate === undefined || rawVatRate === null) {
-    console.warn(
-      "vatRate was not found in billing settings. VAT will default to 0%."
-    );
-    return 0;
-  }
-
-  const normalizedVatRate = String(rawVatRate)
-    .trim()
-    .replace(/%/g, "");
-
-  const vatRate = Number(normalizedVatRate);
-
-  if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate > 100) {
-    console.warn(
-      `Invalid VAT rate "${String(rawVatRate)}". VAT will default to 0%.`
-    );
-    return 0;
-  }
-
-  return roundCurrency(vatRate);
+  return { enabled, rate };
 }
-
 /**
  * Recalculates an invoice from its line items.
  */
