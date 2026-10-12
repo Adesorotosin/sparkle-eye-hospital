@@ -1856,6 +1856,53 @@ export default function LaboratoryPage() {
           ))
         </div>
 
+        {activeTab === "visiting" && !isLoading && (
+          <form onSubmit={async (event) => {
+            event.preventDefault();
+            setIsSubmitting(true);
+            setActionMessage("");
+            try {
+              const response = await createVisitingLabOrder({
+                fullName: visitingName,
+                sourceCenter: visitingCenter,
+                contactPhone: visitingPhone,
+                testCode: visitingTestCode,
+                testName: visitingTestName,
+                specimenType: visitingSpecimen,
+              });
+              setActionMessage(response.message);
+              if (response.success) {
+                setVisitingName("");
+                setVisitingCenter("");
+                setVisitingPhone("");
+                setVisitingTestCode("");
+                setVisitingTestName("");
+                setVisitingSpecimen("");
+                await refreshOrders();
+              }
+            } catch {
+              setActionMessage("Unable to register the visiting patient.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }} className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-gray-900">Register visiting patient</h3>
+            <p className="mt-1 text-sm text-gray-500">Records stay separate from the main patient register and are not added to in-house billing.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <input required value={visitingName} onChange={(event) => setVisitingName(event.target.value)} placeholder="Patient full name" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingCenter} onChange={(event) => setVisitingCenter(event.target.value)} placeholder="Referring centre" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input value={visitingPhone} onChange={(event) => setVisitingPhone(event.target.value)} placeholder="Contact phone (optional)" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingTestCode} onChange={(event) => setVisitingTestCode(event.target.value)} placeholder="Test code" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingTestName} onChange={(event) => setVisitingTestName(event.target.value)} placeholder="Investigation name" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingSpecimen} onChange={(event) => setVisitingSpecimen(event.target.value)} placeholder="Specimen type" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button disabled={isSubmitting} type="submit" className="rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {isSubmitting ? "Saving..." : "Register & add investigation"}
+              </button>
+            </div>
+          </form>
+        )}
         {isLoading ? (
           <div className="flex min-h-100 items-center justify-center rounded-2xl border border-gray-200 bg-white">
             <div className="flex items-center gap-3 text-sm text-gray-500">
