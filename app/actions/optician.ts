@@ -1474,7 +1474,7 @@ export interface OpticalChargeApprovalItem {
   lensType: string;
   lensMaterial: string;
   lensCoating: string;
-  dispensingNotes: string;
+  chargeApprovalStatus: string;
   submittedAt: string;
 }
 
@@ -1545,9 +1545,10 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
     await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
     const { data: orders, error } = await supabaseServer
       .from("optical_orders")
-      .select("id, patient_id, optical_charge, frame_selection, lens_type, lens_material, lens_coating, dispensing_notes, charge_submitted_at, patients(patient_code, full_name)")
-      .eq("charge_approval_status", "pending")
-      .order("charge_submitted_at", { ascending: true });
+      .select("id, patient_id, status, optical_charge, frame_selection, lens_type, lens_material, lens_coating, charge_approval_status, charge_submitted_at, patients(patient_code, full_name)")
+      .in("status", ["measurements", "referred"])
+      .neq("charge_approval_status", "approved")
+      .order("charge_submitted_at", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
     const items: OpticalChargeApprovalItem[] = (orders ?? []).map((order: any) => {
@@ -1561,7 +1562,7 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
         lensType: order.lens_type ?? "",
         lensMaterial: order.lens_material ?? "",
         lensCoating: order.lens_coating ?? "",
-        dispensingNotes: order.dispensing_notes ?? "",
+        chargeApprovalStatus: order.charge_approval_status ?? "not_submitted",
         submittedAt: order.charge_submitted_at ?? "",
       };
     });
@@ -1575,7 +1576,8 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
 export async function decideOpticalChargeApproval(
   orderId: string,
   decision: "approved" | "rejected",
-  note = ""
+  note = "",
+  approvedCharge?: number
 ): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
@@ -1590,8 +1592,12 @@ export async function decideOpticalChargeApproval(
       .maybeSingle();
     if (error) throw error;
     if (!order) return { success: false, message: "Optical order was not found." };
-    if (order.charge_approval_status !== "pending") {
-      return { success: false, message: "This optical charge is no longer awaiting approval. Refresh the page and try again." };
+    if (!["measurements", "referred"].includes(order.status) || order.charge_approval_status === "approved") {
+      return { success: false, message: "This optical order is no longer awaiting Doctor billing review. Refresh the page and try again." };
+    }
+    const finalCharge = Number(approvedCharge);
+    if (decision === "approved" && (!Number.isFinite(finalCharge) || finalCharge <= 0)) {
+      return { success: false, message: "Enter a final optical charge greater than ₦0 before approving." };
     }
     if (decision === "rejected" && !normalizedNote) {
       return { success: false, message: "Please add a reason when rejecting the proposed charge." };
@@ -1601,14 +1607,15 @@ export async function decideOpticalChargeApproval(
     const { data: updated, error: updateError } = await supabaseServer
       .from("optical_orders")
       .update({
-        charge_approval_status: decision,
+        ...(decision === "approved" ? { optical_charge: finalCharge } : {}),
+        charge_approval_status: decision === "approved" ? "approved" : "rejected",
         charge_approval_note: normalizedNote || null,
         charge_approved_by: staff.id,
         charge_approved_at: now,
         updated_at: now,
       })
       .eq("id", order.id)
-      .eq("charge_approval_status", "pending")
+      .neq("charge_approval_status", "approved")
       .select("id")
       .maybeSingle();
     if (updateError) throw updateError;
@@ -1622,13 +1629,13 @@ export async function decideOpticalChargeApproval(
       performedBy: staff.name,
       staffId: staff.id,
       patientId: order.patient_id,
-      details: JSON.stringify({ opticalOrderId: order.id, patientCode: patient?.patient_code ?? null, decision, proposedCharge: normalizeMoney(order.optical_charge), note: normalizedNote || null }),
-      financialAmount: normalizeMoney(order.optical_charge),
+      details: JSON.stringify({ opticalOrderId: order.id, patientCode: patient?.patient_code ?? null, decision, approvedCharge: decision === "approved" ? finalCharge : null, previousCharge: normalizeMoney(order.optical_charge), note: normalizedNote || null }),
+      financialAmount: decision === "approved" ? finalCharge : normalizeMoney(order.optical_charge),
     });
     revalidatePath("/doctor/optical-approvals");
     revalidatePath("/optician");
     if (patient?.patient_code) revalidatePath(`/optician/${patient.patient_code}`);
-    return { success: true, message: decision === "approved" ? "Optical charge approved. The Optician can now mark the order ready for dispensing." : "Optical charge rejected. The Optician can revise the charge and submit it again.", orderId: order.id };
+    return { success: true, message: decision === "approved" ? "Final optical charge set and approved. The Optician can now mark the order ready for dispensing." : "Optical billing request rejected. The Doctor can review it again after the order is updated.", orderId: order.id };
   } catch (error) {
     return handleError(error, "Unable to update the optical charge approval.");
   }
