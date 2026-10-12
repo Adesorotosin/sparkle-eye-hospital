@@ -18,6 +18,7 @@ import {
   markOpticalOrderCollected,
   markOpticalOrderReady,
   saveOpticalOrder,
+  submitOpticalChargeForApproval,
   startOpticianMeasurements,
   type OpticalOrder,
 } from "@/app/actions/optician";
@@ -523,6 +524,43 @@ export default function OpticianPatientPage({
       if (result.success) {
         refreshPatient();
       }
+    });
+  }
+
+  function handleSubmitChargeForApproval() {
+    if (!order) return;
+
+    setFeedback("");
+    const parsedCharge = opticalCharge.trim() === "" ? 0 : Number(opticalCharge);
+    if (!Number.isFinite(parsedCharge) || parsedCharge <= 0) {
+      setFeedback("Please enter a proposed optical charge greater than ₦0.");
+      return;
+    }
+
+    startTransition(async () => {
+      const saveResult = await saveOpticalOrder({
+        orderId: order.id,
+        pdBinocular: pdBinocular,
+        pdOD,
+        pdOS,
+        segmentHeightOD,
+        segmentHeightOS,
+        frameSelection,
+        lensType,
+        lensMaterial,
+        lensCoating,
+        dispensingNotes,
+        opticalCharge: parsedCharge,
+      });
+
+      if (!saveResult.success) {
+        setFeedback(saveResult.message);
+        return;
+      }
+
+      const result = await submitOpticalChargeForApproval(order.id);
+      setFeedback(result.message);
+      if (result.success) refreshPatient();
     });
   }
 
@@ -1038,12 +1076,12 @@ export default function OpticianPatientPage({
             </SectionCard>
 
             <SectionCard
-              title="Optical Billing"
-              description="Enter the total charge for the patient's eyewear order. This amount will be added to the patient's invoice when the order is marked ready."
+              title="Proposed Optical Charge"
+              description="Submit the total eyewear charge for Doctor approval. It will only be added to the patient invoice after approval and when the order is marked ready."
             >
               <div className="max-w-md">
                 <InputField
-                  label="Total Optical Charge (₦)"
+                  label="Proposed Optical Charge (₦)"
                   value={opticalCharge}
                   onChange={setOpticalCharge}
                   placeholder="e.g. 85000"
@@ -1053,19 +1091,58 @@ export default function OpticianPatientPage({
                   disabled={
                     !measurementsStarted ||
                     orderReady ||
-                    orderCollected
+                    orderCollected ||
+                    order?.chargeApprovalStatus === "pending"
                   }
                 />
 
                 <p className="mt-2 text-xs text-slate-500">
-                  Include the complete eyewear charge, including frame,
-                  lenses, coatings and other optical items supplied.
+                  Include the frame, lenses, coatings and any other optical items supplied.
                 </p>
+
+                {order ? (
+                  <div className={`mt-4 rounded-xl border p-3 text-sm ${
+                    order.chargeApprovalStatus === "approved"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : order.chargeApprovalStatus === "pending"
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : order.chargeApprovalStatus === "rejected"
+                          ? "border-rose-200 bg-rose-50 text-rose-800"
+                          : "border-slate-200 bg-slate-50 text-slate-600"
+                  }`}>
+                    <p className="font-semibold">
+                      Charge approval: {
+                        order.chargeApprovalStatus === "approved"
+                          ? "Approved by Doctor"
+                          : order.chargeApprovalStatus === "pending"
+                            ? "Awaiting Doctor approval"
+                            : order.chargeApprovalStatus === "rejected"
+                              ? "Rejected — revise and resubmit"
+                              : "Not submitted"
+                      }
+                    </p>
+                    {order.chargeApprovalNote ? (
+                      <p className="mt-1 text-xs">Doctor's note: {order.chargeApprovalNote}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {order && measurementsStarted && !orderReady && !orderCollected && order.chargeApprovalStatus !== "approved" ? (
+                  <button
+                    type="button"
+                    onClick={handleSubmitChargeForApproval}
+                    disabled={isPending || order.chargeApprovalStatus === "pending" || !hasValidOpticalCharge}
+                    className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                    {order.chargeApprovalStatus === "pending" ? "Awaiting Doctor Approval" : "Submit Charge for Approval"}
+                  </button>
+                ) : null}
 
                 {hasValidOpticalCharge ? (
                   <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
-                      Current Optical Charge
+                      Proposed Charge
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-violet-900">
@@ -1135,7 +1212,7 @@ export default function OpticianPatientPage({
                 {order ? (
                   <div className="border-t border-white/10 pt-4">
                     <p className="text-xs text-slate-400">
-                      Optical Charge
+                      Proposed Charge
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-white">
@@ -1229,7 +1306,8 @@ export default function OpticianPatientPage({
 
                   {measurementsStarted &&
                   !orderReady &&
-                  !orderCollected ? (
+                  !orderCollected &&
+                  order.chargeApprovalStatus === "approved" ? (
                     <button
                       type="button"
                       onClick={handleMarkReady}

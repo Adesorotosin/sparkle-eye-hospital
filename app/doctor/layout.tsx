@@ -15,6 +15,7 @@ import {
   LogOut,
   ChevronDown,
   TestTube2,
+  BadgeCheck,
 } from "lucide-react";
 
 type ActivePatient = {
@@ -92,6 +93,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope },
     { name: "Appointments", href: "/appointments", icon: Calendar },
     { name: "Optical Inventory", href: "/inventory", icon: Package },
+    { name: "Optical Charge Approvals", href: "/doctor/optical-approvals", icon: BadgeCheck },
   ];
 
   const allergyItems = (activePatient?.allergies ?? "")
