@@ -25,6 +25,7 @@ import {
   FlaskConical,
   LogOut,
   Microscope,
+  Bell,
   Search,
   TestTube2,
   User,
@@ -67,13 +68,6 @@ type ResultParameter = {
 type LabResult = {
   parameters: ResultParameter[];
   comments: string;
-};
-
-type LabTimelineItem = {
-  label: string;
-  date?: string;
-  by?: string;
-  completed: boolean;
 };
 
 type LabOrder = {
@@ -364,61 +358,6 @@ function flagClasses(flag: ResultFlag) {
   }
 }
 
-function buildTimeline(order: LabOrder): LabTimelineItem[] {
-  const processingStarted =
-    Boolean(order.processingAt) ||
-    order.status === "PROCESSING" ||
-    order.status === "AWAITING_VERIFICATION" ||
-    order.status === "COMPLETED";
-
-  const resultEntered =
-    Boolean(order.resultEnteredAt) ||
-    order.status === "AWAITING_VERIFICATION" ||
-    order.status === "COMPLETED";
-
-  const resultVerified =
-    Boolean(order.verifiedAt) ||
-    order.status === "COMPLETED";
-
-  return [
-    {
-      label: "Test Ordered",
-      date: order.orderedAt,
-      by: order.orderedBy,
-      completed: Boolean(order.orderedAt),
-    },
-    {
-      label: "Sample Collected",
-      date: order.collectedAt,
-      by: order.collectedBy,
-      completed: Boolean(order.collectedAt),
-    },
-    {
-      label: "Sample Received",
-      date: order.receivedAt,
-      by: order.receivedBy,
-      completed: Boolean(order.receivedAt),
-    },
-    {
-      label: "Processing Started",
-      date: order.processingAt,
-      by: order.processedBy,
-      completed: processingStarted,
-    },
-    {
-      label: "Result Entered",
-      date: order.resultEnteredAt,
-      by: order.resultEnteredBy,
-      completed: resultEntered,
-    },
-    {
-      label: "Result Verified",
-      date: order.verifiedAt,
-      by: order.verifiedBy,
-      completed: resultVerified,
-    },
-  ];
-}
 
 export default function LaboratoryPage() {
   const router = useRouter();
@@ -427,6 +366,8 @@ export default function LaboratoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [seenRequestIds, setSeenRequestIds] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting" | "overview" | "queue" | "results" | "history">("request");
   const [visitingName, setVisitingName] = useState("");
@@ -513,6 +454,37 @@ export default function LaboratoryPage() {
   };
 
   useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("sparkle-eye-lab-seen-requests");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+          setSeenRequestIds(parsed);
+        }
+      }
+    } catch {
+      // Notifications still work for this session if browser storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const pollForRequests = async () => {
+      try {
+        const response = await getLabOrders();
+        if (active && response.success) setOrders(response.orders);
+      } catch {
+        // Keep the current dashboard usable if a background refresh fails.
+      }
+    };
+    const intervalId = window.setInterval(pollForRequests, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     async function load() {
@@ -547,6 +519,28 @@ export default function LaboratoryPage() {
       mounted = false;
     };
   }, []);
+
+  const pendingRequests = useMemo(
+    () => orders.filter((order) => order.status === "PENDING"),
+    [orders]
+  );
+
+  const unreadRequestCount = pendingRequests.filter(
+    (order) => !seenRequestIds.includes(order.id)
+  ).length;
+
+  function markRequestsSeen() {
+    const nextSeen = Array.from(new Set([
+      ...seenRequestIds,
+      ...pendingRequests.map((order) => order.id),
+    ]));
+    setSeenRequestIds(nextSeen);
+    try {
+      window.localStorage.setItem("sparkle-eye-lab-seen-requests", JSON.stringify(nextSeen));
+    } catch {
+      // The badge remains usable for this session if storage is unavailable.
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1522,10 +1516,6 @@ export default function LaboratoryPage() {
   }
 
   if (selectedOrder) {
-    const timeline = buildTimeline(
-      selectedOrder
-    );
-
     return (
       <div className="min-h-screen bg-[#f8fafc] text-gray-900">
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
@@ -1664,72 +1654,49 @@ export default function LaboratoryPage() {
             </section>
 
             <aside className="space-y-6">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                 <SectionHeading
-                  icon={
-                    <Clock3 className="h-5 w-5" />
-                  }
-                  title="Order Timeline"
-                  description="Laboratory workflow progress."
+                  icon={<Activity className="h-5 w-5" />}
+                  title="Processing Status"
+                  description="Compact five-stage progress."
                 />
 
-                <div className="mt-6 space-y-0">
-                  {timeline.map(
-                    (item, index) => (
-                      <div
-                        key={item.label}
-                        className="relative flex gap-4 pb-7 last:pb-0"
-                      >
-                        {index <
-                          timeline.length - 1 && (
-                          <div
-                            className={`absolute left-2.5 top-6 h-full w-px ${
-                              item.completed
-                                ? "bg-emerald-200"
-                                : "bg-gray-200"
-                            }`}
-                          />
-                        )}
-
-                        <div
-                          className={`relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                            item.completed
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-gray-300 bg-white"
+                {selectedOrder.status === "RECOLLECTION" ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-semibold text-red-700">Recollection required</p>
+                    <p className="mt-1 text-xs text-red-600">
+                      {selectedOrder.recollectionReason || "A new sample is required before processing can continue."}
+                    </p>
+                  </div>
+                ) : (
+                  <ol className="mt-4 flex flex-wrap gap-2">
+                    {([
+                      { status: "PENDING", label: "Pending" },
+                      { status: "COLLECTED", label: "Collected" },
+                      { status: "PROCESSING", label: "Processing" },
+                      { status: "AWAITING_VERIFICATION", label: "Verify" },
+                      { status: "COMPLETED", label: "Completed" },
+                    ] as const).map((step, index, steps) => {
+                      const currentIndex = steps.findIndex((item) => item.status === selectedOrder.status);
+                      const done = currentIndex >= 0 && index < currentIndex;
+                      const current = step.status === selectedOrder.status;
+                      return (
+                        <li
+                          key={step.status}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
+                            current ? "border-purple-200 bg-purple-50 text-purple-700" :
+                            done ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+                            "border-gray-200 bg-gray-50 text-gray-400"
                           }`}
+                          aria-current={current ? "step" : undefined}
                         >
-                          {item.completed && (
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <p
-                            className={`text-sm font-medium ${
-                              item.completed
-                                ? "text-gray-900"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {item.label}
-                          </p>
-
-                          {item.date && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {item.date}
-                            </p>
-                          )}
-
-                          {item.by && (
-                            <p className="mt-0.5 text-xs text-gray-400">
-                              {item.by}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
+                          {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[10px]">{index + 1}</span>}
+                          <span>{step.label}</span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
               </div>
 
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -1796,7 +1763,94 @@ export default function LaboratoryPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                type="button"
+                aria-label={unreadRequestCount ? `Notifications, ${unreadRequestCount} new laboratory requests` : "Laboratory notifications"}
+                aria-expanded={isNotificationOpen}
+                onClick={() => {
+                  const willOpen = !isNotificationOpen;
+                  setIsNotificationOpen(willOpen);
+                  if (willOpen) markRequestsSeen();
+                }}
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 hover:text-purple-700"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadRequestCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {unreadRequestCount > 99 ? "99+" : unreadRequestCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">New lab requests</p>
+                      <p className="text-xs text-gray-500">{pendingRequests.length} pending</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsNotificationOpen(false)}
+                      aria-label="Close notifications"
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {pendingRequests.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <Bell className="mx-auto h-6 w-6 text-gray-300" />
+                      <p className="mt-2 text-sm font-medium text-gray-700">You’re all caught up</p>
+                      <p className="mt-1 text-xs text-gray-500">New doctor requests will appear here.</p>
+                    </div>
+                  ) : (
+                    <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto">
+                      {pendingRequests.slice(0, 8).map((order) => (
+                        <li key={order.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setIsNotificationOpen(false);
+                            }}
+                            className="w-full px-4 py-3 text-left transition hover:bg-purple-50"
+                          >
+                            <span className="flex items-start justify-between gap-3">
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium text-gray-900">{order.test}</span>
+                                <span className="mt-1 block truncate text-xs text-gray-500">{order.patientName} · {order.patientId}</span>
+                              </span>
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                order.priority === "STAT" ? "bg-red-50 text-red-700" :
+                                order.priority === "URGENT" ? "bg-orange-50 text-orange-700" :
+                                "bg-gray-100 text-gray-600"
+                              }`}>{priorityLabel(order.priority)}</span>
+                            </span>
+                            <span className="mt-2 block text-xs font-medium text-purple-700">Open request →</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {pendingRequests.length > 8 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("request");
+                        setIsNotificationOpen(false);
+                      }}
+                      className="w-full border-t border-gray-100 px-4 py-3 text-center text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                    >
+                      View all {pendingRequests.length} requests
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="hidden items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 sm:flex">
               <Microscope className="h-4 w-4 text-purple-600" />
 
