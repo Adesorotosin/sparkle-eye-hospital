@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collectLabSample,
+  createVisitingLabOrder,
   getLabOrders,
   receiveLabSample,
   requestLabRecollection,
@@ -79,6 +80,8 @@ type LabOrder = {
   id: string;
   patientId: string;
   patientName: string;
+  patientType: "IN_HOUSE" | "VISITING";
+  sourceCenter?: string;
   age?: number;
   sex?: string;
   test: string;
@@ -425,9 +428,13 @@ export default function LaboratoryPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "queue" | "results" | "history"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting" | "overview" | "queue" | "results" | "history">("request");
+  const [visitingName, setVisitingName] = useState("");
+  const [visitingCenter, setVisitingCenter] = useState("");
+  const [visitingPhone, setVisitingPhone] = useState("");
+  const [visitingTestCode, setVisitingTestCode] = useState("");
+  const [visitingTestName, setVisitingTestName] = useState("");
+  const [visitingSpecimen, setVisitingSpecimen] = useState("");
 
   const [selectedOrderId, setSelectedOrderId] =
     useState<string | null>(null);
@@ -567,17 +574,15 @@ export default function LaboratoryPage() {
         priorityFilter === "ALL" ||
         order.priority === priorityFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority
-      );
+      const matchesTab = activeTab === "request" ? order.status === "PENDING" : activeTab === "in-house" ? order.patientType === "IN_HOUSE" : activeTab === "visiting" ? order.patientType === "VISITING" : true;
+      return matchesSearch && matchesStatus && matchesPriority && matchesTab;
     });
   }, [
     orders,
     search,
     statusFilter,
     priorityFilter,
+    activeTab,
   ]);
 
   const pendingCount = orders.filter(
@@ -1836,34 +1841,68 @@ export default function LaboratoryPage() {
 
         <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
           {[
-            ["overview", "Overview"],
-            ["queue", "Work Queue"],
-            ["results", "Results"],
-            ["history", "History"],
+            ["request", "Request"],
+            ["in-house", "In-house"],
+            ["visiting", "Visiting"],
           ].map(([value, label]) => (
             <button
               key={value}
               type="button"
-              onClick={() =>
-                setActiveTab(
-                  value as
-                    | "overview"
-                    | "queue"
-                    | "results"
-                    | "history"
-                )
-              }
-              className={`border-b-2 px-4 py-3 text-sm font-medium transition ${
-                activeTab === value
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
-              }`}
+              onClick={() => setActiveTab(value as "request" | "in-house" | "visiting")}
+              className={"border-b-2 px-4 py-3 text-sm font-medium transition " + (activeTab === value ? "border-purple-600 text-purple-600" : "border-transparent text-gray-500 hover:text-gray-800")}
             >
               {label}
             </button>
           ))}
         </div>
 
+        {activeTab === "visiting" && !isLoading && (
+          <form onSubmit={async (event) => {
+            event.preventDefault();
+            setIsSubmitting(true);
+            setActionMessage("");
+            try {
+              const response = await createVisitingLabOrder({
+                fullName: visitingName,
+                sourceCenter: visitingCenter,
+                contactPhone: visitingPhone,
+                testCode: visitingTestCode,
+                testName: visitingTestName,
+                specimenType: visitingSpecimen,
+              });
+              setActionMessage(response.message);
+              if (response.success) {
+                setVisitingName("");
+                setVisitingCenter("");
+                setVisitingPhone("");
+                setVisitingTestCode("");
+                setVisitingTestName("");
+                setVisitingSpecimen("");
+                await refreshOrders();
+              }
+            } catch {
+              setActionMessage("Unable to register the visiting patient.");
+            } finally {
+              setIsSubmitting(false);
+            }
+          }} className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h3 className="font-semibold text-gray-900">Register visiting patient</h3>
+            <p className="mt-1 text-sm text-gray-500">Records stay separate from the main patient register and are not added to in-house billing.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <input required value={visitingName} onChange={(event) => setVisitingName(event.target.value)} placeholder="Patient full name" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingCenter} onChange={(event) => setVisitingCenter(event.target.value)} placeholder="Referring centre" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input value={visitingPhone} onChange={(event) => setVisitingPhone(event.target.value)} placeholder="Contact phone (optional)" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingTestCode} onChange={(event) => setVisitingTestCode(event.target.value)} placeholder="Test code" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingTestName} onChange={(event) => setVisitingTestName(event.target.value)} placeholder="Investigation name" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+              <input required value={visitingSpecimen} onChange={(event) => setVisitingSpecimen(event.target.value)} placeholder="Specimen type" className="h-10 rounded-lg border border-gray-200 px-3 text-sm" />
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button disabled={isSubmitting} type="submit" className="rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                {isSubmitting ? "Saving..." : "Register & add investigation"}
+              </button>
+            </div>
+          </form>
+        )}
         {isLoading ? (
           <div className="flex min-h-100 items-center justify-center rounded-2xl border border-gray-200 bg-white">
             <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -2067,19 +2106,19 @@ export default function LaboratoryPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        {activeTab === "queue"
-                          ? "Laboratory Work Queue"
-                          : activeTab === "results"
-                            ? "Laboratory Results"
-                            : "Laboratory History"}
+                        {activeTab === "request"
+                          ? "Requested Investigations"
+                          : activeTab === "in-house"
+                            ? "In-house Investigations"
+                            : "Visiting Patient Investigations"}
                       </h3>
 
                       <p className="mt-1 text-sm text-gray-500">
-                        {activeTab === "queue"
-                          ? "Find and manage laboratory investigations."
-                          : activeTab === "results"
-                            ? "Review laboratory investigations and their results."
-                            : "Review the laboratory investigation history."}
+                        {activeTab === "request"
+                          ? "Review newly requested investigations awaiting collection."
+                          : activeTab === "in-house"
+                            ? "Manage investigations for registered hospital patients."
+                            : "Manage investigations for patients referred by other centres."}
                       </p>
                     </div>
 
