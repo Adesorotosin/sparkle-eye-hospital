@@ -20,6 +20,7 @@ import {
   Beaker,
   CheckCircle2,
   ChevronLeft,
+  Clock3,
   FileCheck2,
   FlaskConical,
   LogOut,
