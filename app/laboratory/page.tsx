@@ -1658,7 +1658,7 @@ export default function LaboratoryPage() {
                 <SectionHeading
                   icon={<Activity className="h-5 w-5" />}
                   title="Processing Status"
-                  description="Five clear stages. No long timeline."
+                  description="Compact five-stage progress."
                 />
 
                 {selectedOrder.status === "RECOLLECTION" ? (
@@ -1669,31 +1669,29 @@ export default function LaboratoryPage() {
                     </p>
                   </div>
                 ) : (
-                  <ol className="mt-4 grid grid-cols-1 gap-2">
+                  <ol className="mt-4 flex flex-wrap gap-2">
                     {([
                       { status: "PENDING", label: "Pending" },
                       { status: "COLLECTED", label: "Collected" },
                       { status: "PROCESSING", label: "Processing" },
-                      { status: "AWAITING_VERIFICATION", label: "Verify result" },
+                      { status: "AWAITING_VERIFICATION", label: "Verify" },
                       { status: "COMPLETED", label: "Completed" },
                     ] as const).map((step, index, steps) => {
                       const currentIndex = steps.findIndex((item) => item.status === selectedOrder.status);
                       const done = currentIndex >= 0 && index < currentIndex;
                       const current = step.status === selectedOrder.status;
                       return (
-                        <li key={step.status} className="flex items-center gap-3">
-                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                            done ? "bg-emerald-100 text-emerald-700" :
-                            current ? "bg-purple-600 text-white" :
-                            "bg-gray-100 text-gray-400"
-                          }`}>
-                            {done ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                          </span>
-                          <span className={`text-sm ${
-                            current ? "font-semibold text-purple-700" :
-                            done ? "text-gray-700" : "text-gray-400"
-                          }`}>{step.label}</span>
-                          {current && <span className="ml-auto rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">Current</span>}
+                        <li
+                          key={step.status}
+                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
+                            current ? "border-purple-200 bg-purple-50 text-purple-700" :
+                            done ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+                            "border-gray-200 bg-gray-50 text-gray-400"
+                          }`}
+                          aria-current={current ? "step" : undefined}
+                        >
+                          {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span className="text-[10px]">{index + 1}</span>}
+                          <span>{step.label}</span>
                         </li>
                       );
                     })}
