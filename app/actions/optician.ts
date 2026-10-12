@@ -1369,23 +1369,13 @@ export async function saveOpticalOrder(
       updatePayload.optical_charge = normalizedCharge;
     }
 
-    const chargeRelevantDetailsChanged =
-      normalizedCharge !== normalizeMoney(order.optical_charge) ||
-      emptyToNull(input.frameSelection) !== (order.frame_selection ?? null) ||
-      emptyToNull(input.lensType) !== (order.lens_type ?? null) ||
-      emptyToNull(input.lensMaterial) !== (order.lens_material ?? null) ||
-      emptyToNull(input.lensCoating) !== (order.lens_coating ?? null);
-
-    if (
-      chargeRelevantDetailsChanged &&
-      ["pending", "approved", "rejected"].includes(order.charge_approval_status ?? "")
-    ) {
-      updatePayload.charge_approval_status = "not_submitted";
-      updatePayload.charge_approval_note = null;
-      updatePayload.charge_approved_by = null;
-      updatePayload.charge_approved_at = null;
-      updatePayload.charge_submitted_at = null;
-    }
+    // Saving the optical order is also the explicit handoff to the Doctor.
+    // The Doctor sets the final charge, so no proposed amount is required here.
+    updatePayload.charge_approval_status = "pending";
+    updatePayload.charge_approval_note = null;
+    updatePayload.charge_approved_by = null;
+    updatePayload.charge_approved_at = null;
+    updatePayload.charge_submitted_at = now;
 
     const {
       error: updateError,
@@ -1409,9 +1399,9 @@ export async function saveOpticalOrder(
 
     await logActivity({
       module: "Optician",
-      category: "CLINICAL",
+      category: "BILLING",
       action:
-        "Optical order measurements saved",
+        "Optical order saved and sent for Doctor billing review",
       performedBy:
         staff.name,
       staffId:
@@ -1437,6 +1427,7 @@ export async function saveOpticalOrder(
         }),
     });
 
+    revalidatePath("/doctor/optical-approvals");
     revalidatePath(
       "/optician"
     );
@@ -1450,7 +1441,7 @@ export async function saveOpticalOrder(
     return {
       success: true,
       message:
-        "Optical order saved successfully.",
+        "Optical order saved and sent to the Doctor for final billing review.",
       orderId:
         order.id,
     };
@@ -1547,7 +1538,7 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
       .from("optical_orders")
       .select("id, patient_id, status, optical_charge, frame_selection, lens_type, lens_material, lens_coating, charge_approval_status, charge_submitted_at, patients(patient_code, full_name)")
       .in("status", ["measurements", "referred"])
-      .neq("charge_approval_status", "approved")
+      .eq("charge_approval_status", "pending")
       .order("charge_submitted_at", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
