@@ -806,86 +806,32 @@ export default function OpticianPatientPage({
           <div className="space-y-6">
             <SectionCard
               title="Optometry Prescription"
-              description="Completed clinical assessment received from Optometry. This information is read-only."
             >
               {!optometry ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <p className="text-sm font-semibold text-amber-900">
                     No completed Optometry assessment found.
                   </p>
-
                   <p className="mt-1 text-sm text-amber-700">
-                    The optical order should only be processed after
-                    Optometry completes the patient's assessment.
+                    Complete the Optometry assessment before processing this optical order.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <ReadOnlyField
-                      label="Visual Acuity OD"
-                      value={optometry.visualAcuityOD}
-                    />
-
-                    <ReadOnlyField
-                      label="Visual Acuity OS"
-                      value={optometry.visualAcuityOS}
-                    />
-
-                    <ReadOnlyField
-                      label="Visual Acuity OU"
-                      value={optometry.visualAcuityOU}
-                    />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Right Eye — OD
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      {formatRefraction(optometry.refractionOD)}
+                    </p>
                   </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">
-                        Right Eye — OD
-                      </p>
-
-                      <p className="mt-3 text-sm leading-6 text-slate-600">
-                        {formatRefraction(
-                          optometry.refractionOD
-                        )}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-semibold text-slate-900">
-                        Left Eye — OS
-                      </p>
-
-                      <p className="mt-3 text-sm leading-6 text-slate-600">
-                        {formatRefraction(
-                          optometry.refractionOS
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <ReadOnlyField
-                      label="Correction Used"
-                      value={
-                        optometry.withCorrection
-                          ? "With correction"
-                          : "Without correction"
-                      }
-                    />
-
-                    <ReadOnlyField
-                      label="Clinical Impression"
-                      value={optometry.diagnosis}
-                    />
-                  </div>
-
-                  <div className="border-t border-slate-100 pt-4">
-                    <p className="text-xs text-slate-400">
-                      Optometry assessment recorded{" "}
-                      {formatDate(
-                        optometry.createdAt
-                      )}
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Left Eye — OS
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                      {formatRefraction(optometry.refractionOS)}
                     </p>
                   </div>
                 </div>
