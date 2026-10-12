@@ -420,7 +420,7 @@ export async function createVisitingLabOrder(
   input: VisitingLabOrderInput
 ): Promise<LabOrderResponse> {
   try {
-    const staff = await getLabOrderCreators();
+    const staff = await getLabStaff();
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();
