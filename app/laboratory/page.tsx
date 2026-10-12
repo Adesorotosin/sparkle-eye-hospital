@@ -1853,7 +1853,7 @@ export default function LaboratoryPage() {
             >
               {label}
             </button>
-          ))
+          ))}
         </div>
 
         {activeTab === "visiting" && !isLoading && (
