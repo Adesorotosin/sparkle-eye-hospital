@@ -719,6 +719,8 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
         )
       );
 
+    const visitingPatientMap = new Map((visitingPatientsResult.data ?? []).map((patient) => [patient.id, patient]));
+
     const staffMap =
       new Map(
         (staffResult.data ?? []).map(
@@ -745,6 +747,8 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
           patientMap.get(
             order.patient_id
           );
+
+        const visitingPatient = order.visiting_patient_id ? visitingPatientMap.get(order.visiting_patient_id) : undefined;
 
         const result =
           resultMap.get(
@@ -830,13 +834,10 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
         return {
           id: order.id,
 
-          patientId:
-            patient?.patient_code ??
-            order.patient_id,
-
-          patientName:
-            patient?.full_name ??
-            "Unknown patient",
+          patientId: patient?.patient_code ?? (visitingPatient ? "VISITING" : order.patient_id ?? "Unknown"),
+          patientName: patient?.full_name ?? visitingPatient?.full_name ?? "Unknown patient",
+          patientType: visitingPatient ? "VISITING" : "IN_HOUSE",
+          sourceCenter: visitingPatient?.source_center ?? undefined,
 
           age: undefined,
           sex: undefined,
