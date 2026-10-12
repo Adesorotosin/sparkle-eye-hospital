@@ -403,10 +403,101 @@ export async function createLabOrder(
   }
 }
 
+export type VisitingLabOrderInput = {
+  fullName: string;
+  sourceCenter: string;
+  contactPhone?: string;
+  sex?: string;
+  dateOfBirth?: string;
+  testCode: string;
+  testName: string;
+  specimenType: string;
+  priority?: LabOrderPriority;
+  clinicalNotes?: string;
+};
+
+export async function createVisitingLabOrder(
+  input: VisitingLabOrderInput
+): Promise<LabOrderResponse> {
+  try {
+    const staff = await getLabOrderCreators();
+    const fullName = input.fullName?.trim();
+    const sourceCenter = input.sourceCenter?.trim();
+    const testCode = input.testCode?.trim().toUpperCase();
+    const testName = input.testName?.trim();
+    const specimenType = input.specimenType?.trim();
+    const priority = input.priority ?? "NORMAL";
+
+    if (!fullName || !sourceCenter || !testCode || !testName || !specimenType) {
+      return { success: false, message: "Patient name, referring centre, test code, test name, and specimen type are required." };
+    }
+    if (!["NORMAL", "URGENT", "STAT"].includes(priority)) {
+      return { success: false, message: "Invalid laboratory order priority." };
+    }
+
+    const { data: visitingPatient, error: patientError } = await supabaseServer
+      .from("visiting_lab_patients")
+      .insert({
+        full_name: fullName,
+        source_center: sourceCenter,
+        contact_phone: input.contactPhone?.trim() || null,
+        sex: input.sex || null,
+        date_of_birth: input.dateOfBirth || null,
+        notes: input.clinicalNotes?.trim() || null,
+        created_by: staff.id,
+      })
+      .select("id")
+      .single();
+
+    if (patientError || !visitingPatient) {
+      console.error("Visiting laboratory patient creation failed:", patientError);
+      return { success: false, message: "Unable to register the visiting patient. Confirm the visiting-patient database migration has been applied." };
+    }
+
+    const orderId = crypto.randomUUID();
+    const { error: orderError } = await supabaseServer.from("lab_orders").insert({
+      id: orderId,
+      patient_id: null,
+      visiting_patient_id: visitingPatient.id,
+      test_code: testCode,
+      test_name: testName,
+      specimen_type: specimenType,
+      priority,
+      status: "PENDING",
+      clinical_notes: input.clinicalNotes?.trim() || null,
+      ordered_by: staff.id,
+    });
+
+    if (orderError) {
+      console.error("Visiting laboratory order creation failed:", orderError);
+      return { success: false, message: "The visiting patient was registered, but the investigation request could not be created." };
+    }
+
+    await logLabActivity({
+      action: `Visiting laboratory test requested: ${testName}`,
+      staff,
+      details: { orderId, visitingPatientId: visitingPatient.id, fullName, sourceCenter, testCode, testName, specimenType, priority },
+    });
+    revalidatePath("/laboratory");
+    return { success: true, message: `${testName} has been added to the visiting laboratory queue.`, id: orderId };
+  } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return { success: false, message: "You must be signed in to perform this action." };
+    }
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return { success: false, message: "You are not authorized to create laboratory orders." };
+    }
+    console.error("Create visiting laboratory order error:", error);
+    return { success: false, message: "An unexpected error occurred while creating the visiting laboratory order." };
+  }
+}
+
 export type LaboratoryDashboardOrder = {
   id: string;
   patientId: string;
   patientName: string;
+  patientType: "IN_HOUSE" | "VISITING";
+  sourceCenter?: string;
   age?: number;
   sex?: string;
   test: string;
@@ -517,6 +608,8 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
       };
     }
 
+    const visitingPatientIds = [...new Set(orders.map((order) => order.visiting_patient_id).filter(Boolean))];
+
     const patientIds = [
       ...new Set(
         orders
@@ -548,6 +641,7 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
 
     const [
       patientsResult,
+      visitingPatientsResult,
       staffResult,
       resultsResult,
     ] = await Promise.all([
@@ -565,6 +659,10 @@ export async function getLabOrders(): Promise<GetLabOrdersResponse> {
             data: [],
             error: null,
           }),
+
+      visitingPatientIds.length
+        ? supabaseServer.from("visiting_lab_patients").select("id, full_name, source_center, contact_phone, sex, date_of_birth").in("id", visitingPatientIds)
+        : Promise.resolve({ data: [], error: null }),
 
       staffIds.length
         ? supabaseServer
