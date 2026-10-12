@@ -574,17 +574,15 @@ export default function LaboratoryPage() {
         priorityFilter === "ALL" ||
         order.priority === priorityFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesPriority
-      );
+      const matchesTab = activeTab === "request" ? order.status === "PENDING" : activeTab === "in-house" ? order.patientType === "IN_HOUSE" : activeTab === "visiting" ? order.patientType === "VISITING" : true;
+      return matchesSearch && matchesStatus && matchesPriority && matchesTab;
     });
   }, [
     orders,
     search,
     statusFilter,
     priorityFilter,
+    activeTab,
   ]);
 
   const pendingCount = orders.filter(
