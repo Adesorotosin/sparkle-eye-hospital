@@ -1230,6 +1230,10 @@ export async function saveOpticalOrder(
         measurements_started_at,
         optical_charge,
         charge_approval_status,
+        frame_selection,
+        lens_type,
+        lens_material,
+        lens_coating,
         patients (
           patient_code,
           full_name
@@ -1357,18 +1361,30 @@ export async function saveOpticalOrder(
         now,
     };
 
-    if (
-      numericOpticalCharge !== null
-    ) {
-      const normalizedCharge = normalizeMoney(numericOpticalCharge);
-      updatePayload.optical_charge = normalizedCharge;
+    const normalizedCharge = numericOpticalCharge !== null
+      ? normalizeMoney(numericOpticalCharge)
+      : normalizeMoney(order.optical_charge);
 
-      if (normalizedCharge !== normalizeMoney(order.optical_charge)) {
-        updatePayload.charge_approval_status = "not_submitted";
-        updatePayload.charge_approval_note = null;
-        updatePayload.charge_approved_by = null;
-        updatePayload.charge_approved_at = null;
-      }
+    if (numericOpticalCharge !== null) {
+      updatePayload.optical_charge = normalizedCharge;
+    }
+
+    const chargeRelevantDetailsChanged =
+      normalizedCharge !== normalizeMoney(order.optical_charge) ||
+      emptyToNull(input.frameSelection) !== (order.frame_selection ?? null) ||
+      emptyToNull(input.lensType) !== (order.lens_type ?? null) ||
+      emptyToNull(input.lensMaterial) !== (order.lens_material ?? null) ||
+      emptyToNull(input.lensCoating) !== (order.lens_coating ?? null);
+
+    if (
+      chargeRelevantDetailsChanged &&
+      ["pending", "approved", "rejected"].includes(order.charge_approval_status ?? "")
+    ) {
+      updatePayload.charge_approval_status = "not_submitted";
+      updatePayload.charge_approval_note = null;
+      updatePayload.charge_approved_by = null;
+      updatePayload.charge_approved_at = null;
+      updatePayload.charge_submitted_at = null;
     }
 
     const {
