@@ -1024,7 +1024,7 @@ export default function OpticianPatientPage({
                         <Save className="h-4 w-4" />
                       )}
 
-                      Save Optical Order
+                      Save & Send to Doctor
                     </button>
                   ) : null}
 
