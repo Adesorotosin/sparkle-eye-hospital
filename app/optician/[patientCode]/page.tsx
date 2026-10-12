@@ -1142,7 +1142,7 @@ export default function OpticianPatientPage({
                 {hasValidOpticalCharge ? (
                   <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-violet-500">
-                      Current Optical Charge
+                      Proposed Charge
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-violet-900">
@@ -1212,7 +1212,7 @@ export default function OpticianPatientPage({
                 {order ? (
                   <div className="border-t border-white/10 pt-4">
                     <p className="text-xs text-slate-400">
-                      Optical Charge
+                      Proposed Charge
                     </p>
 
                     <p className="mt-1 text-lg font-bold text-white">
