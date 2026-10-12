@@ -2106,19 +2106,19 @@ export default function LaboratoryPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        {activeTab === "queue"
-                          ? "Laboratory Work Queue"
-                          : activeTab === "results"
-                            ? "Laboratory Results"
-                            : "Laboratory History"}
+                        {activeTab === "request"
+                          ? "Requested Investigations"
+                          : activeTab === "in-house"
+                            ? "In-house Investigations"
+                            : "Visiting Patient Investigations"}
                       </h3>
 
                       <p className="mt-1 text-sm text-gray-500">
-                        {activeTab === "queue"
-                          ? "Find and manage laboratory investigations."
-                          : activeTab === "results"
-                            ? "Review laboratory investigations and their results."
-                            : "Review the laboratory investigation history."}
+                        {activeTab === "request"
+                          ? "Review newly requested investigations awaiting collection."
+                          : activeTab === "in-house"
+                            ? "Manage investigations for registered hospital patients."
+                            : "Manage investigations for patients referred by other centres."}
                       </p>
                     </div>
 
