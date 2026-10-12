@@ -20,7 +20,6 @@ import {
   Beaker,
   CheckCircle2,
   ChevronLeft,
-  Clock3,
   FileCheck2,
   FlaskConical,
   LogOut,
@@ -67,13 +66,6 @@ type ResultParameter = {
 type LabResult = {
   parameters: ResultParameter[];
   comments: string;
-};
-
-type LabTimelineItem = {
-  label: string;
-  date?: string;
-  by?: string;
-  completed: boolean;
 };
 
 type LabOrder = {
@@ -364,61 +356,6 @@ function flagClasses(flag: ResultFlag) {
   }
 }
 
-function buildTimeline(order: LabOrder): LabTimelineItem[] {
-  const processingStarted =
-    Boolean(order.processingAt) ||
-    order.status === "PROCESSING" ||
-    order.status === "AWAITING_VERIFICATION" ||
-    order.status === "COMPLETED";
-
-  const resultEntered =
-    Boolean(order.resultEnteredAt) ||
-    order.status === "AWAITING_VERIFICATION" ||
-    order.status === "COMPLETED";
-
-  const resultVerified =
-    Boolean(order.verifiedAt) ||
-    order.status === "COMPLETED";
-
-  return [
-    {
-      label: "Test Ordered",
-      date: order.orderedAt,
-      by: order.orderedBy,
-      completed: Boolean(order.orderedAt),
-    },
-    {
-      label: "Sample Collected",
-      date: order.collectedAt,
-      by: order.collectedBy,
-      completed: Boolean(order.collectedAt),
-    },
-    {
-      label: "Sample Received",
-      date: order.receivedAt,
-      by: order.receivedBy,
-      completed: Boolean(order.receivedAt),
-    },
-    {
-      label: "Processing Started",
-      date: order.processingAt,
-      by: order.processedBy,
-      completed: processingStarted,
-    },
-    {
-      label: "Result Entered",
-      date: order.resultEnteredAt,
-      by: order.resultEnteredBy,
-      completed: resultEntered,
-    },
-    {
-      label: "Result Verified",
-      date: order.verifiedAt,
-      by: order.verifiedBy,
-      completed: resultVerified,
-    },
-  ];
-}
 
 export default function LaboratoryPage() {
   const router = useRouter();
@@ -1522,10 +1459,6 @@ export default function LaboratoryPage() {
   }
 
   if (selectedOrder) {
-    const timeline = buildTimeline(
-      selectedOrder
-    );
-
     return (
       <div className="min-h-screen bg-[#f8fafc] text-gray-900">
         <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
@@ -1664,72 +1597,51 @@ export default function LaboratoryPage() {
             </section>
 
             <aside className="space-y-6">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
                 <SectionHeading
-                  icon={
-                    <Clock3 className="h-5 w-5" />
-                  }
-                  title="Order Timeline"
-                  description="Laboratory workflow progress."
+                  icon={<Activity className="h-5 w-5" />}
+                  title="Processing Status"
+                  description="Five clear stages. No long timeline."
                 />
 
-                <div className="mt-6 space-y-0">
-                  {timeline.map(
-                    (item, index) => (
-                      <div
-                        key={item.label}
-                        className="relative flex gap-4 pb-7 last:pb-0"
-                      >
-                        {index <
-                          timeline.length - 1 && (
-                          <div
-                            className={`absolute left-2.5 top-6 h-full w-px ${
-                              item.completed
-                                ? "bg-emerald-200"
-                                : "bg-gray-200"
-                            }`}
-                          />
-                        )}
-
-                        <div
-                          className={`relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                            item.completed
-                              ? "border-emerald-500 bg-emerald-500 text-white"
-                              : "border-gray-300 bg-white"
-                          }`}
-                        >
-                          {item.completed && (
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0">
-                          <p
-                            className={`text-sm font-medium ${
-                              item.completed
-                                ? "text-gray-900"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {item.label}
-                          </p>
-
-                          {item.date && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              {item.date}
-                            </p>
-                          )}
-
-                          {item.by && (
-                            <p className="mt-0.5 text-xs text-gray-400">
-                              {item.by}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
+                {selectedOrder.status === "RECOLLECTION" ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-semibold text-red-700">Recollection required</p>
+                    <p className="mt-1 text-xs text-red-600">
+                      {selectedOrder.recollectionReason || "A new sample is required before processing can continue."}
+                    </p>
+                  </div>
+                ) : (
+                  <ol className="mt-4 grid grid-cols-1 gap-2">
+                    {([
+                      { status: "PENDING", label: "Pending" },
+                      { status: "COLLECTED", label: "Collected" },
+                      { status: "PROCESSING", label: "Processing" },
+                      { status: "AWAITING_VERIFICATION", label: "Verify result" },
+                      { status: "COMPLETED", label: "Completed" },
+                    ] as const).map((step, index, steps) => {
+                      const currentIndex = steps.findIndex((item) => item.status === selectedOrder.status);
+                      const done = currentIndex >= 0 && index < currentIndex;
+                      const current = step.status === selectedOrder.status;
+                      return (
+                        <li key={step.status} className="flex items-center gap-3">
+                          <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                            done ? "bg-emerald-100 text-emerald-700" :
+                            current ? "bg-purple-600 text-white" :
+                            "bg-gray-100 text-gray-400"
+                          }`}>
+                            {done ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                          </span>
+                          <span className={`text-sm ${
+                            current ? "font-semibold text-purple-700" :
+                            done ? "text-gray-700" : "text-gray-400"
+                          }`}>{step.label}</span>
+                          {current && <span className="ml-auto rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">Current</span>}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
               </div>
 
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
