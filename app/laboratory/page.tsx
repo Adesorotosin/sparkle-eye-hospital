@@ -24,6 +24,7 @@ import {
   FlaskConical,
   LogOut,
   Microscope,
+  Bell,
   Search,
   TestTube2,
   User,
@@ -364,6 +365,8 @@ export default function LaboratoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [seenRequestIds, setSeenRequestIds] = useState<string[]>([]);
 
   const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting" | "overview" | "queue" | "results" | "history">("request");
   const [visitingName, setVisitingName] = useState("");
@@ -450,6 +453,37 @@ export default function LaboratoryPage() {
   };
 
   useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem("sparkle-eye-lab-seen-requests");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+          setSeenRequestIds(parsed);
+        }
+      }
+    } catch {
+      // Notifications still work for this session if browser storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const pollForRequests = async () => {
+      try {
+        const response = await getLabOrders();
+        if (active && response.success) setOrders(response.orders);
+      } catch {
+        // Keep the current dashboard usable if a background refresh fails.
+      }
+    };
+    const intervalId = window.setInterval(pollForRequests, 30000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     async function load() {
@@ -484,6 +518,28 @@ export default function LaboratoryPage() {
       mounted = false;
     };
   }, []);
+
+  const pendingRequests = useMemo(
+    () => orders.filter((order) => order.status === "PENDING"),
+    [orders]
+  );
+
+  const unreadRequestCount = pendingRequests.filter(
+    (order) => !seenRequestIds.includes(order.id)
+  ).length;
+
+  function markRequestsSeen() {
+    const nextSeen = Array.from(new Set([
+      ...seenRequestIds,
+      ...pendingRequests.map((order) => order.id),
+    ]));
+    setSeenRequestIds(nextSeen);
+    try {
+      window.localStorage.setItem("sparkle-eye-lab-seen-requests", JSON.stringify(nextSeen));
+    } catch {
+      // The badge remains usable for this session if storage is unavailable.
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1708,7 +1764,94 @@ export default function LaboratoryPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                type="button"
+                aria-label={unreadRequestCount ? `Notifications, ${unreadRequestCount} new laboratory requests` : "Laboratory notifications"}
+                aria-expanded={isNotificationOpen}
+                onClick={() => {
+                  const willOpen = !isNotificationOpen;
+                  setIsNotificationOpen(willOpen);
+                  if (willOpen) markRequestsSeen();
+                }}
+                className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-gray-600 transition hover:bg-gray-50 hover:text-purple-700"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadRequestCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                    {unreadRequestCount > 99 ? "99+" : unreadRequestCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                  <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">New lab requests</p>
+                      <p className="text-xs text-gray-500">{pendingRequests.length} pending</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsNotificationOpen(false)}
+                      aria-label="Close notifications"
+                      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {pendingRequests.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <Bell className="mx-auto h-6 w-6 text-gray-300" />
+                      <p className="mt-2 text-sm font-medium text-gray-700">You’re all caught up</p>
+                      <p className="mt-1 text-xs text-gray-500">New doctor requests will appear here.</p>
+                    </div>
+                  ) : (
+                    <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto">
+                      {pendingRequests.slice(0, 8).map((order) => (
+                        <li key={order.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedOrderId(order.id);
+                              setIsNotificationOpen(false);
+                            }}
+                            className="w-full px-4 py-3 text-left transition hover:bg-purple-50"
+                          >
+                            <span className="flex items-start justify-between gap-3">
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium text-gray-900">{order.test}</span>
+                                <span className="mt-1 block truncate text-xs text-gray-500">{order.patientName} · {order.patientId}</span>
+                              </span>
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                order.priority === "STAT" ? "bg-red-50 text-red-700" :
+                                order.priority === "URGENT" ? "bg-orange-50 text-orange-700" :
+                                "bg-gray-100 text-gray-600"
+                              }`}>{priorityLabel(order.priority)}</span>
+                            </span>
+                            <span className="mt-2 block text-xs font-medium text-purple-700">Open request →</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {pendingRequests.length > 8 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("request");
+                        setIsNotificationOpen(false);
+                      }}
+                      className="w-full border-t border-gray-100 px-4 py-3 text-center text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                    >
+                      View all {pendingRequests.length} requests
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="hidden items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 sm:flex">
               <Microscope className="h-4 w-4 text-purple-600" />
 
