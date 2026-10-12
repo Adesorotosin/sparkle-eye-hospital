@@ -428,7 +428,7 @@ export default function LaboratoryPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting">("request");
+  const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting" | "overview" | "queue" | "results" | "history">("request");
   const [visitingName, setVisitingName] = useState("");
   const [visitingCenter, setVisitingCenter] = useState("");
   const [visitingPhone, setVisitingPhone] = useState("");
