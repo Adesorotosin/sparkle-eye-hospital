@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collectLabSample,
+  createVisitingLabOrder,
   getLabOrders,
   receiveLabSample,
   requestLabRecollection,
@@ -79,6 +80,8 @@ type LabOrder = {
   id: string;
   patientId: string;
   patientName: string;
+  patientType: "IN_HOUSE" | "VISITING";
+  sourceCenter?: string;
   age?: number;
   sex?: string;
   test: string;
@@ -425,9 +428,13 @@ export default function LaboratoryPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "queue" | "results" | "history"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<"request" | "in-house" | "visiting">("request");
+  const [visitingName, setVisitingName] = useState("");
+  const [visitingCenter, setVisitingCenter] = useState("");
+  const [visitingPhone, setVisitingPhone] = useState("");
+  const [visitingTestCode, setVisitingTestCode] = useState("");
+  const [visitingTestName, setVisitingTestName] = useState("");
+  const [visitingSpecimen, setVisitingSpecimen] = useState("");
 
   const [selectedOrderId, setSelectedOrderId] =
     useState<string | null>(null);
@@ -1836,32 +1843,19 @@ export default function LaboratoryPage() {
 
         <div className="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
           {[
-            ["overview", "Overview"],
-            ["queue", "Work Queue"],
-            ["results", "Results"],
-            ["history", "History"],
+            ["request", "Request"],
+            ["in-house", "In-house"],
+            ["visiting", "Visiting"],
           ].map(([value, label]) => (
             <button
               key={value}
               type="button"
-              onClick={() =>
-                setActiveTab(
-                  value as
-                    | "overview"
-                    | "queue"
-                    | "results"
-                    | "history"
-                )
-              }
-              className={`border-b-2 px-4 py-3 text-sm font-medium transition ${
-                activeTab === value
-                  ? "border-purple-600 text-purple-600"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
-              }`}
+              onClick={() => setActiveTab(value as "request" | "in-house" | "visiting")}
+              className={"border-b-2 px-4 py-3 text-sm font-medium transition " + (activeTab === value ? "border-purple-600 text-purple-600" : "border-transparent text-gray-500 hover:text-gray-800")}
             >
               {label}
             </button>
-          ))}
+          ))
         </div>
 
         {isLoading ? (
