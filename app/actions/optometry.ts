@@ -28,6 +28,7 @@ export type OptometryPatient = {
     | "completed"
     | null;
   referredAt: string | null;
+  optometrySource: "in_house" | "visiting";
 };
 
 function handleError(
@@ -85,6 +86,7 @@ export async function getOptometryQueue(): Promise<{
         age,
         gender,
         optometry_status,
+        optometry_source,
         created_at,
         vitals (
           primary_complaint,
@@ -166,6 +168,10 @@ export async function getOptometryQueue(): Promise<{
           vitals?.recorded_at ??
           patient.created_at ??
           null,
+        optometrySource:
+          patient.optometry_source === "visiting"
+            ? "visiting"
+            : "in_house",
       };
     });
 
@@ -564,5 +570,75 @@ export async function getOptometryPatient(
           ? "You are not authorized to access Optometry records."
           : "Unable to load the patient record.",
     };
+  }
+}
+
+/**
+ * Categorizes an existing Optometry queue patient as internal or visiting.
+ * Only Optometry staff and IT administrators can change this classification.
+ */
+export async function updateOptometrySource(
+  patientCode: string,
+  source: "in_house" | "visiting"
+): Promise<OptometryActionResponse> {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const normalizedCode = patientCode?.trim();
+
+    if (!normalizedCode) {
+      return { success: false, message: "Patient code is required." };
+    }
+
+    if (source !== "in_house" && source !== "visiting") {
+      return { success: false, message: "Invalid patient source." };
+    }
+
+    const { data: patient, error: patientError } = await supabaseServer
+      .from("patients")
+      .select("id, patient_code, full_name, optometry_status")
+      .eq("patient_code", normalizedCode)
+      .maybeSingle();
+
+    if (patientError) throw patientError;
+    if (!patient) {
+      return { success: false, message: "Patient was not found." };
+    }
+    if (!patient.optometry_status) {
+      return {
+        success: false,
+        message: "Only patients already referred to Optometry can be categorized here.",
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("patients")
+      .update({ optometry_source: source })
+      .eq("id", patient.id);
+
+    if (error) throw error;
+
+    await logActivity({
+      module: "Optometry",
+      category: "CLINICAL",
+      action: "Optometry patient source updated",
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: patient.id,
+      details: JSON.stringify({
+        patientCode: patient.patient_code,
+        patientName: patient.full_name,
+        source,
+      }),
+    });
+
+    revalidatePath("/optometry");
+    return {
+      success: true,
+      message: source === "visiting"
+        ? "Patient marked as visiting."
+        : "Patient marked as in-house.",
+    };
+  } catch (error) {
+    return handleError(error, "Unable to update the patient's source.");
   }
 }
