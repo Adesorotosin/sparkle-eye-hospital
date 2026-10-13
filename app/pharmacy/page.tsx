@@ -14,6 +14,7 @@ import PatientBanner, {
 
 import {
   Search,
+  ArrowLeft,
   ChevronRight,
   Info,
   Printer,
@@ -1946,18 +1947,30 @@ function PharmacyContent() {
 
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between print:hidden">
+        <header className="bg-white border-b border-slate-200/80 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 print:hidden">
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <span>
-              Dispensing Queue
-            </span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => router.push("/pharmacy")}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              aria-label="Back to Pharmacy Dashboard"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Pharmacy Dashboard</span>
+            </button>
 
-            <span>›</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <span>
+                Dispensing Queue
+              </span>
 
-            <span className="text-slate-900 font-bold">
-              Order Detail
-            </span>
+              <span>›</span>
+
+              <span className="text-slate-900 font-bold">
+                Order Detail
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
