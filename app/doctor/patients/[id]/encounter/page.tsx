@@ -386,7 +386,13 @@ export default function DoctorEncounterPage() {
         const encounter = data.encounters?.[0];
         if (encounter) {
           setPresentingComplaint(encounter.presentingComplaint ?? "");
-          setHistoryProforma(encounter.historyProforma ?? {});
+          setHistoryProforma(encounter.historyProforma && Object.keys(encounter.historyProforma).length > 0 ? encounter.historyProforma : {
+            presentingComplaints: { selected: [], notes: encounter.presentingComplaint ?? "" },
+            historyOfPresentingComplaints: { selected: [], notes: encounter.historyOfPresentingComplaint ?? "" },
+            pastMedicalHistory: { selected: [], notes: encounter.pastMedicalHistory ?? "" },
+            pastOcularHistory: { selected: [], notes: encounter.pastOcularHistory ?? "" },
+            familyOcularHistory: { selected: [], notes: encounter.familyOcularHistory ?? "" },
+          });
           setOcularExamODRows(parseEyeExam(encounter.ocularExamOD, encounter.slitLampOD));
           setOcularExamOSRows(parseEyeExam(encounter.ocularExamOS, encounter.slitLampOS));
           setRefractionNotes(encounter.refractionNotes ?? "");
@@ -429,6 +435,7 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
+        encounterId: latestEncounter?.id,
         presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
         historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
         pastMedicalHistory: historyText("pastMedicalHistory"),
