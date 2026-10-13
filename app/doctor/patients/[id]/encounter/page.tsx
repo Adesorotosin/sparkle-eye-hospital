@@ -538,7 +538,7 @@ export default function DoctorEncounterPage() {
     setError("");
 
     startTransition(async () => {
-      const response = await createOpticalOrder(patientCode);
+      const response = await createOpticalOrder(patientCode, { lensType, refractionNotes });
       if (!response.success) {
         setError(response.message);
       } else {
