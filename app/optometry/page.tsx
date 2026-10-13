@@ -65,6 +65,7 @@ export default function OptometryDashboard() {
     dateOfBirth: "",
     gender: "",
     phone: "",
+    visitType: "external_referral" as "external_referral" | "self_presenting",
     referralFacility: "",
     referringClinician: "",
     referralReason: "",
@@ -269,9 +270,10 @@ export default function OptometryDashboard() {
         dateOfBirth: visitingForm.dateOfBirth || undefined,
         gender: visitingForm.gender,
         phone: visitingForm.phone || undefined,
-        referralFacility: visitingForm.referralFacility,
+        visitType: visitingForm.visitType,
+        referralFacility: visitingForm.referralFacility || undefined,
         referringClinician: visitingForm.referringClinician || undefined,
-        referralReason: visitingForm.referralReason,
+        referralReason: visitingForm.referralReason || undefined,
         referralNotes: visitingForm.referralNotes || undefined,
       });
 
@@ -283,7 +285,7 @@ export default function OptometryDashboard() {
         setShowVisitingForm(false);
         setVisitingForm({
           fullName: "", age: "", dateOfBirth: "", gender: "", phone: "",
-          referralFacility: "", referringClinician: "", referralReason: "", referralNotes: "",
+          visitType: "external_referral", referralFacility: "", referringClinician: "", referralReason: "", referralNotes: "",
         });
         setActiveTab("VISITING");
         setFilter("ALL");
@@ -761,7 +763,7 @@ export default function OptometryDashboard() {
               <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
                 <div>
                   <h3 id="visiting-patient-title" className="text-lg font-black text-slate-900">Register Visiting Patient</h3>
-                  <p className="mt-1 text-sm text-slate-500">Create a full hospital record for a patient referred by an outside facility.</p>
+                  <p className="mt-1 text-sm text-slate-500">Create a full hospital record for an external referral or a patient who came directly to Optometry.</p>
                 </div>
                 <button type="button" onClick={() => setShowVisitingForm(false)} aria-label="Close registration form" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">✕</button>
               </div>
@@ -794,25 +796,41 @@ export default function OptometryDashboard() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">Referral details</h4>
+                  <h4 className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">Arrival details</h4>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="space-y-1.5 text-xs font-bold text-slate-700">
-                      Referring hospital / eye centre <span className="text-rose-600">*</span>
-                      <input required value={visitingForm.referralFacility} onChange={(e) => setVisitingForm((f) => ({ ...f, referralFacility: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Facility name" />
-                    </label>
-                    <label className="space-y-1.5 text-xs font-bold text-slate-700">
-                      Referring clinician
-                      <input value={visitingForm.referringClinician} onChange={(e) => setVisitingForm((f) => ({ ...f, referringClinician: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Doctor / optometrist name" />
-                    </label>
                     <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
-                      Reason for visit <span className="text-rose-600">*</span>
-                      <input required value={visitingForm.referralReason} onChange={(e) => setVisitingForm((f) => ({ ...f, referralReason: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Why has the patient been referred for optometry?" />
+                      How did the patient arrive? <span className="text-rose-600">*</span>
+                      <select required value={visitingForm.visitType} onChange={(e) => setVisitingForm((f) => ({ ...f, visitType: e.target.value as "external_referral" | "self_presenting" }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white">
+                        <option value="external_referral">Referred by another facility</option>
+                        <option value="self_presenting">Came directly / self-presenting</option>
+                      </select>
                     </label>
-                    <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
-                      Referral notes
-                      <textarea rows={3} value={visitingForm.referralNotes} onChange={(e) => setVisitingForm((f) => ({ ...f, referralNotes: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Relevant information from the referring facility" />
-                    </label>
+                    {visitingForm.visitType === "external_referral" && (
+                      <>
+                        <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                          Referring hospital / eye centre
+                          <input value={visitingForm.referralFacility} onChange={(e) => setVisitingForm((f) => ({ ...f, referralFacility: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Facility name (optional)" />
+                        </label>
+                        <label className="space-y-1.5 text-xs font-bold text-slate-700">
+                          Referring clinician
+                          <input value={visitingForm.referringClinician} onChange={(e) => setVisitingForm((f) => ({ ...f, referringClinician: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Doctor / optometrist name (optional)" />
+                        </label>
+                        <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                          Reason for referral
+                          <input value={visitingForm.referralReason} onChange={(e) => setVisitingForm((f) => ({ ...f, referralReason: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Reason for referral (optional)" />
+                        </label>
+                        <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                          Referral notes
+                          <textarea rows={3} value={visitingForm.referralNotes} onChange={(e) => setVisitingForm((f) => ({ ...f, referralNotes: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Additional information from the referring facility (optional)" />
+                        </label>
+                      </>
+                    )}
                   </div>
+                  {visitingForm.visitType === "self_presenting" && (
+                    <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-xs font-medium text-blue-800">
+                      No external referral is required. The patient will receive a normal hospital record and be added directly to the Visiting Optometry queue.
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
                   <button type="button" disabled={savingVisitingPatient} onClick={() => setShowVisitingForm(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
