@@ -708,6 +708,12 @@ export async function registerVisitingOptometryPatient(
       if (Number.isNaN(parsed.getTime()) || parsed > new Date()) {
         return { success: false, message: "Enter a valid date of birth that is not in the future." };
       }
+      const today = new Date();
+      age = today.getFullYear() - parsed.getFullYear();
+      const monthDifference = today.getMonth() - parsed.getMonth();
+      if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < parsed.getDate())) {
+        age -= 1;
+      }
     }
 
     const { registerPatient } = await import("@/lib/patient-flow");
