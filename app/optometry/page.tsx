@@ -28,6 +28,27 @@ import {
   type OptometryPatient,
 } from "@/app/actions/optometry";
 
+function getAgeFromDateOfBirth(dateOfBirth: string): string {
+  if (!dateOfBirth) return "";
+
+  const birthDate = new Date(`${dateOfBirth}T00:00:00`);
+  const today = new Date();
+
+  if (Number.isNaN(birthDate.getTime()) || birthDate > today) return "";
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return String(age);
+}
+
 type QueueFilter =
   | "ALL"
   | "WAITING"
@@ -786,11 +807,11 @@ export default function OptometryDashboard() {
                     </label>
                     <label className="space-y-1.5 text-xs font-bold text-slate-700">
                       Date of birth
-                      <input type="date" max={new Date().toISOString().slice(0, 10)} value={visitingForm.dateOfBirth} onChange={(e) => setVisitingForm((f) => ({ ...f, dateOfBirth: e.target.value, age: "" }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" />
+                      <input type="date" max={new Date().toISOString().slice(0, 10)} value={visitingForm.dateOfBirth} onChange={(e) => setVisitingForm((f) => ({ ...f, dateOfBirth: e.target.value, age: getAgeFromDateOfBirth(e.target.value) }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" />
                     </label>
                     <label className="space-y-1.5 text-xs font-bold text-slate-700">
-                      Age (if date of birth is unknown)
-                      <input type="number" min="0" max="150" step="1" value={visitingForm.age} onChange={(e) => setVisitingForm((f) => ({ ...f, age: e.target.value, dateOfBirth: "" }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Age in years" />
+                      {visitingForm.dateOfBirth ? "Age (calculated from date of birth)" : "Age (if date of birth is unknown)"}
+                      <input type="number" min="0" max="150" step="1" value={visitingForm.age} readOnly={Boolean(visitingForm.dateOfBirth)} onChange={(e) => setVisitingForm((f) => ({ ...f, age: e.target.value, dateOfBirth: "" }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Age in years" />
                     </label>
                     <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
                       Phone number
