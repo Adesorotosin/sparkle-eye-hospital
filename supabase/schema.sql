@@ -200,6 +200,31 @@ create table appointments (
   created_at timestamptz not null default now()
 );
 
+-- Routed clinical requests from the Doctor's module to Cashier and Receptionist.
+create table clinical_handoffs (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references patients(id) on delete cascade,
+  encounter_id uuid references encounters(id) on delete set null,
+  destination text not null check (destination in ('CASHIER','RECEPTIONIST')),
+  handoff_type text not null check (handoff_type in ('TREATMENT_PLAN','PROCEDURE','FOLLOW_UP')),
+  title text not null,
+  details text not null default '',
+  interval_value integer,
+  interval_unit text check (interval_unit in ('days','months')),
+  target_date date,
+  preferred_time text,
+  status text not null default 'pending' check (status in ('pending','acknowledged','completed','cancelled')),
+  requested_by uuid references staff(id) on delete set null,
+  received_by uuid references staff(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+create index idx_clinical_handoffs_destination_status_created
+  on clinical_handoffs(destination, status, created_at desc);
+create index idx_clinical_handoffs_patient
+  on clinical_handoffs(patient_id, created_at desc);
+
 -- Manually broadcast alerts/announcements from Admin > Notifications.
 -- NOTE: these persist and are visible in this Admin view, but are not yet
 -- pushed live to other roles' dashboards — that would need each role's
