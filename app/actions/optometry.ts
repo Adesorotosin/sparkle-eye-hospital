@@ -91,6 +91,7 @@ export async function getOptometryQueue(): Promise<{
         gender,
         optometry_status,
         optometry_source,
+        optometry_visit_type,
         optometry_referral_facility,
         optometry_referring_clinician,
         optometry_referral_reason,
@@ -180,6 +181,10 @@ export async function getOptometryQueue(): Promise<{
           patient.optometry_source === "visiting"
             ? "visiting"
             : "in_house",
+        visitType:
+          patient.optometry_visit_type === "self_presenting"
+            ? "self_presenting"
+            : "external_referral",
         referralFacility: patient.optometry_referral_facility ?? null,
         referringClinician: patient.optometry_referring_clinician ?? null,
         referralReason: patient.optometry_referral_reason ?? null,
@@ -359,6 +364,7 @@ export async function getOptometryPatient(
           status,
           optometry_status,
           optometry_source,
+          optometry_visit_type,
           optometry_referral_facility,
           optometry_referring_clinician,
           optometry_referral_reason,
@@ -478,6 +484,7 @@ export async function getOptometryPatient(
           patient.optometry_status ??
           null,
         optometrySource: patient.optometry_source === "visiting" ? "visiting" : "in_house",
+        visitType: patient.optometry_visit_type === "self_presenting" ? "self_presenting" : "external_referral",
         referralFacility: patient.optometry_referral_facility ?? null,
         referringClinician: patient.optometry_referring_clinician ?? null,
         referralReason: patient.optometry_referral_reason ?? null,
