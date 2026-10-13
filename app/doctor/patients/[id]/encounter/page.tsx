@@ -594,7 +594,7 @@ export default function DoctorEncounterPage() {
   };
 
   const sendSupplierWhatsApp = () => {
-    const phone = supplierWhatsApp.replace(/\\D/g, "");
+    const phone = supplierWhatsApp.replace(/\D/g, "");
     if (!phone) { setError("Enter the supplier's WhatsApp number, including country code."); return; }
     const messageText = [
       "Sparkle Eye Hospital — Lens Order",
@@ -604,7 +604,7 @@ export default function DoctorEncounterPage() {
       `OS: ${[refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "See attached/confirmed prescription"}`,
       `Notes: ${refractionNotes || "None"}`,
       "Please confirm availability and quotation before processing.",
-    ].join("\\n");
+    ].join("\n");
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`, "_blank", "noopener,noreferrer");
   };
 
