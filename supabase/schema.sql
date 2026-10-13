@@ -226,6 +226,8 @@ create index idx_clinical_handoffs_destination_status_created
 create index idx_clinical_handoffs_patient
   on clinical_handoffs(patient_id, created_at desc);
 
+alter table clinical_handoffs enable row level security;
+
 -- Manually broadcast alerts/announcements from Admin > Notifications.
 -- NOTE: these persist and are visible in this Admin view, but are not yet
 -- pushed live to other roles' dashboards — that would need each role's
