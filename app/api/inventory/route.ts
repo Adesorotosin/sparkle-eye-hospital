@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       typeof category !== "string" ||
       !category.trim() ||
       typeof stock !== "number" ||
-      !Number.isFinite(stock) ||
+      !Number.isInteger(stock) ||
       stock < 0 ||
       typeof price !== "number" ||
       !Number.isFinite(price) ||
@@ -248,8 +248,9 @@ export async function POST(request: Request) {
     }
 
     // All initial quantities go through the same atomic stock ledger as later receipts.
+    let resultingStock = 0;
     if (stock > 0) {
-      const { error: receiptError } = await supabaseServer.rpc("inventory_receive_stock", {
+      const { data: receiptData, error: receiptError } = await supabaseServer.rpc("inventory_receive_stock", {
         p_item_id: data.id,
         p_quantity: stock,
         p_performed_by: staff.id,
@@ -264,6 +265,7 @@ export async function POST(request: Request) {
         console.error("Opening inventory receipt failed:", receiptError);
         return NextResponse.json({ error: "Item could not be initialized with stock. Please retry." }, { status: 500 });
       }
+      resultingStock = Number(receiptData?.new_stock ?? stock);
     }
 
     await logActivity({
@@ -285,7 +287,7 @@ export async function POST(request: Request) {
           name: data.name,
           category: data.category,
           domain: data.domain,
-          stock: data.stock,
+          stock: resultingStock,
           reorderLevel: data.reorder_level,
           price: data.price,
         },
