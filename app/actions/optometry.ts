@@ -29,6 +29,7 @@ export type OptometryPatient = {
     | null;
   referredAt: string | null;
   optometrySource: "in_house" | "visiting";
+  visitType: "external_referral" | "self_presenting";
   referralFacility: string | null;
   referringClinician: string | null;
   referralReason: string | null;
