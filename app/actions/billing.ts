@@ -283,7 +283,7 @@ export async function applyBillingDiscount(input: {
       .from("invoices")
       .select("*")
       .eq("patient_id", patient.id)
-      .neq("status", "cancelled")
+      .in("status", ["draft", "pending"])
       .order("created_at", {
         ascending: false,
       })
@@ -650,7 +650,7 @@ export async function processBillingPayment(input: {
     } = await supabaseServer
       .from("invoice_items")
       .select(
-        "id, category, name, quantity, unit_price, total_price"
+        "id, prescription_id, category, name, quantity, unit_price, total_price"
       )
       .eq("invoice_id", invoice.id);
 
@@ -760,12 +760,23 @@ export async function processBillingPayment(input: {
                   prescription.price_per_unit ?? 0
                 );
 
+              const prescriptionTotal = Number(prescription.total_price ?? 0);
+              const invoiceTotal = Number(invoiceItem.total_price ?? 0);
+              if (invoiceItem.prescription_id) {
+                return (
+                  prescription.id === invoiceItem.prescription_id &&
+                  prescriptionQuantity === invoiceQuantity &&
+                  prescriptionUnitPrice === invoiceUnitPrice &&
+                  Math.abs(prescriptionTotal - invoiceTotal) < 0.01
+                );
+              }
+              // Backward compatibility for older invoice lines created before
+              // invoice_items.prescription_id existed.
               return (
                 prescriptionName === invoiceName &&
-                prescriptionQuantity ===
-                  invoiceQuantity &&
-                prescriptionUnitPrice ===
-                  invoiceUnitPrice
+                prescriptionQuantity === invoiceQuantity &&
+                prescriptionUnitPrice === invoiceUnitPrice &&
+                Math.abs(prescriptionTotal - invoiceTotal) < 0.01
               );
             }
           );
