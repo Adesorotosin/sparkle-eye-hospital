@@ -56,6 +56,7 @@ export interface TriageVitals {
   pulse?: number;
   temperature?: number;
   spo2?: number;
+  rbs?: number;
   primaryComplaint: string;
   symptoms?: string[];
   severity?: "Mild" | "Moderate" | "Severe";
