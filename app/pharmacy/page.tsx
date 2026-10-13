@@ -155,6 +155,8 @@ function PharmacyContent() {
   const [isDrugInventoryOpen, setIsDrugInventoryOpen] =
     useState(false);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   const [drugInventory, setDrugInventory] =
     useState<DrugStockItem[]>([]);
 
@@ -286,6 +288,29 @@ function PharmacyContent() {
 
     loadQueue();
   }, [patientId]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCurrentRole = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        if (!response.ok) return;
+        const result = await response.json();
+        if (active) {
+          setIsAdmin(result?.user?.role === "IT_ADMIN");
+        }
+      } catch (error) {
+        console.error("Unable to verify pharmacy inventory permissions:", error);
+        if (active) setIsAdmin(false);
+      }
+    };
+
+    loadCurrentRole();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -1650,6 +1675,7 @@ function PharmacyContent() {
             isLoading={
               isLoadingDrugInventory
             }
+            canAddStock={isAdmin}
             onClose={() =>
               setIsDrugInventoryOpen(
                 false
@@ -1663,7 +1689,7 @@ function PharmacyContent() {
           />
         )}
 
-        {isAddDrugStockModalOpen && (
+        {isAdmin && isAddDrugStockModalOpen && (
           <AddDrugStockModal
             newDrugStock={
               newDrugStock
@@ -2852,6 +2878,7 @@ function PharmacyContent() {
           isLoading={
             isLoadingDrugInventory
           }
+          canAddStock={isAdmin}
           onClose={() =>
             setIsDrugInventoryOpen(
               false
@@ -2867,7 +2894,7 @@ function PharmacyContent() {
 
       {/* ADD STOCK MODAL */}
 
-      {isAddDrugStockModalOpen && (
+      {isAdmin && isAddDrugStockModalOpen && (
         <AddDrugStockModal
           newDrugStock={
             newDrugStock
@@ -2917,11 +2944,13 @@ function PharmacyContent() {
 function DrugInventoryModal({
   drugInventory,
   isLoading,
+  canAddStock,
   onClose,
   onAddDrug,
 }: {
   drugInventory: DrugStockItem[];
   isLoading: boolean;
+  canAddStock: boolean;
   onClose: () => void;
   onAddDrug: () => void;
 }) {
@@ -2939,14 +2968,16 @@ function DrugInventoryModal({
 
           <div className="flex items-center gap-3">
 
-            <button
-              type="button"
-              onClick={onAddDrug}
-              className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Drug
-            </button>
+            {canAddStock && (
+              <button
+                type="button"
+                onClick={onAddDrug}
+                className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Drug
+              </button>
+            )}
 
             <button
               type="button"
