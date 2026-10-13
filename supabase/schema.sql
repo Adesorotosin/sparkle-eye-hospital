@@ -60,6 +60,7 @@ create table vitals (
   pulse numeric,
   temperature numeric,
   spo2 numeric,
+  rbs numeric,                                  -- random blood sugar recorded by the nurse
   primary_complaint text,
   symptoms text,                              -- comma-separated
   severity text,
