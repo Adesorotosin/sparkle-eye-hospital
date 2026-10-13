@@ -357,9 +357,10 @@ export default function OptometryDashboard() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <button
             type="button"
-            onClick={() =>
-              setFilter("WAITING")
-            }
+            onClick={() => {
+              setActiveTab("REFRACTION");
+              setFilter("WAITING");
+            }}
             className="text-left"
           >
             <Stat
@@ -375,11 +376,10 @@ export default function OptometryDashboard() {
 
           <button
             type="button"
-            onClick={() =>
-              setFilter(
-                "IN EXAMINATION"
-              )
-            }
+            onClick={() => {
+              setActiveTab("REFRACTION");
+              setFilter("IN EXAMINATION");
+            }}
             className="text-left"
           >
             <Stat
@@ -396,9 +396,10 @@ export default function OptometryDashboard() {
 
           <button
             type="button"
-            onClick={() =>
-              setFilter("COMPLETED")
-            }
+            onClick={() => {
+              setActiveTab("RESULT");
+              setFilter("COMPLETED");
+            }}
             className="text-left"
           >
             <Stat
