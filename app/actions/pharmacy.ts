@@ -704,24 +704,17 @@ export async function prepareSelectedPrescriptionsForPayment(input: {
     const invoice = await getOrCreateDraftInvoice(patient.id);
     if (invoice.status === "paid" || invoice.status === "cancelled") return { success: false, message: "The active invoice cannot accept medications. Please refresh and try again." };
 
-    // Replace only pharmacy lines; consultation and diagnostic lines remain untouched.
-    const { error: removeError } = await supabaseServer.from("invoice_items").delete().eq("invoice_id", invoice.id).eq("category", "pharmacy");
-    if (removeError) throw removeError;
-
-    const items = (prescriptions ?? []).map((rx) => ({
-      invoice_id: invoice.id,
-      prescription_id: rx.id,
-      category: "pharmacy",
-      name: rx.drug_name,
-      quantity: Number(rx.quantity),
-      unit_price: Number(rx.price_per_unit),
-      total_price: Number(rx.total_price),
-    }));
-    const { error: insertError } = await supabaseServer.from("invoice_items").insert(items);
-    if (insertError) throw insertError;
+    // The database transaction validates the selection and atomically replaces
+    // the pharmacy lines, preserving non-pharmacy invoice items.
+    const { data: prepared, error: prepareError } = await supabaseServer.rpc("prepare_selected_prescriptions_for_payment", {
+      p_patient_id: patient.id,
+      p_invoice_id: invoice.id,
+      p_prescription_ids: selectedIds,
+    });
+    if (prepareError) throw prepareError;
 
     const totals = await recalcInvoice(invoice.id);
-    const selectedTotal = (prescriptions ?? []).reduce((sum, rx) => sum + Number(rx.total_price ?? 0), 0);
+    const selectedTotal = Number(prepared?.selected_total ?? 0);
     await logActivity({
       module: "Pharmacy",
       category: "BILLING",
