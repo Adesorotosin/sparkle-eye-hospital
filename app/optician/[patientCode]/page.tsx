@@ -465,6 +465,7 @@ export default function OpticianPatientPage({
           lensType,
           lensMaterial,
           lensCoating,
+          dispensingNotes: order.dispensingNotes ?? "",
         });
 
       setFeedback(result.message);
