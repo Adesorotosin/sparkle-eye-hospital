@@ -325,20 +325,12 @@ export default function DoctorEncounterPage() {
   const [savedStatus, setSavedStatus] = useState<"draft" | "completed">("draft");
 
   const [presentingComplaint, setPresentingComplaint] = useState("");
-  const [hpi, setHpi] = useState("");
-  const [pastMedicalHistory, setPastMedicalHistory] = useState("");
-  const [pastOcularHistory, setPastOcularHistory] = useState("");
-  const [familyOcularHistory, setFamilyOcularHistory] = useState("");
   const [historyProforma, setHistoryProforma] = useState<Record<string, { selected: string[]; notes: string }>>({});
   const [ocularExamODRows, setOcularExamODRows] = useState<EyeExamRows>(() => emptyEyeExam());
   const [ocularExamOSRows, setOcularExamOSRows] = useState<EyeExamRows>(() => emptyEyeExam());
   const [refractionNotes, setRefractionNotes] = useState("");
   const [lensType, setLensType] = useState("");
   const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
-  const [ocularExamOD, setOcularExamOD] = useState("");
-  const [ocularExamOS, setOcularExamOS] = useState("");
-  const [slitLampOD, setSlitLampOD] = useState("");
-  const [slitLampOS, setSlitLampOS] = useState("");
   const [otherFindings, setOtherFindings] = useState("");
   const [gonioscopyOD, setGonioscopyOD] = useState("");
   const [gonioscopyOS, setGonioscopyOS] = useState("");
@@ -394,19 +386,11 @@ export default function DoctorEncounterPage() {
         const encounter = data.encounters?.[0];
         if (encounter) {
           setPresentingComplaint(encounter.presentingComplaint ?? "");
-          setHpi(encounter.historyOfPresentingComplaint ?? "");
-          setPastMedicalHistory(encounter.pastMedicalHistory ?? "");
-          setPastOcularHistory(encounter.pastOcularHistory ?? "");
-          setFamilyOcularHistory(encounter.familyOcularHistory ?? "");
           setHistoryProforma(encounter.historyProforma ?? {});
-          setOcularExamOD(encounter.ocularExamOD ?? "");
           setOcularExamODRows(parseEyeExam(encounter.ocularExamOD, encounter.slitLampOD));
           setOcularExamOSRows(parseEyeExam(encounter.ocularExamOS, encounter.slitLampOS));
           setRefractionNotes(encounter.refractionNotes ?? "");
           setLensType(encounter.lensType ?? "");
-          setOcularExamOS(encounter.ocularExamOS ?? "");
-          setSlitLampOD(encounter.slitLampOD ?? "");
-          setSlitLampOS(encounter.slitLampOS ?? "");
           setOtherFindings(encounter.otherExaminationFindings ?? "");
           setIopOD(encounter.iopOD !== undefined ? String(encounter.iopOD) : "");
           setIopOS(encounter.iopOS !== undefined ? String(encounter.iopOS) : "");
@@ -445,10 +429,10 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
-        presentingComplaint,
-        historyOfPresentingComplaint: hpi,
-        pastMedicalHistory,
-        pastOcularHistory,
+        presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
         familyOcularHistory: historyText("familyOcularHistory"),
         historyProforma,
         refractionNotes,
