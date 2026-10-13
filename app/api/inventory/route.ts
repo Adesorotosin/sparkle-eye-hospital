@@ -162,7 +162,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Invalid inventory domain. Use 'pharmacy' or 'optical'.",
+            "Invalid inventory domain. Use 'pharmacy', 'optical' or 'hospital'.",
         },
         { status: 400 }
       );
