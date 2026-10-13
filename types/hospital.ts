@@ -174,6 +174,9 @@ export type Encounter = {
   pastMedicalHistory?: string;
   pastOcularHistory?: string;
   familyOcularHistory?: string;
+  historyProforma?: Record<string, { selected: string[]; notes: string }>;
+  refractionNotes?: string;
+  lensType?: string;
   ocularExamOD?: string;
   ocularExamOS?: string;
   slitLampOD?: string;
