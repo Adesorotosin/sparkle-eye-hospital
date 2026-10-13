@@ -358,6 +358,11 @@ export async function getOptometryPatient(
           allergies,
           status,
           optometry_status,
+          optometry_source,
+          optometry_referral_facility,
+          optometry_referring_clinician,
+          optometry_referral_reason,
+          optometry_referral_notes,
           vitals (
             id,
             visual_acuity_od,
@@ -472,6 +477,11 @@ export async function getOptometryPatient(
         optometryStatus:
           patient.optometry_status ??
           null,
+        optometrySource: patient.optometry_source === "visiting" ? "visiting" : "in_house",
+        referralFacility: patient.optometry_referral_facility ?? null,
+        referringClinician: patient.optometry_referring_clinician ?? null,
+        referralReason: patient.optometry_referral_reason ?? null,
+        referralNotes: patient.optometry_referral_notes ?? null,
         vitals: vitals
           ? {
               visualAcuityOD:
