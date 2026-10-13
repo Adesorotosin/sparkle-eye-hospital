@@ -68,7 +68,9 @@ export default function ClinicalHandoffInbox({ destination }: { destination: Han
             <div className="mt-4 flex flex-wrap gap-2">
               {destination === "CASHIER" ?
                 <button type="button" onClick={() => router.push(`/billing?patientCode=${encodeURIComponent(item.patientCode)}`)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"><ReceiptText className="h-4 w-4" /> Open billing</button> :
-                <button type="button" onClick={() => router.push("/appointments")} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"><CalendarDays className="h-4 w-4" /> Open appointments</button>}
+                item.handoffType === "FOLLOW_UP" ?
+                  <button type="button" onClick={() => router.push("/appointments")} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"><CalendarDays className="h-4 w-4" /> Open appointments</button> :
+                  <span className="self-center text-xs text-gray-500">Use the procedure registration form to schedule this request.</span>}
               {item.status === "pending" && <button type="button" onClick={() => void update(item, "acknowledged")} disabled={busyId === item.id} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"><Clock3 className="h-4 w-4" /> Acknowledge</button>}
               <button type="button" onClick={() => void update(item, "completed")} disabled={busyId === item.id} className="inline-flex items-center gap-2 rounded-lg border border-green-200 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50">{busyId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Mark handled</button>
             </div>
