@@ -39,6 +39,9 @@ type Encounter = {
   pastMedicalHistory?: string;
   pastOcularHistory?: string;
   familyOcularHistory?: string;
+  historyProforma?: Record<string, { selected: string[]; notes: string }>;
+  refractionNotes?: string;
+  lensType?: string;
   ocularExamOD?: string;
   ocularExamOS?: string;
   slitLampOD?: string;
@@ -151,6 +154,53 @@ const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
   { name: "Fundus Photograph", price: 9000 },
   { name: "Autorefraction", price: 0 },
 ];
+
+const HISTORY_SECTIONS = [
+  { key: "presentingComplaints", title: "1. Presenting complaints", options: ["Reduced vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Double vision", "Lid swelling", "Trauma", "Other", "Right / OD", "Left / OS", "Both", "Sudden onset", "Gradual onset"] },
+  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Worsening", "Unchanged", "Constant", "Intermittent", "First episode", "Recurrent", "Associated symptoms / triggers", "Treatment tried"] },
+  { key: "pastOcularHistory", title: "3. Past ocular history", options: ["None known", "Glaucoma", "Cataract", "Refractive error", "Other eye disease", "Spectacles / contact lenses", "Eye injury", "Surgery / laser / injection"] },
+  { key: "pastMedicalHistory", title: "4. Past medical history", options: ["None known", "Diabetes", "Hypertension", "Asthma", "Sickle cell disease", "Other", "Previous surgery"] },
+  { key: "medicationAllergyHistory", title: "5. Medication and allergy history", options: ["No medication", "Eye drops", "Systemic medicines", "Steroids", "Traditional remedies", "No known allergies", "Allergy present", "Allergy status unknown"] },
+  { key: "familyHistory", title: "6. Family history", options: ["None known", "Unknown", "Diabetes", "Hypertension", "Sickle cell disease", "Other"] },
+  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Unknown", "Glaucoma", "Blindness", "Cataract", "Other"] },
+  { key: "socialOccupationalHistory", title: "8. Social / occupational history", options: ["Smoking", "Alcohol use", "Dust / chemical exposure", "Prolonged screen use"] },
+] as const;
+
+const OCULAR_PARTS = [
+  "Lid", "Globe", "Extraocular muscle movement", "Conjunctiva", "Cornea",
+  "Anterior chamber", "Pupil", "Lens", "Vitreous", "Fundus",
+] as const;
+
+type EyeExamRows = Record<string, { penlight: string; slitLamp: string }>;
+const emptyEyeExam = (): EyeExamRows => Object.fromEntries(
+  OCULAR_PARTS.map((part) => [part, { penlight: "", slitLamp: "" }])
+);
+function parseEyeExam(value?: string, legacySlitLamp?: string): EyeExamRows {
+  const rows = emptyEyeExam();
+  if (value) {
+    try {
+      const parsed = JSON.parse(value) as Record<string, { penlight?: string; slitLamp?: string }>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const part of OCULAR_PARTS) {
+          if (parsed[part]) rows[part] = { penlight: parsed[part].penlight ?? "", slitLamp: parsed[part].slitLamp ?? "" };
+        }
+      } else {
+        rows.Lid.penlight = value;
+      }
+    } catch {
+      rows.Lid.penlight = value;
+    }
+  }
+  if (legacySlitLamp) {
+    try {
+      const parsed = JSON.parse(legacySlitLamp) as Record<string, { penlight?: string; slitLamp?: string }>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const part of OCULAR_PARTS) if (parsed[part]) rows[part].slitLamp = parsed[part].slitLamp ?? rows[part].slitLamp;
+      } else rows.Lid.slitLamp = legacySlitLamp;
+    } catch { rows.Lid.slitLamp = legacySlitLamp; }
+  }
+  return rows;
+}
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -279,6 +329,12 @@ export default function DoctorEncounterPage() {
   const [pastMedicalHistory, setPastMedicalHistory] = useState("");
   const [pastOcularHistory, setPastOcularHistory] = useState("");
   const [familyOcularHistory, setFamilyOcularHistory] = useState("");
+  const [historyProforma, setHistoryProforma] = useState<Record<string, { selected: string[]; notes: string }>>({});
+  const [ocularExamODRows, setOcularExamODRows] = useState<EyeExamRows>(() => emptyEyeExam());
+  const [ocularExamOSRows, setOcularExamOSRows] = useState<EyeExamRows>(() => emptyEyeExam());
+  const [refractionNotes, setRefractionNotes] = useState("");
+  const [lensType, setLensType] = useState("");
+  const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
   const [ocularExamOD, setOcularExamOD] = useState("");
   const [ocularExamOS, setOcularExamOS] = useState("");
   const [slitLampOD, setSlitLampOD] = useState("");
@@ -342,7 +398,12 @@ export default function DoctorEncounterPage() {
           setPastMedicalHistory(encounter.pastMedicalHistory ?? "");
           setPastOcularHistory(encounter.pastOcularHistory ?? "");
           setFamilyOcularHistory(encounter.familyOcularHistory ?? "");
+          setHistoryProforma(encounter.historyProforma ?? {});
           setOcularExamOD(encounter.ocularExamOD ?? "");
+          setOcularExamODRows(parseEyeExam(encounter.ocularExamOD, encounter.slitLampOD));
+          setOcularExamOSRows(parseEyeExam(encounter.ocularExamOS, encounter.slitLampOS));
+          setRefractionNotes(encounter.refractionNotes ?? "");
+          setLensType(encounter.lensType ?? "");
           setOcularExamOS(encounter.ocularExamOS ?? "");
           setSlitLampOD(encounter.slitLampOD ?? "");
           setSlitLampOS(encounter.slitLampOS ?? "");
@@ -388,11 +449,14 @@ export default function DoctorEncounterPage() {
         historyOfPresentingComplaint: hpi,
         pastMedicalHistory,
         pastOcularHistory,
-        familyOcularHistory,
-        ocularExamOD,
-        ocularExamOS,
-        slitLampOD,
-        slitLampOS,
+        familyOcularHistory: historyText("familyOcularHistory"),
+        historyProforma,
+        refractionNotes,
+        lensType,
+        ocularExamOD: JSON.stringify(ocularExamODRows),
+        ocularExamOS: JSON.stringify(ocularExamOSRows),
+        slitLampOD: "",
+        slitLampOS: "",
         otherExaminationFindings: otherFindings,
         iopOD: iopOD.trim() ? Number(iopOD) : null,
         iopOS: iopOS.trim() ? Number(iopOS) : null,
@@ -533,6 +597,33 @@ export default function DoctorEncounterPage() {
     });
   };
 
+  const historyText = (key: string) => {
+    const section = historyProforma[key];
+    return [...(section?.selected ?? []), section?.notes?.trim() ?? ""].filter(Boolean).join("; ");
+  };
+
+  const updateHistorySection = (key: string, update: Partial<{ selected: string[]; notes: string }>) => {
+    setHistoryProforma((current) => ({
+      ...current,
+      [key]: { selected: current[key]?.selected ?? [], notes: current[key]?.notes ?? "", ...update },
+    }));
+  };
+
+  const sendSupplierWhatsApp = () => {
+    const phone = supplierWhatsApp.replace(/\\D/g, "");
+    if (!phone) { setError("Enter the supplier's WhatsApp number, including country code."); return; }
+    const messageText = [
+      "Sparkle Eye Hospital — Lens Order",
+      `Patient reference: ${patient?.patientId ?? patientCode}`,
+      `Lens type: ${lensType || "To be confirmed"}`,
+      `OD: ${[refractionOD.sphere, refractionOD.cylinder, refractionOD.axis].filter(Boolean).join(" / ") || "See attached/confirmed prescription"}`,
+      `OS: ${[refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "See attached/confirmed prescription"}`,
+      `Notes: ${refractionNotes || "None"}`,
+      "Please confirm availability and quotation before processing.",
+    ].join("\\n");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`, "_blank", "noopener,noreferrer");
+  };
+
   const refractionComplete = useMemo(
     () =>
       Boolean(
@@ -614,7 +705,6 @@ export default function DoctorEncounterPage() {
               ["history", "History"],
               ["exam", "Ocular examination"],
               ["gonioscopy", "Gonioscopy"],
-              ["slit-lamp", "Slit lamp"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
               ["investigation", "Investigation"],
@@ -723,21 +813,48 @@ export default function DoctorEncounterPage() {
             )}
           </Section>
 
-          <Section id="history" title="History" icon={<ClipboardList className="h-5 w-5" />}>
-            <div className="grid gap-4">
-              <Field label="Presenting complaint" value={presentingComplaint} onChange={setPresentingComplaint} />
-              <Field label="History of presenting complaint" value={hpi} onChange={setHpi} rows={5} />
-              <Field label="Past medical history" value={pastMedicalHistory} onChange={setPastMedicalHistory} />
-              <Field label="Past ocular history" value={pastOcularHistory} onChange={setPastOcularHistory} />
-              <Field label="Family ocular history" value={familyOcularHistory} onChange={setFamilyOcularHistory} />
+          <Section id="history" title="Ophthalmology history proforma" icon={<ClipboardList className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Select every applicable option in each section. Add details in the notes field; multiple options may be selected.</p>
+            <div className="space-y-5">
+              {HISTORY_SECTIONS.map((section) => {
+                const value = historyProforma[section.key] ?? { selected: [], notes: "" };
+                return (
+                  <div key={section.key} className="rounded-xl border p-4">
+                    <h3 className="mb-3 font-semibold">{section.title}</h3>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {section.options.map((option) => (
+                        <label key={option} className="flex cursor-pointer items-start gap-2 rounded-lg bg-gray-50 p-2.5 text-sm">
+                          <input type="checkbox" checked={value.selected.includes(option)} onChange={(event) => updateHistorySection(section.key, { selected: event.target.checked ? [...value.selected, option] : value.selected.filter((item) => item !== option) })} className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3">
+                      <Field label="Additional notes / duration / treatment tried" value={value.notes} onChange={(notes) => updateHistorySection(section.key, { notes })} rows={2} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Section>
 
-          <Section id="exam" title="Ocular examination" icon={<Stethoscope className="h-5 w-5" />}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Right eye (OD)" value={ocularExamOD} onChange={setOcularExamOD} rows={5} placeholder="Document ocular examination findings..." />
-              <Field label="Left eye (OS)" value={ocularExamOS} onChange={setOcularExamOS} rows={5} placeholder="Document ocular examination findings..." />
+          <Section id="exam" title="Combined ocular examination — penlight and slit lamp" icon={<Stethoscope className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Record findings for each ocular part. Penlight and slit-lamp findings are grouped in one examination table.</p>
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead className="bg-gray-50"><tr><th className="border-b p-3 text-left">Right eye (OD)</th><th className="border-b p-3 text-left">Ocular parts</th><th className="border-b p-3 text-left">Left eye (OS)</th></tr></thead>
+                <tbody>
+                  {OCULAR_PARTS.map((part) => (
+                    <tr key={part} className="align-top">
+                      <td className="w-[40%] border-b p-3"><div className="space-y-2"><label className="block text-xs font-medium text-gray-500">Penlight</label><textarea rows={2} value={ocularExamODRows[part]?.penlight ?? ""} onChange={(e) => setOcularExamODRows((current) => ({ ...current, [part]: { ...current[part], penlight: e.target.value } }))} className={inputClass} aria-label={`OD ${part} penlight findings`} /><label className="block text-xs font-medium text-gray-500">Slit lamp</label><textarea rows={2} value={ocularExamODRows[part]?.slitLamp ?? ""} onChange={(e) => setOcularExamODRows((current) => ({ ...current, [part]: { ...current[part], slitLamp: e.target.value } }))} className={inputClass} aria-label={`OD ${part} slit lamp findings`} /></div></td>
+                      <th scope="row" className="border-b bg-gray-50/70 p-3 text-left font-semibold">{part}</th>
+                      <td className="w-[40%] border-b p-3"><div className="space-y-2"><label className="block text-xs font-medium text-gray-500">Penlight</label><textarea rows={2} value={ocularExamOSRows[part]?.penlight ?? ""} onChange={(e) => setOcularExamOSRows((current) => ({ ...current, [part]: { ...current[part], penlight: e.target.value } }))} className={inputClass} aria-label={`OS ${part} penlight findings`} /><label className="block text-xs font-medium text-gray-500">Slit lamp</label><textarea rows={2} value={ocularExamOSRows[part]?.slitLamp ?? ""} onChange={(e) => setOcularExamOSRows((current) => ({ ...current, [part]: { ...current[part], slitLamp: e.target.value } }))} className={inputClass} aria-label={`OS ${part} slit lamp findings`} /></div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            <div className="mt-4"><Field label="Other examination notes" value={otherFindings} onChange={setOtherFindings} rows={3} /></div>
           </Section>
 
           <Section id="gonioscopy" title="Gonioscopy" icon={<Activity className="h-5 w-5" />}>
@@ -817,16 +934,6 @@ export default function DoctorEncounterPage() {
             )}
           </Section>
 
-          <Section id="slit-lamp" title="Slit-lamp examination" icon={<Activity className="h-5 w-5" />}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="OD — slit lamp" value={slitLampOD} onChange={setSlitLampOD} rows={6} />
-              <Field label="OS — slit lamp" value={slitLampOS} onChange={setSlitLampOS} rows={6} />
-            </div>
-            <div className="mt-4">
-              <Field label="Other examination findings" value={otherFindings} onChange={setOtherFindings} rows={4} />
-            </div>
-          </Section>
-
           <Section id="iop" title="Intraocular pressure" icon={<Activity className="h-5 w-5" />}>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="block">
@@ -877,10 +984,20 @@ export default function DoctorEncounterPage() {
                     );
                   })}
                 </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Lens type</span><input value={lensType} onChange={(e) => setLensType(e.target.value)} className={inputClass} placeholder="e.g. single vision, bifocal, progressive" /></label>
+                  <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Refraction / lens notes</span><textarea rows={2} value={refractionNotes} onChange={(e) => setRefractionNotes(e.target.value)} className={inputClass} placeholder="Lens design, material, coatings, special instructions..." /></label>
+                </div>
                 <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
                   {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   Send Refraction Request to Optometrist
                 </button>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-green-200 bg-green-50/40 p-4">
+                <h3 className="font-semibold">Send lens prescription to supplier via WhatsApp</h3>
+                <p className="mt-1 text-xs text-gray-600">WhatsApp will open with a prefilled message for staff to review and send. Confirm the recipient before sending.</p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row"><input value={supplierWhatsApp} onChange={(e) => setSupplierWhatsApp(e.target.value)} className={inputClass} placeholder="Supplier WhatsApp number with country code" aria-label="Supplier WhatsApp number" /><button type="button" onClick={sendSupplierWhatsApp} className="shrink-0 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800">Open WhatsApp message</button></div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
