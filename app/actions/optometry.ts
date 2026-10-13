@@ -672,9 +672,10 @@ export type VisitingOptometryRegistrationInput = {
   dateOfBirth?: string | null;
   gender: string;
   phone?: string | null;
-  referralFacility: string;
+  visitType: "external_referral" | "self_presenting";
+  referralFacility?: string | null;
   referringClinician?: string | null;
-  referralReason: string;
+  referralReason?: string | null;
   referralNotes?: string | null;
 };
 
@@ -695,13 +696,23 @@ export async function registerVisitingOptometryPatient(
     const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
     const fullName = input.fullName?.trim();
     const gender = input.gender?.trim();
-    const referralFacility = input.referralFacility?.trim();
-    const referralReason = input.referralReason?.trim();
+    const visitType = input.visitType;
+    const referralFacility = input.referralFacility?.trim() || null;
+    const referringClinician = input.referringClinician?.trim() || null;
+    const referralReason = input.referralReason?.trim() || null;
+    const referralNotes = input.referralNotes?.trim() || null;
 
-    if (!fullName || !gender || !referralFacility || !referralReason) {
+    if (!fullName || !gender) {
       return {
         success: false,
-        message: "Name, gender, referring facility, and reason for visit are required.",
+        message: "Patient name and gender are required.",
+      };
+    }
+
+    if (visitType !== "external_referral" && visitType !== "self_presenting") {
+      return {
+        success: false,
+        message: "Select how the patient arrived at Optometry.",
       };
     }
 
@@ -743,10 +754,11 @@ export async function registerVisitingOptometryPatient(
       .update({
         optometry_status: "referred",
         optometry_source: "visiting",
+        optometry_visit_type: visitType,
         optometry_referral_facility: referralFacility,
-        optometry_referring_clinician: input.referringClinician?.trim() || null,
+        optometry_referring_clinician: referringClinician,
         optometry_referral_reason: referralReason,
-        optometry_referral_notes: input.referralNotes?.trim() || null,
+        optometry_referral_notes: referralNotes,
       })
       .eq("id", patient.id)
       .select("id, patient_code, registration_number, full_name")
@@ -773,8 +785,9 @@ export async function registerVisitingOptometryPatient(
         patientCode: updatedPatient.patient_code,
         registrationNumber: updatedPatient.registration_number ?? null,
         patientName: updatedPatient.full_name,
+        visitType,
         referralFacility,
-        referringClinician: input.referringClinician?.trim() || null,
+        referringClinician,
         referralReason,
       }),
     });
