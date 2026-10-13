@@ -298,6 +298,12 @@ export async function getPharmacyQueue() {
         existing.totalAmount += Number(
           prescription.total_price ?? 0
         );
+
+        // A patient with both unpaid and paid prescriptions should remain
+        // visible in the ready queue so paid medication is not overlooked.
+        if (prescription.status === "ready_for_dispensing") {
+          existing.status = "ready_for_dispensing";
+        }
       } else {
         grouped.set(
           prescription.patient_id,
