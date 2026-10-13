@@ -107,6 +107,7 @@ type Patient = {
     pulse?: number;
     temperature?: number;
     spo2?: number;
+    rbs?: number;
     primaryComplaint: string;
     symptoms?: string[];
     severity?: string;
