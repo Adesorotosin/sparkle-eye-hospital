@@ -22,6 +22,7 @@ import {
 import {
   getOptometryQueue,
   startOptometryExam,
+  updateOptometrySource,
   type OptometryPatient,
 } from "@/app/actions/optometry";
 
@@ -30,6 +31,8 @@ type QueueFilter =
   | "WAITING"
   | "IN EXAMINATION"
   | "COMPLETED";
+
+type DashboardTab = "REFRACTION" | "IN_HOUSE" | "VISITING" | "RESULT";
 
 export default function OptometryDashboard() {
   const router = useRouter();
@@ -42,6 +45,9 @@ export default function OptometryDashboard() {
 
   const [filter, setFilter] =
     useState<QueueFilter>("ALL");
+
+  const [activeTab, setActiveTab] =
+    useState<DashboardTab>("REFRACTION");
 
   const [loading, setLoading] =
     useState(true);
@@ -126,6 +132,16 @@ export default function OptometryDashboard() {
             .toLowerCase()
             .includes(query);
 
+        const isCompleted = patient.optometryStatus === "completed";
+        const matchesTab =
+          activeTab === "REFRACTION"
+            ? !isCompleted
+            : activeTab === "IN_HOUSE"
+              ? patient.optometrySource === "in_house" && !isCompleted
+              : activeTab === "VISITING"
+                ? patient.optometrySource === "visiting" && !isCompleted
+                : isCompleted;
+
         const matchesFilter =
           filter === "ALL" ||
           (filter === "WAITING" &&
@@ -141,11 +157,12 @@ export default function OptometryDashboard() {
 
         return (
           matchesSearch &&
+          matchesTab &&
           matchesFilter
         );
       }
     );
-  }, [patients, search, filter]);
+  }, [patients, search, filter, activeTab]);
 
   function getStatusLabel(
     status: OptometryPatient["optometryStatus"]
@@ -199,6 +216,22 @@ export default function OptometryDashboard() {
         );
       }
     });
+  }
+
+
+  async function handleSourceChange(
+    patientCode: string,
+    source: "in_house" | "visiting"
+  ) {
+    setFeedback("");
+    try {
+      const result = await updateOptometrySource(patientCode, source);
+      setFeedback(result.message);
+      if (result.success) await loadQueue();
+    } catch (error) {
+      console.error("Failed to update Optometry patient source:", error);
+      setFeedback("Unable to update patient source.");
+    }
   }
 
   async function handleLogout() {
@@ -298,6 +331,29 @@ export default function OptometryDashboard() {
           </div>
         )}
 
+
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+          {([
+            ["REFRACTION", "Refraction", patients.filter((p) => p.optometryStatus !== "completed").length],
+            ["IN_HOUSE", "In-house", patients.filter((p) => p.optometrySource === "in_house" && p.optometryStatus !== "completed").length],
+            ["VISITING", "Visiting", patients.filter((p) => p.optometrySource === "visiting" && p.optometryStatus !== "completed").length],
+            ["RESULT", "Result", patients.filter((p) => p.optometryStatus === "completed").length],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setActiveTab(key);
+                setFilter("ALL");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition ${activeTab === key ? "bg-blue-700 text-white shadow-sm" : "text-slate-600 hover:bg-slate-100"}`}
+            >
+              {label}
+              <span className={`rounded-full px-2 py-0.5 text-[10px] ${activeTab === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>{count}</span>
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <button
             type="button"
@@ -377,8 +433,13 @@ export default function OptometryDashboard() {
               </div>
 
               <p className="mt-1 text-xs text-slate-500">
-                Patients referred by the clinical
-                team for Optometry assessment.
+                {activeTab === "RESULT"
+                  ? "Completed refraction assessments forwarded to the doctor."
+                  : activeTab === "VISITING"
+                    ? "Patients referred from outside hospitals or eye centres."
+                    : activeTab === "IN_HOUSE"
+                      ? "Sparkle Eye patients referred internally by the doctor."
+                      : "Patients awaiting or undergoing refraction assessment."}
               </p>
             </div>
 
@@ -456,6 +517,10 @@ export default function OptometryDashboard() {
                     </th>
 
                     <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Source
+                    </th>
+
+                    <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
                       Status
                     </th>
 
@@ -527,6 +592,18 @@ export default function OptometryDashboard() {
                                 ? "With correction"
                                 : "Unaided"}
                             </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <select
+                              aria-label={`Patient source for ${patient.fullName}`}
+                              value={patient.optometrySource}
+                              onChange={(event) => handleSourceChange(patient.patientCode, event.target.value as "in_house" | "visiting")}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[10px] font-bold text-slate-700 outline-none focus:border-blue-500"
+                            >
+                              <option value="in_house">In-house</option>
+                              <option value="visiting">Visiting</option>
+                            </select>
                           </td>
 
                           <td className="px-5 py-4">
