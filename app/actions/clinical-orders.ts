@@ -447,40 +447,9 @@ export async function createPrescription(
       };
     }
 
-    /*
-     * Get the active invoice.
-     */
-    const invoice = await getOrCreateDraftInvoice(patient.id);
-
-    /*
-     * Add the medication to billing.
-     */
-    const { error: itemError } = await supabaseServer
-      .from("invoice_items")
-      .insert({
-        invoice_id: invoice.id,
-        category: "pharmacy",
-        name: drugName,
-        quantity,
-        unit_price: pricePerUnit,
-        total_price: totalPrice,
-      });
-
-    if (itemError) {
-      console.error(
-        "Prescription invoice item creation failed:",
-        itemError
-      );
-
-      return {
-        success: false,
-        message:
-          "Prescription was created, but it could not be added to the invoice.",
-        id: prescription.id,
-      };
-    }
-
-    await recalcInvoice(invoice.id);
+    // Keep prescriptions on the clinical record first. The pharmacist selects
+    // which medicines the patient can afford and prepares only those lines for
+    // cashier billing via prepareSelectedPrescriptionsForPayment.
 
     /*
      * Record the pharmacy activity using the actual
@@ -500,8 +469,8 @@ export async function createPrescription(
         quantity,
         pricePerUnit,
         totalPrice,
+        billingStatus: "awaiting_pharmacist_selection",
       }),
-      financialAmount: totalPrice,
     });
 
     revalidatePath(
@@ -514,7 +483,7 @@ export async function createPrescription(
 
     return {
       success: true,
-      message: `${drugName} has been prescribed and added to the patient's bill.`,
+      message: `${drugName} has been prescribed and sent to the Pharmacy queue for selective billing.`,
       id: prescription.id,
     };
   } catch (error) {
