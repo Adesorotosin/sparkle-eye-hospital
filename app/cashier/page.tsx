@@ -438,6 +438,7 @@ export default function CashierDashboard() {
 
       {/* MAIN */}
       <main className="max-w-7xl mx-auto p-6 space-y-6">
+        <ClinicalHandoffInbox destination="CASHIER" />
         {error && (
           <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
