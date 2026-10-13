@@ -193,19 +193,31 @@ export async function saveConsultationEncounter(
           recorded_by: staff.id,
         };
 
-    const encounterQuery = formData.encounterId
-      ? supabaseServer
-          .from("encounters")
-          .update({ ...encounterValues, updated_at: new Date().toISOString() })
-          .eq("id", formData.encounterId)
-          .eq("patient_id", patient.id)
-      : supabaseServer
-          .from("encounters")
-          .insert(encounterValues);
+    let encounter: { id: string } | null = null;
+    let encounterError: { message: string } | null = null;
 
-    const { data: encounter, error: encounterError } = await encounterQuery
-      .select("id")
-      .single();
+    if (formData.encounterId) {
+      const result = await supabaseServer
+        .from("encounters")
+        .update({ ...encounterValues, updated_at: new Date().toISOString() })
+        .eq("id", formData.encounterId)
+        .eq("patient_id", patient.id)
+        .select("id")
+        .maybeSingle();
+      encounter = result.data;
+      encounterError = result.error;
+      if (!encounter && !encounterError) {
+        encounterError = { message: "The encounter to edit was not found for this patient." };
+      }
+    } else {
+      const result = await supabaseServer
+        .from("encounters")
+        .insert(encounterValues)
+        .select("id")
+        .single();
+      encounter = result.data;
+      encounterError = result.error;
+    }
 
     if (encounterError) {
       console.error("Encounter save failed:", encounterError);
