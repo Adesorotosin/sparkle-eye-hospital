@@ -12,6 +12,7 @@ import {
   Bell,
   Settings,
   Tags,
+  Package,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -36,6 +37,7 @@ export default function AdminSidebar({
     { name: "Notifications & Alerts", href: "/admin/notifications", icon: Bell },
     { name: "Settings", href: "/admin/settings", icon: Settings },
     { name: "Procedure Prices", href: "/admin/procedure-prices", icon: Tags },
+    { name: "Shared Inventory", href: "/inventory", icon: Package },
   ];
 
   const isActive = (href: string) => {
