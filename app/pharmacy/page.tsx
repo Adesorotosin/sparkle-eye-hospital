@@ -98,6 +98,7 @@ function PharmacyContent() {
 
   const [selectedPrescriptionIds, setSelectedPrescriptionIds] = useState<string[]>([]);
   const [isPreparingBill, setIsPreparingBill] = useState(false);
+  const [selectionPatientId, setSelectionPatientId] = useState("");
 
   const [actionError, setActionError] =
     useState<string | null>(null);
@@ -477,8 +478,11 @@ function PharmacyContent() {
   const selectedMedicationTotal = selectedPendingPrescriptions.reduce((sum, rx) => sum + Number(rx.totalPrice || 0), 0);
 
   useEffect(() => {
-    setSelectedPrescriptionIds((patient?.prescriptions ?? []).filter((rx) => rx.status === "pending_payment").map((rx) => rx.id));
-  }, [patient?.patientId]);
+    if (patient?.patientId && patient.patientId !== selectionPatientId) {
+      setSelectionPatientId(patient.patientId);
+      setSelectedPrescriptionIds((patient.prescriptions ?? []).filter((rx) => rx.status === "pending_payment").map((rx) => rx.id));
+    }
+  }, [patient?.patientId, patient?.prescriptions, selectionPatientId]);
 
   const handlePrepareSelectedBill = async () => {
     if (!patientId || selectedPendingPrescriptions.length === 0) { setActionError("Select at least one unpaid medication to prepare the bill."); return; }
@@ -486,7 +490,7 @@ function PharmacyContent() {
     try {
       const result = await prepareSelectedPrescriptionsForPayment({ patientCode: patientId, prescriptionIds: selectedPendingPrescriptions.map((rx) => rx.id) });
       if (!result.success) throw new Error(result.message);
-      setDispenseSuccess(false); await loadPatient(patientId); await loadQueue(); setActionError(null); alert(result.message);
+      setDispenseSuccess(false); setSelectedPrescriptionIds([]); await loadPatient(patientId); await loadQueue(); setActionError(null); alert(result.message);
     } catch (error) { setActionError(error instanceof Error ? error.message : "Unable to prepare the selected bill."); }
     finally { setIsPreparingBill(false); }
   };
