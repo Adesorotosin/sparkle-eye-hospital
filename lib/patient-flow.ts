@@ -399,6 +399,11 @@ function mapVitals(row: any): TriageVitals {
         ? Number(row.spo2)
         : undefined,
 
+    rbs:
+      row.rbs !== null && row.rbs !== undefined
+        ? Number(row.rbs)
+        : undefined,
+
     primaryComplaint:
       row.primary_complaint ?? "",
 
