@@ -633,10 +633,13 @@ export default function OptometryDashboard() {
 
                           <td className="max-w-56 px-5 py-4 text-xs font-medium text-slate-600">
                             <div>{patient.complaint}</div>
-                            {patient.optometrySource === "visiting" && patient.referralFacility && (
+                            {patient.optometrySource === "visiting" && (
                               <p className="mt-1 text-[10px] text-violet-700">
-                                Referred by: {patient.referralFacility}
-                                {patient.referringClinician ? ` · ${patient.referringClinician}` : ""}
+                                {patient.visitType === "self_presenting"
+                                  ? "Self-presenting patient"
+                                  : patient.referralFacility
+                                    ? `Referred by: ${patient.referralFacility}${patient.referringClinician ? ` · ${patient.referringClinician}` : ""}`
+                                    : "External referral"}
                               </p>
                             )}
                           </td>
