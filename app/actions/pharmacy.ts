@@ -521,44 +521,7 @@ export async function createPharmacyPrescription(
       };
     }
 
-    const invoice =
-      await getOrCreateDraftInvoice(
-        patient.id
-      );
-
-    const {
-      error: invoiceItemError,
-    } =
-      await supabaseServer
-        .from("invoice_items")
-        .insert({
-          invoice_id: invoice.id,
-          category: "pharmacy",
-          name: drugName,
-          quantity,
-          unit_price: pricePerUnit,
-          total_price: totalPrice,
-        });
-
-    if (invoiceItemError) {
-      console.error(
-        "Pharmacy invoice item creation failed:",
-        invoiceItemError
-      );
-
-      await supabaseServer
-        .from("prescriptions")
-        .delete()
-        .eq("id", prescription.id);
-
-      return {
-        success: false,
-        message:
-          "The medication could not be added to the patient's bill.",
-      };
-    }
-
-    await recalcInvoice(invoice.id);
+    // Prescription records are added to an invoice only after the pharmacist selects the medications the patient can pay for.
 
     await logActivity({
       module: "Pharmacy",
@@ -590,7 +553,7 @@ export async function createPharmacyPrescription(
     return {
       success: true,
       message:
-        `${drugName} has been added to the patient's prescription and bill.`,
+        `${drugName} has been added to the patient's prescription. Select medications for this payment to prepare the bill.`,
       id: prescription.id,
       totalPrice,
     };
@@ -717,5 +680,67 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       success: false,
       message: "Failed to dispense patient prescriptions.",
     };
+  }
+}
+
+export async function prepareSelectedPrescriptionsForPayment(input: {
+  patientCode: string;
+  prescriptionIds: string[];
+}): Promise<{ success: boolean; message: string; invoiceId?: string; total?: number }> {
+  try {
+    const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    const code = input.patientCode?.trim();
+    const selectedIds = [...new Set((input.prescriptionIds ?? []).filter((id) => typeof id === "string" && id.trim()))];
+    if (!code) return { success: false, message: "Patient code is required." };
+    if (selectedIds.length === 0) return { success: false, message: "Select at least one medication to prepare the bill." };
+
+    const { data: patient, error: patientError } = await supabaseServer.from("patients").select("id, patient_code, full_name").eq("patient_code", code).maybeSingle();
+    if (patientError || !patient) return { success: false, message: "Unable to find the patient record." };
+
+    const { data: prescriptions, error: prescriptionError } = await supabaseServer.from("prescriptions").select("id, drug_name, quantity, price_per_unit, total_price, status").eq("patient_id", patient.id).in("id", selectedIds).eq("status", "pending_payment");
+    if (prescriptionError) throw prescriptionError;
+    if ((prescriptions ?? []).length !== selectedIds.length) return { success: false, message: "Some selected medications are no longer awaiting payment. Refresh the patient record and try again." };
+
+    const invoice = await getOrCreateDraftInvoice(patient.id);
+    if (invoice.status === "paid" || invoice.status === "cancelled") return { success: false, message: "The active invoice cannot accept medications. Please refresh and try again." };
+
+    // Replace only pharmacy lines; consultation and diagnostic lines remain untouched.
+    const { error: removeError } = await supabaseServer.from("invoice_items").delete().eq("invoice_id", invoice.id).eq("category", "pharmacy");
+    if (removeError) throw removeError;
+
+    const items = (prescriptions ?? []).map((rx) => ({
+      invoice_id: invoice.id,
+      prescription_id: rx.id,
+      category: "pharmacy",
+      name: rx.drug_name,
+      quantity: Number(rx.quantity),
+      unit_price: Number(rx.price_per_unit),
+      total_price: Number(rx.total_price),
+    }));
+    const { error: insertError } = await supabaseServer.from("invoice_items").insert(items);
+    if (insertError) throw insertError;
+
+    const totals = await recalcInvoice(invoice.id);
+    const selectedTotal = (prescriptions ?? []).reduce((sum, rx) => sum + Number(rx.total_price ?? 0), 0);
+    await logActivity({
+      module: "Pharmacy",
+      category: "BILLING",
+      action: "Selected medications prepared for payment.",
+      performedBy: staff.name,
+      patientId: patient.id,
+      staffId: staff.id,
+      details: JSON.stringify({ invoiceId: invoice.id, prescriptionIds: selectedIds, selectedMedicationTotal: selectedTotal }),
+      financialAmount: selectedTotal,
+    });
+    revalidatePath("/pharmacy");
+    revalidatePath("/billing");
+    revalidatePath("/cashier");
+    return { success: true, message: selectedIds.length + " medication(s) prepared for payment. Unselected prescriptions remain on the patient's record and were not added to this bill.", invoiceId: invoice.id, total: totals.grandTotal };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "UNAUTHENTICATED") return { success: false, message: "Authentication required." };
+    if (message === "FORBIDDEN") return { success: false, message: "You are not authorized to prepare pharmacy bills." };
+    console.error("Prepare selected prescriptions error:", error);
+    return { success: false, message: "Unable to prepare the selected medications for payment. Please refresh and try again." };
   }
 }
