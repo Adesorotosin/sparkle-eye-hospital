@@ -33,6 +33,7 @@ import {
   getPharmacyQueue,
   createPharmacyPrescription,
   dispensePatientPrescriptions,
+  prepareSelectedPrescriptionsForPayment,
   type PharmacyPatient,
   type PharmacyQueueItem,
 } from "@/app/actions/pharmacy";
@@ -94,6 +95,9 @@ function PharmacyContent() {
 
   const [dispenseSuccess, setDispenseSuccess] =
     useState(false);
+
+  const [selectedPrescriptionIds, setSelectedPrescriptionIds] = useState<string[]>([]);
+  const [isPreparingBill, setIsPreparingBill] = useState(false);
 
   const [actionError, setActionError] =
     useState<string | null>(null);
@@ -467,6 +471,25 @@ function PharmacyContent() {
         status: rx.status,
       })
     ) ?? [];
+
+  const pendingPrescriptions = activePrescriptions.filter((rx) => rx.status === "pending_payment");
+  const selectedPendingPrescriptions = pendingPrescriptions.filter((rx) => selectedPrescriptionIds.includes(rx.id));
+  const selectedMedicationTotal = selectedPendingPrescriptions.reduce((sum, rx) => sum + Number(rx.totalPrice || 0), 0);
+
+  useEffect(() => {
+    setSelectedPrescriptionIds((patient?.prescriptions ?? []).filter((rx) => rx.status === "pending_payment").map((rx) => rx.id));
+  }, [patient?.patientId, patient?.prescriptions]);
+
+  const handlePrepareSelectedBill = async () => {
+    if (!patientId || selectedPendingPrescriptions.length === 0) { setActionError("Select at least one unpaid medication to prepare the bill."); return; }
+    setIsPreparingBill(true); setActionError(null);
+    try {
+      const result = await prepareSelectedPrescriptionsForPayment({ patientCode: patientId, prescriptionIds: selectedPendingPrescriptions.map((rx) => rx.id) });
+      if (!result.success) throw new Error(result.message);
+      setDispenseSuccess(false); await loadPatient(patientId); await loadQueue(); setActionError(null); alert(result.message);
+    } catch (error) { setActionError(error instanceof Error ? error.message : "Unable to prepare the selected bill."); }
+    finally { setIsPreparingBill(false); }
+  };
 
   const totalPrescriptionPrice =
     activePrescriptions.reduce(
@@ -2158,6 +2181,10 @@ function PharmacyContent() {
                   <tr className="border-b border-slate-200/80 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
 
                     <th className="pb-3">
+                      BILL
+                    </th>
+
+                    <th className="pb-3">
                       DRUG NAME
                     </th>
 
@@ -2208,6 +2235,12 @@ function PharmacyContent() {
                               rx.id
                             }
                           >
+
+                            <td className="py-3.5">
+                              {rx.status === "pending_payment" ? (
+                                <input aria-label={"Select " + rx.drugName + " for payment"} type="checkbox" className="h-4 w-4 accent-purple-600" checked={selectedPrescriptionIds.includes(rx.id)} onChange={(event) => setSelectedPrescriptionIds((current) => event.target.checked ? [...current, rx.id] : current.filter((id) => id !== rx.id))} />
+                              ) : <span className="text-xs text-slate-400">—</span>}
+                            </td>
 
                             <td className="py-3.5">
 
@@ -2374,6 +2407,20 @@ function PharmacyContent() {
             </div>
 
           </div>
+
+          {pendingPrescriptions.length > 0 && (
+            <div className="w-full rounded-xl border border-purple-100 bg-purple-50 p-4 mb-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><p className="text-sm font-extrabold text-slate-900">Prepare an affordable medication bill</p><p className="mt-1 text-xs text-slate-600">Select only the medicines the patient can pay for now. Unselected prescriptions stay on the record and can be billed later.</p></div>
+                <div className="text-right"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Selected medication total</p><p className="text-lg font-extrabold text-purple-700">₦{selectedMedicationTotal.toLocaleString()}</p></div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => setSelectedPrescriptionIds(pendingPrescriptions.map((rx) => rx.id))} className="rounded-lg border border-purple-200 bg-white px-3 py-2 text-xs font-bold text-purple-700">Select all unpaid</button>
+                <button type="button" onClick={() => setSelectedPrescriptionIds([])} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600">Clear selection</button>
+                <button type="button" onClick={handlePrepareSelectedBill} disabled={isPreparingBill || selectedPendingPrescriptions.length === 0} className="rounded-lg bg-purple-600 px-4 py-2 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-50">{isPreparingBill ? "Preparing bill…" : "Prepare selected for payment"}</button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
 
