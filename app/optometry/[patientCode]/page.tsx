@@ -80,6 +80,11 @@ type PatientData = {
     | "in_examination"
     | "completed"
     | null;
+  optometrySource: "in_house" | "visiting";
+  referralFacility: string | null;
+  referringClinician: string | null;
+  referralReason: string | null;
+  referralNotes: string | null;
 
   vitals: {
     visualAcuityOD: string;
@@ -537,6 +542,18 @@ export default function OptometryExaminationPage() {
               />
             </div>
           </div>
+
+          {patient.optometrySource === "visiting" && (
+            <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-800">Visiting patient</span>
+                {patient.referralFacility && <span className="font-bold">Referred by {patient.referralFacility}</span>}
+                {patient.referringClinician && <span className="text-violet-700">· {patient.referringClinician}</span>}
+              </div>
+              {patient.referralReason && <p className="mt-2"><strong>Reason for referral:</strong> {patient.referralReason}</p>}
+              {patient.referralNotes && <p className="mt-1 whitespace-pre-wrap"><strong>Referral notes:</strong> {patient.referralNotes}</p>}
+            </div>
+          )}
 
           {patient.allergies && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
