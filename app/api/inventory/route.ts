@@ -101,7 +101,6 @@ export async function POST(request: Request) {
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "PHARMACIST",
     ]);
 
     const body = await request.json();
@@ -288,7 +287,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "You do not have permission to add inventory.",
+            "Only an administrator can add new inventory stock.",
         },
         { status: 403 }
       );
