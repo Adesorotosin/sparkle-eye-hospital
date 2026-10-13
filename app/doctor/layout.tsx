@@ -44,10 +44,10 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
 
     let cancelled = false;
 
-    async function loadActivePatient() {
+    async function loadActivePatient(code: string) {
       try {
         const response = await fetch(
-          `/api/patients/${encodeURIComponent(patientCode)}`,
+          `/api/patients/${encodeURIComponent(code)}`,
           { cache: "no-store" },
         );
 
@@ -67,7 +67,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       }
     }
 
-    loadActivePatient();
+    loadActivePatient(patientCode);
 
     return () => {
       cancelled = true;
