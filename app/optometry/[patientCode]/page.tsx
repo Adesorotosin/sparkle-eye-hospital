@@ -81,6 +81,7 @@ type PatientData = {
     | "completed"
     | null;
   optometrySource: "in_house" | "visiting";
+  visitType: "external_referral" | "self_presenting";
   referralFacility: string | null;
   referringClinician: string | null;
   referralReason: string | null;
@@ -547,8 +548,14 @@ export default function OptometryExaminationPage() {
             <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-800">Visiting patient</span>
-                {patient.referralFacility && <span className="font-bold">Referred by {patient.referralFacility}</span>}
-                {patient.referringClinician && <span className="text-violet-700">· {patient.referringClinician}</span>}
+                {patient.visitType === "self_presenting" ? (
+                  <span className="font-semibold">Self-presenting · no external referral</span>
+                ) : (
+                  <>
+                    {patient.referralFacility && <span className="font-bold">Referred by {patient.referralFacility}</span>}
+                    {patient.referringClinician && <span className="text-violet-700">· {patient.referringClinician}</span>}
+                  </>
+                )}
               </div>
               {patient.referralReason && <p className="mt-2"><strong>Reason for referral:</strong> {patient.referralReason}</p>}
               {patient.referralNotes && <p className="mt-1 whitespace-pre-wrap"><strong>Referral notes:</strong> {patient.referralNotes}</p>}
