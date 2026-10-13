@@ -80,6 +80,12 @@ type PatientData = {
     | "in_examination"
     | "completed"
     | null;
+  optometrySource: "in_house" | "visiting";
+  visitType: "external_referral" | "self_presenting";
+  referralFacility: string | null;
+  referringClinician: string | null;
+  referralReason: string | null;
+  referralNotes: string | null;
 
   vitals: {
     visualAcuityOD: string;
@@ -272,11 +278,11 @@ export default function OptometryExaminationPage() {
         );
 
         setRefractionOD(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setRefractionOS(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setSlitLampOD("");
@@ -292,11 +298,11 @@ export default function OptometryExaminationPage() {
         setWithCorrection(false);
 
         setRefractionOD(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setRefractionOS(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setSlitLampOD("");
@@ -538,6 +544,24 @@ export default function OptometryExaminationPage() {
             </div>
           </div>
 
+          {patient.optometrySource === "visiting" && (
+            <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-800">Visiting patient</span>
+                {patient.visitType === "self_presenting" ? (
+                  <span className="font-semibold">Self-presenting · no external referral</span>
+                ) : (
+                  <>
+                    {patient.referralFacility && <span className="font-bold">Referred by {patient.referralFacility}</span>}
+                    {patient.referringClinician && <span className="text-violet-700">· {patient.referringClinician}</span>}
+                  </>
+                )}
+              </div>
+              {patient.referralReason && <p className="mt-2"><strong>{patient.visitType === "self_presenting" ? "Reason for visit:" : "Reason for referral:"}</strong> {patient.referralReason}</p>}
+              {patient.referralNotes && <p className="mt-1 whitespace-pre-wrap"><strong>Referral notes:</strong> {patient.referralNotes}</p>}
+            </div>
+          )}
+
           {patient.allergies && (
             <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">
@@ -568,7 +592,8 @@ export default function OptometryExaminationPage() {
 
 
 
-        <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
+        {patient.optometrySource !== "visiting" && (
+          <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
           <SectionHeader
             icon={Eye}
             title="Visual Acuity Recorded by Nurse"
@@ -595,6 +620,7 @@ export default function OptometryExaminationPage() {
             ))}
           </div>
         </section>
+        )}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <SectionHeader

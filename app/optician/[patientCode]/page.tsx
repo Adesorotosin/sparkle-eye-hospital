@@ -465,6 +465,7 @@ export default function OpticianPatientPage({
           lensType,
           lensMaterial,
           lensCoating,
+          dispensingNotes: order.dispensingNotes ?? "",
         });
 
       setFeedback(result.message);
@@ -1024,7 +1025,7 @@ export default function OpticianPatientPage({
                         <Save className="h-4 w-4" />
                       )}
 
-                      Save Optical Order
+                      Save & Send to Doctor
                     </button>
                   ) : null}
 

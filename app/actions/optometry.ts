@@ -28,6 +28,12 @@ export type OptometryPatient = {
     | "completed"
     | null;
   referredAt: string | null;
+  optometrySource: "in_house" | "visiting";
+  visitType: "external_referral" | "self_presenting";
+  referralFacility: string | null;
+  referringClinician: string | null;
+  referralReason: string | null;
+  referralNotes: string | null;
 };
 
 function handleError(
@@ -85,6 +91,12 @@ export async function getOptometryQueue(): Promise<{
         age,
         gender,
         optometry_status,
+        optometry_source,
+        optometry_visit_type,
+        optometry_referral_facility,
+        optometry_referring_clinician,
+        optometry_referral_reason,
+        optometry_referral_notes,
         created_at,
         vitals (
           primary_complaint,
@@ -166,6 +178,18 @@ export async function getOptometryQueue(): Promise<{
           vitals?.recorded_at ??
           patient.created_at ??
           null,
+        optometrySource:
+          patient.optometry_source === "visiting"
+            ? "visiting"
+            : "in_house",
+        visitType:
+          patient.optometry_visit_type === "self_presenting"
+            ? "self_presenting"
+            : "external_referral",
+        referralFacility: patient.optometry_referral_facility ?? null,
+        referringClinician: patient.optometry_referring_clinician ?? null,
+        referralReason: patient.optometry_referral_reason ?? null,
+        referralNotes: patient.optometry_referral_notes ?? null,
       };
     });
 
@@ -340,6 +364,12 @@ export async function getOptometryPatient(
           allergies,
           status,
           optometry_status,
+          optometry_source,
+          optometry_visit_type,
+          optometry_referral_facility,
+          optometry_referring_clinician,
+          optometry_referral_reason,
+          optometry_referral_notes,
           vitals (
             id,
             visual_acuity_od,
@@ -454,6 +484,12 @@ export async function getOptometryPatient(
         optometryStatus:
           patient.optometry_status ??
           null,
+        optometrySource: patient.optometry_source === "visiting" ? "visiting" : "in_house",
+        visitType: patient.optometry_visit_type === "self_presenting" ? "self_presenting" : "external_referral",
+        referralFacility: patient.optometry_referral_facility ?? null,
+        referringClinician: patient.optometry_referring_clinician ?? null,
+        referralReason: patient.optometry_referral_reason ?? null,
+        referralNotes: patient.optometry_referral_notes ?? null,
         vitals: vitals
           ? {
               visualAcuityOD:
@@ -564,5 +600,216 @@ export async function getOptometryPatient(
           ? "You are not authorized to access Optometry records."
           : "Unable to load the patient record.",
     };
+  }
+}
+
+/**
+ * Categorizes an existing Optometry queue patient as internal or visiting.
+ * Only Optometry staff and IT administrators can change this classification.
+ */
+export async function updateOptometrySource(
+  patientCode: string,
+  source: "in_house" | "visiting"
+): Promise<OptometryActionResponse> {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const normalizedCode = patientCode?.trim();
+
+    if (!normalizedCode) {
+      return { success: false, message: "Patient code is required." };
+    }
+
+    if (source !== "in_house" && source !== "visiting") {
+      return { success: false, message: "Invalid patient source." };
+    }
+
+    const { data: patient, error: patientError } = await supabaseServer
+      .from("patients")
+      .select("id, patient_code, full_name, optometry_status")
+      .eq("patient_code", normalizedCode)
+      .maybeSingle();
+
+    if (patientError) throw patientError;
+    if (!patient) {
+      return { success: false, message: "Patient was not found." };
+    }
+    if (!patient.optometry_status) {
+      return {
+        success: false,
+        message: "Only patients already referred to Optometry can be categorized here.",
+      };
+    }
+
+    const { error } = await supabaseServer
+      .from("patients")
+      .update({ optometry_source: source })
+      .eq("id", patient.id);
+
+    if (error) throw error;
+
+    await logActivity({
+      module: "Optometry",
+      category: "CLINICAL",
+      action: "Optometry patient source updated",
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: patient.id,
+      details: JSON.stringify({
+        patientCode: patient.patient_code,
+        patientName: patient.full_name,
+        source,
+      }),
+    });
+
+    revalidatePath("/optometry");
+    return {
+      success: true,
+      message: source === "visiting"
+        ? "Patient marked as visiting."
+        : "Patient marked as in-house.",
+    };
+  } catch (error) {
+    return handleError(error, "Unable to update the patient's source.");
+  }
+}
+
+
+export type VisitingOptometryRegistrationInput = {
+  fullName: string;
+  age?: number | null;
+  dateOfBirth?: string | null;
+  gender: string;
+  phone?: string | null;
+  visitType: "external_referral" | "self_presenting";
+  referralFacility?: string | null;
+  referringClinician?: string | null;
+  referralReason?: string | null;
+  referralNotes?: string | null;
+};
+
+export type VisitingOptometryRegistrationResult =
+  OptometryActionResponse & {
+    patientCode?: string;
+    registrationNumber?: string | null;
+  };
+
+/**
+ * Creates a full hospital patient record for an outside referral and places
+ * it directly in the Optometry queue as a visiting patient.
+ */
+export async function registerVisitingOptometryPatient(
+  input: VisitingOptometryRegistrationInput
+): Promise<VisitingOptometryRegistrationResult> {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const fullName = input.fullName?.trim();
+    const gender = input.gender?.trim();
+    const visitType = input.visitType;
+    const referralFacility = input.referralFacility?.trim() || null;
+    const referringClinician = input.referringClinician?.trim() || null;
+    const referralReason = input.referralReason?.trim() || null;
+    const referralNotes = input.referralNotes?.trim() || null;
+
+    if (!fullName || !gender) {
+      return {
+        success: false,
+        message: "Patient name and gender are required.",
+      };
+    }
+
+    if (visitType !== "external_referral" && visitType !== "self_presenting") {
+      return {
+        success: false,
+        message: "Select how the patient arrived at Optometry.",
+      };
+    }
+
+    let age: number | undefined;
+    if (input.age !== undefined && input.age !== null) {
+      if (!Number.isInteger(input.age) || input.age < 0 || input.age > 150) {
+        return { success: false, message: "Age must be a whole number between 0 and 150." };
+      }
+      age = input.age;
+    }
+
+    if (input.dateOfBirth) {
+      const parsed = new Date(input.dateOfBirth + "T00:00:00");
+      if (Number.isNaN(parsed.getTime()) || parsed > new Date()) {
+        return { success: false, message: "Enter a valid date of birth that is not in the future." };
+      }
+      const today = new Date();
+      age = today.getFullYear() - parsed.getFullYear();
+      const monthDifference = today.getMonth() - parsed.getMonth();
+      if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < parsed.getDate())) {
+        age -= 1;
+      }
+    }
+
+    const { registerPatient } = await import("@/lib/patient-flow");
+    const patient = await registerPatient({
+      fullName,
+      age,
+      dateOfBirth: input.dateOfBirth || undefined,
+      gender,
+      phone: input.phone?.trim() || undefined,
+      coveragePlan: "Self-Pay",
+      status: "in_consultation",
+      isWalkIn: true,
+    });
+
+    const { data: updatedPatient, error: updateError } = await supabaseServer
+      .from("patients")
+      .update({
+        optometry_status: "referred",
+        optometry_source: "visiting",
+        optometry_visit_type: visitType,
+        optometry_referral_facility: referralFacility,
+        optometry_referring_clinician: referringClinician,
+        optometry_referral_reason: referralReason,
+        optometry_referral_notes: referralNotes,
+      })
+      .eq("id", patient.id)
+      .select("id, patient_code, registration_number, full_name")
+      .single();
+
+    if (updateError) {
+      console.error("Visiting patient was registered but Optometry referral details could not be saved:", updateError);
+      return {
+        success: false,
+        message: "The patient record was created, but the Optometry referral could not be saved. Please contact an administrator before registering this patient again.",
+        patientCode: patient.patient_code,
+        registrationNumber: patient.registration_number ?? null,
+      };
+    }
+
+    await logActivity({
+      module: "Optometry",
+      category: "CLINICAL",
+      action: "Visiting Optometry patient registered",
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: updatedPatient.id,
+      details: JSON.stringify({
+        patientCode: updatedPatient.patient_code,
+        registrationNumber: updatedPatient.registration_number ?? null,
+        patientName: updatedPatient.full_name,
+        visitType,
+        referralFacility,
+        referringClinician,
+        referralReason,
+      }),
+    });
+
+    revalidatePath("/optometry");
+    revalidatePath("/receptionist");
+
+    return {
+      success: true,
+      message: "Visiting patient registered and added to the Optometry queue.",
+      patientCode: updatedPatient.patient_code,
+      registrationNumber: updatedPatient.registration_number ?? null,
+    };
+  } catch (error) {
+    return handleError(error, "Unable to register the visiting Optometry patient.");
   }
 }
