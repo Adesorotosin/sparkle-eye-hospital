@@ -80,7 +80,7 @@ function refreshInventoryPaths() {
 
 export async function getInventoryData() {
   try {
-    await requireRole([...INVENTORY_READ_ROLES]);
+    const staff = await requireRole([...INVENTORY_READ_ROLES]);
     const [itemsResult, suppliersResult, movementsResult] = await Promise.all([
       supabaseServer
         .from("inventory_items")
@@ -101,7 +101,7 @@ export async function getInventoryData() {
     const error = itemsResult.error || suppliersResult.error || movementsResult.error;
     if (error) {
       console.error("Inventory data load failed:", error);
-      return { success: false as const, message: "Unable to load inventory. Confirm the shared inventory migration has been applied.", items: [] as InventoryItemRecord[], suppliers: [] as InventorySupplierRecord[], movements: [] as InventoryMovementRecord[] };
+      return { success: false as const, message: "Unable to load inventory. Confirm the shared inventory migration has been applied.", role: null, items: [] as InventoryItemRecord[], suppliers: [] as InventorySupplierRecord[], movements: [] as InventoryMovementRecord[] };
     }
 
     const movements = (movementsResult.data ?? []).map((row: any) => ({
@@ -113,12 +113,13 @@ export async function getInventoryData() {
     return {
       success: true as const,
       message: "Inventory loaded.",
+      role: staff.role,
       items: (itemsResult.data ?? []) as InventoryItemRecord[],
       suppliers: (suppliersResult.data ?? []) as InventorySupplierRecord[],
       movements: movements as InventoryMovementRecord[],
     };
   } catch (error) {
-    return { success: false as const, message: failureMessage(error, "Unable to load inventory."), items: [] as InventoryItemRecord[], suppliers: [] as InventorySupplierRecord[], movements: [] as InventoryMovementRecord[] };
+    return { success: false as const, message: failureMessage(error, "Unable to load inventory."), role: null, items: [] as InventoryItemRecord[], suppliers: [] as InventorySupplierRecord[], movements: [] as InventoryMovementRecord[] };
   }
 }
 
