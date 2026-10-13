@@ -109,6 +109,18 @@ export async function createClinicalHandoff(input: {
       return { success: false, message: "Patient not found. Refresh the record and try again." };
     }
 
+    if (input.encounterId) {
+      const { data: encounter, error: encounterError } = await supabaseServer
+        .from("encounters")
+        .select("id")
+        .eq("id", input.encounterId)
+        .eq("patient_id", patient.id)
+        .maybeSingle();
+      if (encounterError || !encounter) {
+        return { success: false, message: "The consultation record does not belong to this patient. Refresh the patient record and try again." };
+      }
+    }
+
     const { data: handoff, error } = await supabaseServer
       .from("clinical_handoffs")
       .insert({
