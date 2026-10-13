@@ -219,12 +219,12 @@ export async function saveConsultationEncounter(
       encounterError = result.error;
     }
 
-    if (encounterError) {
+    if (encounterError || !encounter) {
       console.error("Encounter save failed:", encounterError);
 
       return {
         success: false,
-        message: "Failed to save the consultation record.",
+        message: encounterError?.message || "The encounter could not be found or saved.",
       };
     }
 
