@@ -470,6 +470,7 @@ export default function DoctorEncounterPage() {
 
       setSavedStatus(status);
       setMessage(response.message);
+      await refreshPatient();
     });
   };
 
