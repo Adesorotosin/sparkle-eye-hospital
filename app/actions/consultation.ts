@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/server-auth";
 
 export interface ConsultationFormData {
   patientId: string;
+  encounterId?: string;
 
   presentingComplaint: string;
   historyOfPresentingComplaint: string;
@@ -129,10 +130,7 @@ export async function saveConsultationEncounter(
      * We intentionally INSERT instead of UPDATE because an encounter
      * represents a clinical event/history item.
      */
-    const { data: encounter, error: encounterError } =
-      await supabaseServer
-        .from("encounters")
-        .insert({
+    const encounterValues = {
           patient_id: patient.id,
 
           presenting_complaint:
@@ -193,9 +191,21 @@ export async function saveConsultationEncounter(
 
           status: formData.status,
           recorded_by: staff.id,
-        })
-        .select("id")
-        .single();
+        };
+
+    const encounterQuery = formData.encounterId
+      ? supabaseServer
+          .from("encounters")
+          .update({ ...encounterValues, updated_at: new Date().toISOString() })
+          .eq("id", formData.encounterId)
+          .eq("patient_id", patient.id)
+      : supabaseServer
+          .from("encounters")
+          .insert(encounterValues);
+
+    const { data: encounter, error: encounterError } = await encounterQuery
+      .select("id")
+      .single();
 
     if (encounterError) {
       console.error("Encounter save failed:", encounterError);
