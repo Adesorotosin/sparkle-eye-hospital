@@ -1043,7 +1043,7 @@ export default function DoctorEncounterPage() {
                   <Pill className="h-5 w-5 text-blue-600" />
                   <div>
                     <h3 className="font-semibold">Pharmacy request</h3>
-                    <p className="text-xs text-gray-500">Create the prescription and automatically add it to billing.</p>
+                    <p className="text-xs text-gray-500">Record the prescription for the patient. The pharmacist selects affordable medicines and prepares the bill.</p>
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-4">
