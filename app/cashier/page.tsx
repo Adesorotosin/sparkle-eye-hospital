@@ -7,6 +7,7 @@ import React, {
 } from "react";
 
 import Image from "next/image";
+import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 import { useRouter } from "next/navigation";
 
 import {
