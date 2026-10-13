@@ -25,6 +25,7 @@ import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
 import { createOpticalOrder } from "@/app/actions/optician";
 import { getOptometryPatient } from "@/app/actions/optometry";
+import { createClinicalHandoff } from "@/app/actions/clinical-handoffs";
 
 type Refraction = {
   sphere: string;
@@ -349,8 +350,11 @@ export default function DoctorEncounterPage() {
   const [pricePerUnit, setPricePerUnit] = useState("0");
 
   const [requesting, setRequesting] = useState("");
-  const [appointmentDate, setAppointmentDate] = useState("");
-  const [appointmentTime, setAppointmentTime] = useState("");
+  const [procedureRequest, setProcedureRequest] = useState("");
+  const [followUpInterval, setFollowUpInterval] = useState("1");
+  const [followUpUnit, setFollowUpUnit] = useState<"days" | "months">("months");
+  const [followUpTime, setFollowUpTime] = useState("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
   const [optometryResult, setOptometryResult] = useState<any>(null);
 
   const latestEncounter = patient?.encounters?.[0];
@@ -556,6 +560,18 @@ export default function DoctorEncounterPage() {
     });
   };
 
+  const sendHandoff = (input: Parameters<typeof createClinicalHandoff>[0]) => {
+    setMessage("");
+    setError("");
+    setRequesting(`handoff-${input.handoffType}`);
+    startTransition(async () => {
+      const response = await createClinicalHandoff(input);
+      if (!response.success) setError(response.message);
+      else setMessage(response.message);
+      setRequesting("");
+    });
+  };
+
   const prescribe = () => {
     setMessage("");
     setError("");
@@ -700,6 +716,7 @@ export default function DoctorEncounterPage() {
               ["diagnosis", "Diagnosis"],
               ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
               ["appointment", "Appointment"],
@@ -1038,6 +1055,10 @@ export default function DoctorEncounterPage() {
           <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
             <div className="space-y-4">
               <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div><p className="font-semibold text-amber-950">Send treatment plan to Cashier</p><p className="mt-1 text-xs text-amber-800">The cashier receives the clinical plan for review and billing. The plan itself is not automatically converted into a charge.</p></div>
+                <button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "CASHIER", handoffType: "TREATMENT_PLAN", title: "Doctor treatment plan", details: treatmentPlan })} disabled={isPending || !treatmentPlan.trim() || requesting === "handoff-TREATMENT_PLAN"} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{requesting === "handoff-TREATMENT_PLAN" ? "Sending..." : "Send to Cashier"}</button>
+              </div>
               <div className="rounded-2xl border p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <Pill className="h-5 w-5 text-blue-600" />
@@ -1057,6 +1078,12 @@ export default function DoctorEncounterPage() {
                 </button>
               </div>
             </div>
+          </Section>
+
+          <Section id="procedure-request" title="Procedure request to Reception" icon={<Send className="h-5 w-5" />}>
+            <p className="mb-3 text-sm text-gray-500">Send the procedure or service the patient needs to Reception. Reception staff can register it using the approved procedure catalogue and price.</p>
+            <Field label="Procedure / service requested" value={procedureRequest} onChange={setProcedureRequest} rows={3} placeholder="Describe the procedure, urgency, and any preparation instructions..." />
+            <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: "Procedure request", details: procedureRequest })} disabled={isPending || !procedureRequest.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send to Reception"}</button></div>
           </Section>
 
           <Section id="requests" title="Clinical requests" icon={<Send className="h-5 w-5" />}>
@@ -1183,27 +1210,15 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
-          <Section id="appointment" title="Appointment" icon={<Calendar className="h-5 w-5" />}>
+          <Section id="appointment" title="Follow-up appointment" icon={<Calendar className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Choose when the patient should return. This creates a request for Reception to confirm the actual appointment date and time with the patient.</p>
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">Preferred date</span>
-                <input type="date" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} className={inputClass} />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-gray-700">Preferred time</span>
-                <input type="time" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} className={inputClass} />
-              </label>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={() => router.push(`/appointments?patientCode=${encodeURIComponent(patientCode)}&date=${encodeURIComponent(appointmentDate)}&time=${encodeURIComponent(appointmentTime)}`)}
-                  className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Open Appointment Booking
-                </button>
-              </div>
+              <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Follow up in</span><input type="number" min="1" max="120" step="1" value={followUpInterval} onChange={(e) => setFollowUpInterval(e.target.value)} className={inputClass} /></label>
+              <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Interval unit</span><select value={followUpUnit} onChange={(e) => setFollowUpUnit(e.target.value as "days" | "months")} className={inputClass}><option value="days">Days</option><option value="months">Months</option></select></label>
+              <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Preferred time (optional)</span><input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className={inputClass} /></label>
             </div>
-            <p className="mt-3 text-xs text-gray-500">The appointment module remains the source of truth for booking and scheduling.</p>
+            <div className="mt-4"><Field label="Follow-up instructions / reason" value={followUpNotes} onChange={setFollowUpNotes} rows={2} placeholder="e.g. review response to treatment, repeat IOP..." /></div>
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
           </Section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm">
