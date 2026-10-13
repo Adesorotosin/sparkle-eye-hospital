@@ -557,7 +557,7 @@ export default function OptometryExaminationPage() {
                   </>
                 )}
               </div>
-              {patient.referralReason && <p className="mt-2"><strong>Reason for referral:</strong> {patient.referralReason}</p>}
+              {patient.referralReason && <p className="mt-2"><strong>{patient.visitType === "self_presenting" ? "Reason for visit:" : "Reason for referral:"}</strong> {patient.referralReason}</p>}
               {patient.referralNotes && <p className="mt-1 whitespace-pre-wrap"><strong>Referral notes:</strong> {patient.referralNotes}</p>}
             </div>
           )}
