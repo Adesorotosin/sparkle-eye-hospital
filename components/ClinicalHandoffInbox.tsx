@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays, CheckCircle2, Clock3, Loader2, ReceiptText, RefreshCw, Send, Stethoscope } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, Loader2, ReceiptText, RefreshCw } from "lucide-react";
 import { getClinicalHandoffs, updateClinicalHandoffStatus, type ClinicalHandoff, type HandoffDestination } from "@/app/actions/clinical-handoffs";
 
 export default function ClinicalHandoffInbox({ destination }: { destination: HandoffDestination }) {
