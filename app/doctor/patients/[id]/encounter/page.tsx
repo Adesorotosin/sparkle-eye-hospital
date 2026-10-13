@@ -624,8 +624,10 @@ export default function DoctorEncounterPage() {
       "Sparkle Eye Hospital — Lens Order",
       `Patient reference: ${patient?.patientId ?? patientCode}`,
       `Lens type: ${lensType || "To be confirmed"}`,
-      `OD: ${[refractionOD.sphere, refractionOD.cylinder, refractionOD.axis].filter(Boolean).join(" / ") || "See attached/confirmed prescription"}`,
-      `OS: ${[refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "See attached/confirmed prescription"}`,
+      `OD objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "objective") : [refractionOD.sphere, refractionOD.cylinder, refractionOD.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
+      `OD subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
+      `OS objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "objective") : [refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
+      `OS subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
       `Notes: ${refractionNotes || "None"}`,
       "Please confirm availability and quotation before processing.",
     ].join("\n");
