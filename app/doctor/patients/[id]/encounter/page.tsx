@@ -788,6 +788,7 @@ export default function DoctorEncounterPage() {
                     ["Pulse", patient.vitals.pulse !== undefined ? `${patient.vitals.pulse} bpm` : undefined],
                     ["Temperature", patient.vitals.temperature !== undefined ? `${patient.vitals.temperature} °C` : undefined],
                     ["SpO₂", patient.vitals.spo2 !== undefined ? `${patient.vitals.spo2}%` : undefined],
+                    ["RBS", patient.vitals.rbs !== undefined ? String(patient.vitals.rbs) + " mmol/L" : undefined],
                     ["Correction", patient.vitals.withCorrection ? "With correction" : "Without correction"],
                     ["Severity", patient.vitals.severity],
                   ]
