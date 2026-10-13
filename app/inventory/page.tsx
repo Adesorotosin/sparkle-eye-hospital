@@ -85,6 +85,7 @@ export default function InventoryPage() {
   useEffect(() => { void loadData(); }, [loadData]);
 
   const isManager = role === "IT_ADMIN" || role === "PHARMACIST";
+  const dashboardHref = role === "PHARMACIST" ? "/pharmacy" : role === "OPTICIAN" ? "/optician" : role === "LAB_SCIENTIST" ? "/laboratory" : role === "NURSE" ? "/nurse" : "/admin";
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
@@ -169,7 +170,7 @@ export default function InventoryPage() {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href="/admin" aria-label="Back to dashboard" className="rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50">
+            <Link href={dashboardHref} aria-label="Back to dashboard" className="rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50">
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700"><Boxes className="h-5 w-5" /></div>
