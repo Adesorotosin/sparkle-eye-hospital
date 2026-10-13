@@ -819,15 +819,15 @@ export default function OptometryDashboard() {
                           <input value={visitingForm.referringClinician} onChange={(e) => setVisitingForm((f) => ({ ...f, referringClinician: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Doctor / optometrist name (optional)" />
                         </label>
                         <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
-                          Reason for referral
-                          <input value={visitingForm.referralReason} onChange={(e) => setVisitingForm((f) => ({ ...f, referralReason: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Reason for referral (optional)" />
-                        </label>
-                        <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
                           Referral notes
                           <textarea rows={3} value={visitingForm.referralNotes} onChange={(e) => setVisitingForm((f) => ({ ...f, referralNotes: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder="Additional information from the referring facility (optional)" />
                         </label>
                       </>
                     )}
+                    <label className="space-y-1.5 text-xs font-bold text-slate-700 sm:col-span-2">
+                      Reason for visit {visitingForm.visitType === "external_referral" ? "(optional)" : "(optional)"}
+                      <input value={visitingForm.referralReason} onChange={(e) => setVisitingForm((f) => ({ ...f, referralReason: e.target.value }))} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-blue-500 focus:bg-white" placeholder={visitingForm.visitType === "external_referral" ? "Reason for referral (optional)" : "Why has the patient come to Optometry? (optional)"} />
+                    </label>
                   </div>
                   {visitingForm.visitType === "self_presenting" && (
                     <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-xs font-medium text-blue-800">
