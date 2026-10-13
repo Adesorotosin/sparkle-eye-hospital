@@ -592,7 +592,8 @@ export default function OptometryExaminationPage() {
 
 
 
-        <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
+        {patient.optometrySource !== "visiting" && (
+          <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
           <SectionHeader
             icon={Eye}
             title="Visual Acuity Recorded by Nurse"
@@ -619,6 +620,7 @@ export default function OptometryExaminationPage() {
             ))}
           </div>
         </section>
+        )}
 
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <SectionHeader
