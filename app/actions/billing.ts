@@ -543,7 +543,7 @@ export async function processBillingPayment(input: {
       .from("invoices")
       .select("*")
       .eq("patient_id", patient.id)
-      .neq("status", "cancelled")
+      .in("status", ["draft", "pending"])
       .order("created_at", {
         ascending: false,
       })
