@@ -105,6 +105,9 @@ create table encounters (
   slit_lamp_os text,
   refraction_od jsonb,          -- { sphere, cylinder, axis }
   refraction_os jsonb,
+  history_proforma jsonb not null default '{}'::jsonb,
+  refraction_notes text,
+  lens_type text,
   diagnosis text,
   status text not null default 'draft' check (status in ('draft','completed')),
   recorded_by uuid references staff(id),
