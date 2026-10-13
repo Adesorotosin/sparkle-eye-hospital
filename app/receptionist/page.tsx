@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
+import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 
 type Patient = {
   id: string;
