@@ -2944,6 +2944,7 @@ function PharmacyContent() {
             isLoadingDrugInventory
           }
           canAddStock={isAdmin}
+          onOpenSharedInventory={() => router.push("/inventory")}
           onClose={() =>
             setIsDrugInventoryOpen(
               false
