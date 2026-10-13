@@ -325,6 +325,7 @@ export default function DoctorEncounterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedStatus, setSavedStatus] = useState<"draft" | "completed">("draft");
+  const [editingEncounterId, setEditingEncounterId] = useState<string | null>(null);
 
   const [presentingComplaint, setPresentingComplaint] = useState("");
   const [historyProforma, setHistoryProforma] = useState<Record<string, { selected: string[]; notes: string }>>({});
@@ -389,6 +390,7 @@ export default function DoctorEncounterPage() {
         }
 
         const encounter = data.encounters?.[0];
+        setEditingEncounterId(encounter?.id ?? null);
         if (encounter) {
           setPresentingComplaint(encounter.presentingComplaint ?? "");
           setHistoryProforma(encounter.historyProforma && Object.keys(encounter.historyProforma).length > 0 ? encounter.historyProforma : {
@@ -440,7 +442,7 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
-        encounterId: latestEncounter?.id,
+        encounterId: editingEncounterId,
         presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
         historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
         pastMedicalHistory: historyText("pastMedicalHistory"),
@@ -470,9 +472,37 @@ export default function DoctorEncounterPage() {
       }
 
       setSavedStatus(status);
+      setEditingEncounterId(response.encounterId ?? editingEncounterId);
       setMessage(response.message);
       await refreshPatient();
     });
+  };
+
+  const startNewEncounter = () => {
+    setEditingEncounterId(null);
+    setSavedStatus("draft");
+    setMessage("Started a new consultation. Previous encounters remain in the patient history.");
+    setError("");
+    setHistoryProforma({});
+    setOcularExamODRows(emptyEyeExam());
+    setOcularExamOSRows(emptyEyeExam());
+    setOtherFindings("");
+    setIopOD("");
+    setIopOS("");
+    setIopInstrument("Goldmann");
+    setRefractionOD({ sphere: "", cylinder: "", axis: "" });
+    setRefractionOS({ sphere: "", cylinder: "", axis: "" });
+    setRefractionNotes("");
+    setLensType("");
+    setDiagnosis("");
+    setTreatmentPlan("");
+    setMedication("");
+    setDosage("");
+    setQuantity("1");
+    setPricePerUnit("0");
+    setProcedureRequest("");
+    setFollowUpNotes("");
+    setPresentingComplaint(patient?.vitals?.primaryComplaint ?? "");
   };
 
   const requestLab = (test: LabRequest) => {
@@ -690,6 +720,7 @@ export default function DoctorEncounterPage() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {latestEncounter && <button type="button" onClick={startNewEncounter} disabled={isPending} className="rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">New encounter</button>}
             <button
               onClick={() => save("draft")}
               disabled={isPending}
@@ -1062,7 +1093,7 @@ export default function DoctorEncounterPage() {
               <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div><p className="font-semibold text-amber-950">Send treatment plan to Cashier</p><p className="mt-1 text-xs text-amber-800">The cashier receives the clinical plan for review and billing. The plan itself is not automatically converted into a charge.</p></div>
-                <button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "CASHIER", handoffType: "TREATMENT_PLAN", title: "Doctor treatment plan", details: treatmentPlan })} disabled={isPending || !treatmentPlan.trim() || requesting === "handoff-TREATMENT_PLAN"} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{requesting === "handoff-TREATMENT_PLAN" ? "Sending..." : "Send to Cashier"}</button>
+                <button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "CASHIER", handoffType: "TREATMENT_PLAN", title: "Doctor treatment plan", details: treatmentPlan })} disabled={isPending || !treatmentPlan.trim() || requesting === "handoff-TREATMENT_PLAN"} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{requesting === "handoff-TREATMENT_PLAN" ? "Sending..." : "Send to Cashier"}</button>
               </div>
               <div className="rounded-2xl border p-4">
                 <div className="mb-4 flex items-center gap-2">
@@ -1088,7 +1119,7 @@ export default function DoctorEncounterPage() {
           <Section id="procedure-request" title="Procedure request to Reception" icon={<Send className="h-5 w-5" />}>
             <p className="mb-3 text-sm text-gray-500">Send the procedure or service the patient needs to Reception. Reception staff can register it using the approved procedure catalogue and price.</p>
             <Field label="Procedure / service requested" value={procedureRequest} onChange={setProcedureRequest} rows={3} placeholder="Describe the procedure, urgency, and any preparation instructions..." />
-            <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: "Procedure request", details: procedureRequest })} disabled={isPending || !procedureRequest.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send to Reception"}</button></div>
+            <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: "Procedure request", details: procedureRequest })} disabled={isPending || !procedureRequest.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send to Reception"}</button></div>
           </Section>
 
           <Section id="requests" title="Clinical requests" icon={<Send className="h-5 w-5" />}>
@@ -1223,7 +1254,7 @@ export default function DoctorEncounterPage() {
               <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Preferred time (optional)</span><input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className={inputClass} /></label>
             </div>
             <div className="mt-4"><Field label="Follow-up instructions / reason" value={followUpNotes} onChange={setFollowUpNotes} rows={2} placeholder="e.g. review response to treatment, repeat IOP..." /></div>
-            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: latestEncounter?.id, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
           </Section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm">
