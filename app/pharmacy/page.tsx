@@ -478,7 +478,7 @@ function PharmacyContent() {
 
   useEffect(() => {
     setSelectedPrescriptionIds((patient?.prescriptions ?? []).filter((rx) => rx.status === "pending_payment").map((rx) => rx.id));
-  }, [patient?.patientId, patient?.prescriptions]);
+  }, [patient?.patientId]);
 
   const handlePrepareSelectedBill = async () => {
     if (!patientId || selectedPendingPrescriptions.length === 0) { setActionError("Select at least one unpaid medication to prepare the bill."); return; }
