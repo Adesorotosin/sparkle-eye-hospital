@@ -52,7 +52,7 @@ export default function ClinicalHandoffInbox({ destination }: { destination: Han
       </div>
       {(message || error) && <p className={`mb-3 rounded-lg p-3 text-sm ${error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{error || message}</p>}
       {loading ? <div className="flex items-center gap-2 py-6 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading requests...</div> :
-        requests.length === 0 ? <p className="rounded-xl border border-dashed p-5 text-sm text-gray-500">No pending doctor requests.</p> :
+        requests.length === 0 && !error ? <p className="rounded-xl border border-dashed p-5 text-sm text-gray-500">No pending doctor requests.</p> :
         <div className="space-y-3">{requests.map((item) => (
           <article key={item.id} className="rounded-xl border p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">

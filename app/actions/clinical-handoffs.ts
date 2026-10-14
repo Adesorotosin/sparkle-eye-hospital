@@ -217,7 +217,28 @@ export async function getClinicalHandoffs(destination: HandoffDestination) {
     };
   } catch (error) {
     console.error("Loading clinical handoffs failed:", error);
-    return { success: false, requests: [] as ClinicalHandoff[], message: "Unable to load department requests." };
+
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") {
+      return { success: false, requests: [] as ClinicalHandoff[], message: "Your session has expired. Please sign in again." };
+    }
+    if (error instanceof Error && error.message === "FORBIDDEN") {
+      return { success: false, requests: [] as ClinicalHandoff[], message: "Your account does not have permission to view Reception requests. Sign in with a Receptionist or IT Admin account." };
+    }
+
+    const code = typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+    if (code === "42P01" || code === "PGRST205" || code === "PGRST200") {
+      return {
+        success: false,
+        requests: [] as ClinicalHandoff[],
+        message: "The doctor-request inbox is not configured in the database yet. Apply migration 20261014010000_clinical_handoffs.sql in Supabase, then refresh this page.",
+      };
+    }
+    if (code === "42501") {
+      return { success: false, requests: [] as ClinicalHandoff[], message: "The database denied access to doctor requests. Check the clinical_handoffs table permissions and server database configuration." };
+    }
+    return { success: false, requests: [] as ClinicalHandoff[], message: "Unable to load department requests. Check the server logs for “Loading clinical handoffs failed” to identify the database or connection error." };
   }
 }
 
