@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Search,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
