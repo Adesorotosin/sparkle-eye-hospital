@@ -442,7 +442,7 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
-        encounterId: editingEncounterId,
+        encounterId: editingEncounterId ?? undefined,
         presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
         historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
         pastMedicalHistory: historyText("pastMedicalHistory"),
@@ -1093,7 +1093,7 @@ export default function DoctorEncounterPage() {
               <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
                 <div><p className="font-semibold text-amber-950">Send treatment plan to Cashier</p><p className="mt-1 text-xs text-amber-800">The cashier receives the clinical plan for review and billing. The plan itself is not automatically converted into a charge.</p></div>
-                <button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "CASHIER", handoffType: "TREATMENT_PLAN", title: "Doctor treatment plan", details: treatmentPlan })} disabled={isPending || !treatmentPlan.trim() || requesting === "handoff-TREATMENT_PLAN"} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{requesting === "handoff-TREATMENT_PLAN" ? "Sending..." : "Send to Cashier"}</button>
+                <button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId ?? undefined, destination: "CASHIER", handoffType: "TREATMENT_PLAN", title: "Doctor treatment plan", details: treatmentPlan })} disabled={isPending || !treatmentPlan.trim() || requesting === "handoff-TREATMENT_PLAN"} className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">{requesting === "handoff-TREATMENT_PLAN" ? "Sending..." : "Send to Cashier"}</button>
               </div>
               <div className="rounded-2xl border p-4">
                 <div className="mb-4 flex items-center gap-2">
@@ -1119,7 +1119,7 @@ export default function DoctorEncounterPage() {
           <Section id="procedure-request" title="Procedure request to Reception" icon={<Send className="h-5 w-5" />}>
             <p className="mb-3 text-sm text-gray-500">Send the procedure or service the patient needs to Reception. Reception staff can register it using the approved procedure catalogue and price.</p>
             <Field label="Procedure / service requested" value={procedureRequest} onChange={setProcedureRequest} rows={3} placeholder="Describe the procedure, urgency, and any preparation instructions..." />
-            <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: "Procedure request", details: procedureRequest })} disabled={isPending || !procedureRequest.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send to Reception"}</button></div>
+            <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId ?? undefined, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: "Procedure request", details: procedureRequest })} disabled={isPending || !procedureRequest.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send to Reception"}</button></div>
           </Section>
 
           <Section id="requests" title="Clinical requests" icon={<Send className="h-5 w-5" />}>
@@ -1254,7 +1254,7 @@ export default function DoctorEncounterPage() {
               <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Preferred time (optional)</span><input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className={inputClass} /></label>
             </div>
             <div className="mt-4"><Field label="Follow-up instructions / reason" value={followUpNotes} onChange={setFollowUpNotes} rows={2} placeholder="e.g. review response to treatment, repeat IOP..." /></div>
-            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId: editingEncounterId ?? undefined, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
           </Section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm">

@@ -1704,6 +1704,7 @@ function PharmacyContent() {
               isLoadingDrugInventory
             }
             canAddStock={isAdmin}
+            onOpenSharedInventory={() => router.push("/inventory")}
             onClose={() =>
               setIsDrugInventoryOpen(
                 false
@@ -2943,6 +2944,7 @@ function PharmacyContent() {
             isLoadingDrugInventory
           }
           canAddStock={isAdmin}
+          onOpenSharedInventory={() => router.push("/inventory")}
           onClose={() =>
             setIsDrugInventoryOpen(
               false
@@ -3009,12 +3011,14 @@ function DrugInventoryModal({
   drugInventory,
   isLoading,
   canAddStock,
+  onOpenSharedInventory,
   onClose,
   onAddDrug,
 }: {
   drugInventory: DrugStockItem[];
   isLoading: boolean;
   canAddStock: boolean;
+  onOpenSharedInventory: () => void;
   onClose: () => void;
   onAddDrug: () => void;
 }) {
@@ -3031,6 +3035,14 @@ function DrugInventoryModal({
           </h3>
 
           <div className="flex items-center gap-3">
+
+            <button
+              type="button"
+              onClick={onOpenSharedInventory}
+              className="px-3 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold hover:bg-slate-100"
+            >
+              Open Shared Inventory
+            </button>
 
             {canAddStock && (
               <button

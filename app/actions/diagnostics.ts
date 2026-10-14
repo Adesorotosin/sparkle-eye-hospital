@@ -101,6 +101,9 @@ export async function completeDiagnosticOrder(input: {
 
     if (updateError) throw updateError;
 
+    const patient = order.patients?.[0];
+    const patientCode = patient?.patient_code ?? null;
+
     await logActivity({
       module: "Diagnostics",
       category: "CLINICAL",
@@ -110,7 +113,7 @@ export async function completeDiagnosticOrder(input: {
       patientId: order.patient_id,
       details: JSON.stringify({
         diagnosticOrderId: order.id,
-        patientCode: order.patients.patient_code,
+        patientCode,
         testName: order.name,
         findings: input.findings.trim(),
         interpretation: input.interpretation?.trim() || null,
@@ -118,7 +121,9 @@ export async function completeDiagnosticOrder(input: {
     });
 
     revalidatePath("/diagnostics");
-    revalidatePath(`/doctor/patients/${order.patients.patient_code}/encounter`);
+    if (patientCode) {
+      revalidatePath(`/doctor/patients/${patientCode}/encounter`);
+    }
 
     return { success: true, message: "Investigation result recorded and sent to the doctor." };
   } catch (error) {
