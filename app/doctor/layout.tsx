@@ -13,6 +13,8 @@ import {
   Calendar,
   Search,
   LogOut,
+  Menu,
+  X,
   ChevronDown,
   TestTube2,
   BadgeCheck,
@@ -31,6 +33,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
 
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activePatient, setActivePatient] = useState<ActivePatient | null>(null);
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     { name: "Investigation Room", href: "/diagnostics", icon: TestTube2 },
     { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope },
     { name: "Appointments", href: "/appointments", icon: Calendar },
-    { name: "Optical Inventory", href: "/inventory", icon: Package },
+    { name: "Optical Inventory", href: "/doctor/optical-inventory", icon: Package },
     { name: "Optical Charge Approvals", href: "/doctor/optical-approvals", icon: BadgeCheck },
   ];
 
@@ -103,7 +106,17 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
-      <aside className="w-72 bg-[#0B132B] text-white p-6 flex flex-col justify-between shrink-0 border-r border-slate-800 min-h-screen sticky top-0">
+      <div className="md:hidden fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur">
+        <div className="flex min-w-0 items-center gap-2">
+          <Image src="/Logo.png" alt="Sparkle Eye Hospital Logo" width={32} height={32} className="shrink-0 object-contain" priority />
+          <span className="truncate text-sm font-extrabold text-slate-900">Doctor Portal</span>
+        </div>
+        <button type="button" aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"} aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)} className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-700">
+          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+      {mobileMenuOpen && <button type="button" aria-label="Close navigation menu" onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 z-40 bg-slate-950/50 md:hidden" />}
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col justify-between overflow-y-auto border-r border-slate-800 bg-[#0B132B] p-5 text-white transition-transform duration-200 md:sticky md:top-0 md:min-h-screen md:translate-x-0 md:p-6 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="space-y-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-slate-900 overflow-hidden border border-slate-800 flex items-center justify-center shrink-0 relative shadow-xs">
@@ -155,6 +168,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
                 <Link
                   key={item.name}
                   href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                     isActive
                       ? "bg-purple-600/20 text-purple-300 border border-purple-500/30"
@@ -277,8 +291,8 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 flex flex-col overflow-y-auto">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col pt-14 md:pt-0">
+        <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
           {children}
         </main>
       </div>
