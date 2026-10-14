@@ -1328,6 +1328,42 @@ export default function AccessControlPage() {
                       </div>
                     </div>
 
+                    {selectedStaff.role === "INVENTORY_MANAGER" && (
+                      <div className="mx-5 mt-5 rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="rounded-lg bg-white p-2 text-cyan-700">
+                            <Shield className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-bold text-cyan-950">
+                              Inventory module access
+                            </h3>
+                            <p className="mt-1 text-xs leading-5 text-cyan-900">
+                              This role is routed to the inventory workspace. These module permissions are enforced by server-side role checks, not by the general permission switches below.
+                            </p>
+                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {[
+                                "View inventory and stock levels",
+                                "Create and update inventory items",
+                                "Manage inventory suppliers",
+                                "Receive stock into inventory",
+                                "Record authorized stock issues",
+                                "View inventory movement history",
+                              ].map((permission) => (
+                                <div key={permission} className="flex items-start gap-2 text-xs font-medium text-cyan-950">
+                                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-700" />
+                                  <span>{permission}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-3 rounded-lg border border-cyan-200 bg-white/80 px-3 py-2 text-xs text-cyan-950">
+                              Restricted: clinical records, pharmacy dispensing, cashier/billing, and system administration.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="p-5 space-y-5">
                       {PERMISSION_GROUPS.map(
                         (group) => {
