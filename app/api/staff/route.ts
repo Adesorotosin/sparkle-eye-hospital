@@ -18,6 +18,7 @@ const ALLOWED_ROLES = [
   "LAB_SCIENTIST",
   "OPTICIAN",
   "OPTOMETRIST",
+  "INVENTORY_MANAGER",
 ] as const;
 
 type StaffRole = (typeof ALLOWED_ROLES)[number];

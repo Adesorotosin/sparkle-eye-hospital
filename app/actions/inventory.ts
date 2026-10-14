@@ -11,15 +11,17 @@ const INVENTORY_READ_ROLES = [
   "OPTICIAN",
   "LAB_SCIENTIST",
   "NURSE",
+  "INVENTORY_MANAGER",
 ] as const;
 
-const INVENTORY_MANAGER_ROLES = ["IT_ADMIN", "PHARMACIST"] as const;
+const INVENTORY_MANAGER_ROLES = ["IT_ADMIN", "PHARMACIST", "INVENTORY_MANAGER"] as const;
 const INVENTORY_STOCK_ROLES = [
   "IT_ADMIN",
   "PHARMACIST",
   "OPTICIAN",
   "LAB_SCIENTIST",
   "NURSE",
+  "INVENTORY_MANAGER",
 ] as const;
 
 export type InventoryDomain = "optical" | "pharmacy" | "hospital";
@@ -233,7 +235,7 @@ export async function issueInventoryStock(input: {
       LAB_SCIENTIST: "Laboratory",
       NURSE: "Nursing",
     };
-    if (staff.role !== "IT_ADMIN" && staff.role !== "PHARMACIST" && permittedDepartment[staff.role] !== department) {
+    if (staff.role !== "IT_ADMIN" && staff.role !== "PHARMACIST" && staff.role !== "INVENTORY_MANAGER" && permittedDepartment[staff.role] !== department) {
       return { success: false, message: "You may only issue stock to your own department. Ask the inventory manager for other departments." };
     }
 

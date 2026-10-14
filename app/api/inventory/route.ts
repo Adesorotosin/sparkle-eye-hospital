@@ -17,6 +17,7 @@ export async function GET(request: Request) {
       "PHARMACIST",
       "RECEPTIONIST",
       "CASHIER",
+      "INVENTORY_MANAGER",
     ]);
 
     const { searchParams } = new URL(request.url);

@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import Link from "next/link";
+import Image from "next/image";
 import {
-  Activity, AlertTriangle, ArrowDownToLine, ArrowLeft, ArrowUpFromLine,
+  Activity, AlertTriangle, ArrowDownToLine, ArrowUpFromLine,
   Boxes, CheckCircle2, ClipboardList, LoaderCircle, Package, Plus,
-  RefreshCw, Search, Truck, X,
+  RefreshCw, Search, Truck, X, LogOut,
 } from "lucide-react";
 import {
   createInventoryItem,
@@ -84,8 +84,7 @@ export default function InventoryPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const isManager = role === "IT_ADMIN" || role === "PHARMACIST";
-  const dashboardHref = role === "PHARMACIST" ? "/pharmacy" : role === "OPTICIAN" ? "/optician" : role === "LAB_SCIENTIST" ? "/laboratory" : role === "NURSE" ? "/nurse" : "/admin";
+  const isManager = role === "IT_ADMIN" || role === "PHARMACIST" || role === "INVENTORY_MANAGER";
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
@@ -104,6 +103,14 @@ export default function InventoryPage() {
     setError("");
     closeModal();
     await loadData();
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      window.location.href = "/";
+    }
   };
 
   const submitItem = async (event: FormEvent<HTMLFormElement>) => {
@@ -170,11 +177,9 @@ export default function InventoryPage() {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Link href={dashboardHref} aria-label="Back to dashboard" className="rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700"><Boxes className="h-5 w-5" /></div>
+            <Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital logo" width={44} height={44} priority className="h-11 w-11 shrink-0 object-contain" />
             <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-violet-700">Sparkle Eye Specialist Hospital</p>
               <h1 className="text-xl font-extrabold tracking-tight text-slate-950">Shared Inventory</h1>
               <p className="mt-0.5 text-xs text-slate-500">Optical products, pharmacy stock and hospital consumables</p>
             </div>
@@ -183,6 +188,7 @@ export default function InventoryPage() {
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
             <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
+            <button onClick={() => void handleSignOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
         </div>
       </header>

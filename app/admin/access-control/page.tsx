@@ -153,6 +153,7 @@ const ROLE_LABELS: Record<string, string> = {
   NURSE: "Nurse",
   CASHIER: "Cashier",
   RECEPTIONIST: "Receptionist",
+  INVENTORY_MANAGER: "Inventory Manager",
 };
 
 const ROLE_STYLES: Record<string, string> = {
@@ -170,6 +171,8 @@ const ROLE_STYLES: Record<string, string> = {
     "bg-amber-50 text-amber-700 border-amber-200",
   RECEPTIONIST:
     "bg-slate-50 text-slate-700 border-slate-200",
+  INVENTORY_MANAGER:
+    "bg-cyan-50 text-cyan-700 border-cyan-200",
 };
 
 const DEFAULT_PERMISSIONS: Record<
@@ -286,6 +289,23 @@ const DEFAULT_PERMISSIONS: Record<
 
   RECEPTIONIST: {
     view_patient_records: true,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
+  },
+  INVENTORY_MANAGER: {
+    view_patient_records: false,
     edit_clinical_notes: false,
     order_diagnostics: false,
     view_lab_results: false,
