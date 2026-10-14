@@ -175,6 +175,39 @@ export async function createInventoryItem(input: {
   }
 }
 
+export async function updateInventoryUnitCost(input: { itemId: string; unitCost: number }) {
+  try {
+    const staff = await requireRole([...INVENTORY_MANAGER_ROLES]);
+    if (!input.itemId || !Number.isFinite(input.unitCost) || input.unitCost < 0) {
+      return { success: false, message: "Select an item and enter a valid unit cost of zero or greater." };
+    }
+
+    const { data, error } = await supabaseServer
+      .from("inventory_items")
+      .update({ unit_cost: input.unitCost, updated_at: new Date().toISOString() })
+      .eq("id", input.itemId)
+      .eq("is_active", true)
+      .select("id, name, sku")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return { success: false, message: "The inventory item was not found or is inactive." };
+
+    await logActivity({
+      module: "Inventory",
+      category: "ADMIN",
+      action: `Inventory unit cost updated: ${data.name}`,
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ itemId: data.id, sku: data.sku, unitCost: input.unitCost }),
+    });
+    refreshInventoryPaths();
+    return { success: true, message: `Unit cost updated for ${data.name}. Stock value has been recalculated.` };
+  } catch (error) {
+    return { success: false, message: failureMessage(error, "Unable to update unit cost.") };
+  }
+}
+
 export async function receiveInventoryStock(input: {
   itemId: string;
   quantity: number;

@@ -14,6 +14,7 @@ import {
   getInventoryData,
   issueInventoryStock,
   receiveInventoryStock,
+  updateInventoryUnitCost,
   type InventoryDomain,
   type InventoryItemRecord,
   type InventoryMovementRecord,
@@ -21,7 +22,7 @@ import {
 } from "@/app/actions/inventory";
 
 type TabKey = "all" | "optical" | "hospital" | "pharmacy";
-type ModalKey = "item" | "receive" | "issue" | "supplier" | null;
+type ModalKey = "item" | "receive" | "issue" | "supplier" | "cost" | null;
 
 const money = (value: number) => new Intl.NumberFormat("en-NG", {
   style: "currency", currency: "NGN", maximumFractionDigits: 2,
@@ -66,6 +67,7 @@ export default function InventoryPage() {
     itemId: "", quantity: "1", department: "Optician", reference: "", notes: "",
   });
   const [supplierForm, setSupplierForm] = useState({ name: "", contactPerson: "", phone: "", email: "" });
+  const [costForm, setCostForm] = useState({ itemId: "", unitCost: "" });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -94,7 +96,9 @@ export default function InventoryPage() {
 
   const lowStockItems = items.filter((item) => item.is_active && item.stock <= item.reorder_level);
   const totalUnits = items.filter((item) => item.is_active).reduce((sum, item) => sum + Number(item.stock || 0), 0);
-  const inventoryValue = items.filter((item) => item.is_active).reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.unit_cost || 0), 0);
+  const activeItems = items.filter((item) => item.is_active);
+  const itemsMissingCost = activeItems.filter((item) => Number(item.unit_cost || 0) <= 0);
+  const inventoryValue = activeItems.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.unit_cost || 0), 0);
   const recentMovements = movements.filter((movement) => movementFilter === "all" || movement.movement_type === movementFilter);
 
   const closeModal = () => setModal(null);
@@ -157,6 +161,17 @@ export default function InventoryPage() {
     setSaving(false);
   };
 
+  const submitCost = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true); setError(""); setNotice("");
+    const result = await updateInventoryUnitCost({ itemId: costForm.itemId, unitCost: Number(costForm.unitCost) });
+    if (result.success) {
+      setCostForm({ itemId: "", unitCost: "" });
+      await refreshAfterSuccess(result.message);
+    } else setError(result.message);
+    setSaving(false);
+  };
+
   const submitSupplier = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true); setError(""); setNotice("");
@@ -203,7 +218,7 @@ export default function InventoryPage() {
             { label: "Active item types", value: items.filter((item) => item.is_active).length.toLocaleString(), hint: "Across all inventory categories", icon: Package },
             { label: "Units in stock", value: totalUnits.toLocaleString(), hint: "Current counted quantities", icon: Boxes },
             { label: "Low-stock alerts", value: lowStockItems.length.toLocaleString(), hint: "At or below reorder level", icon: AlertTriangle },
-            { label: "Stock value", value: money(inventoryValue), hint: "Quantity × recorded unit cost", icon: Activity },
+            { label: "Stock value", value: money(inventoryValue), hint: itemsMissingCost.length ? `Partial: ${itemsMissingCost.length} item types have no recorded cost` : "Quantity × recorded unit cost", icon: Activity },
           ].map((stat) => {
             const Icon = stat.icon;
             return <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-xs font-bold text-slate-500">{stat.label}</p><span className="rounded-xl bg-violet-50 p-2 text-violet-700"><Icon className="h-4 w-4" /></span></div><p className="mt-3 text-2xl font-extrabold tracking-tight text-slate-950">{stat.value}</p><p className="mt-1 text-xs text-slate-500">{stat.hint}</p></div>;
@@ -231,9 +246,9 @@ export default function InventoryPage() {
                     <td className="px-5 py-4"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-1 font-mono text-[10px] text-slate-400">{item.sku} · {domainLabel[item.domain]}</p></td>
                     <td className="px-5 py-4 text-slate-600">{item.category}</td>
                     <td className="px-5 py-4"><span className="font-extrabold text-slate-900">{item.stock}</span> <span className="text-xs text-slate-500">{item.unit_of_measure}</span><p className="mt-1 text-[10px] text-slate-400">Reorder at {item.reorder_level}</p></td>
-                    <td className="px-5 py-4 text-slate-600">{money(item.unit_cost)}</td><td className="px-5 py-4 font-semibold text-slate-800">{money(item.price)}</td>
+                    <td className="px-5 py-4 text-slate-600"><div>{money(item.unit_cost)}</div>{Number(item.unit_cost || 0) <= 0 && <span className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">Cost missing</span>}</td><td className="px-5 py-4 font-semibold text-slate-800">{money(item.price)}</td>
                     <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${low ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{low ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}{low ? "Low stock" : "In stock"}</span></td>
-                    <td className="px-5 py-4"><button onClick={() => { setReceiveForm((v) => ({...v, itemId: item.id})); setModal(isManager ? "receive" : "issue"); if (!isManager) setIssueForm((v) => ({...v, itemId: item.id})); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">{isManager ? "Receive" : "Issue"}</button></td>
+                    <td className="px-5 py-4"><div className="flex items-center gap-2">{isManager && <button onClick={() => { setCostForm({ itemId: item.id, unitCost: String(item.unit_cost ?? 0) }); setModal("cost"); }} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100">Set cost</button>}<button onClick={() => { setReceiveForm((v) => ({...v, itemId: item.id})); setModal(isManager ? "receive" : "issue"); if (!isManager) setIssueForm((v) => ({...v, itemId: item.id})); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">{isManager ? "Receive" : "Issue"}</button></div></td>
                   </tr>;
                 })}
               </tbody>
@@ -253,7 +268,7 @@ export default function InventoryPage() {
 
       {modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
         <div role="dialog" aria-modal="true" className="my-6 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="font-extrabold text-slate-950">{modal === "item" ? "Add inventory item" : modal === "receive" ? "Receive stock" : modal === "issue" ? "Issue stock to department" : "Add supplier"}</h3><p className="mt-1 text-xs text-slate-500">{modal === "item" ? "New items start at zero stock; record a receipt to add quantity." : modal === "receive" ? "Stock and its movement audit entry are saved together." : modal === "issue" ? "The system prevents issues that exceed available stock." : "Supplier details can be linked to future receipts."}</p></div><button onClick={closeModal} aria-label="Close dialog" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="font-extrabold text-slate-950">{modal === "item" ? "Add inventory item" : modal === "receive" ? "Receive stock" : modal === "issue" ? "Issue stock to department" : modal === "cost" ? "Update unit cost" : "Add supplier"}</h3><p className="mt-1 text-xs text-slate-500">{modal === "item" ? "New items start at zero stock; record a receipt to add quantity." : modal === "receive" ? "Stock and its movement audit entry are saved together." : modal === "issue" ? "The system prevents issues that exceed available stock." : modal === "cost" ? "Enter the actual purchase cost per unit. This does not change stock quantity." : "Supplier details can be linked to future receipts."}</p></div><button onClick={closeModal} aria-label="Close dialog" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
           {modal === "item" && <form onSubmit={submitItem} className="grid gap-4 p-5 sm:grid-cols-2">
             <label className={labelClass}>SKU / item code<input required maxLength={40} value={itemForm.sku} onChange={(e) => setItemForm({...itemForm, sku: e.target.value})} placeholder="e.g. OPT-FRM-001" className={inputClass} /></label>
             <label className={labelClass}>Item name<input required value={itemForm.name} onChange={(e) => setItemForm({...itemForm, name: e.target.value})} placeholder="e.g. Black optical frame" className={inputClass} /></label>
@@ -264,6 +279,12 @@ export default function InventoryPage() {
             <label className={labelClass}>Unit cost (₦)<input required type="number" min="0" step="0.01" value={itemForm.unitCost} onChange={(e) => setItemForm({...itemForm, unitCost: e.target.value})} className={inputClass} /></label>
             <label className={labelClass}>Unit selling price (₦)<input required type="number" min="0" step="0.01" value={itemForm.price} onChange={(e) => setItemForm({...itemForm, price: e.target.value})} className={inputClass} /></label>
             <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Create item"}</button></div>
+          </form>}
+          {modal === "cost" && <form onSubmit={submitCost} className="grid gap-4 p-5 sm:grid-cols-2">
+            <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={costForm.itemId} onChange={(e) => { const item = selectedItem(e.target.value); setCostForm({ itemId: e.target.value, unitCost: item ? String(item.unit_cost ?? 0) : "" }); }} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} (current cost: {money(item.unit_cost)})</option>)}</select></label>
+            <label className={`${labelClass} sm:col-span-2`}>Actual unit purchase cost (₦)<input required type="number" min="0" step="0.01" value={costForm.unitCost} onChange={(e) => setCostForm({...costForm, unitCost: e.target.value})} className={inputClass} placeholder="Enter cost from supplier invoice" /></label>
+            <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 sm:col-span-2">Use the real cost paid per unit, not the selling price. Saving updates the stock valuation without changing the quantity on hand. The change is recorded in the activity log.</p>
+            <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving || !costForm.itemId || costForm.unitCost === ""} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Save unit cost"}</button></div>
           </form>}
           {modal === "receive" && <form onSubmit={submitReceive} className="grid gap-4 p-5 sm:grid-cols-2">
             <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={receiveForm.itemId} onChange={(e) => setReceiveForm({...receiveForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>
