@@ -908,6 +908,7 @@ export default function OnboardStaffPage() {
                     <option>Laboratory</option>
                     <option>Optical Services</option>
                     <option>Optometry</option>
+                    <option>Inventory & Stores</option>
                   </select>
                 </div>
 
