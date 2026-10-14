@@ -1344,7 +1344,7 @@ export default function AccessControlPage() {
                             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                               {[
                                 "View inventory and stock levels",
-                                "Create and update inventory items",
+                                "Create inventory items",
                                 "Manage inventory suppliers",
                                 "Receive stock into inventory",
                                 "Record authorized stock issues",
