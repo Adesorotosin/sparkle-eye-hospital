@@ -10,7 +10,8 @@ export type UserRole =
   | "RECEPTIONIST"
   | "LAB_SCIENTIST"
   | "OPTICIAN"
-  | "OPTOMETRIST";
+  | "OPTOMETRIST"
+  | "INVENTORY_MANAGER";
 
 export interface UserSession {
   id: string;
@@ -128,6 +129,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
     "LAB_SCIENTIST",
     "IT_ADMIN",
     "NURSE",
+    "INVENTORY_MANAGER",
   ],
 };
 
