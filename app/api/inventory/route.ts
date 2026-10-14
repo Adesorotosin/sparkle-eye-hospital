@@ -103,7 +103,6 @@ export async function POST(request: Request) {
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "INVENTORY_MANAGER",
     ]);
 
     const body = await request.json();
