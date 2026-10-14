@@ -17,6 +17,7 @@ export async function GET(request: Request) {
       "PHARMACIST",
       "RECEPTIONIST",
       "CASHIER",
+      "INVENTORY_MANAGER",
     ]);
 
     const { searchParams } = new URL(request.url);
@@ -102,6 +103,7 @@ export async function POST(request: Request) {
   try {
     const staff = await requireRole([
       "IT_ADMIN",
+      "INVENTORY_MANAGER",
     ]);
 
     const body = await request.json();
