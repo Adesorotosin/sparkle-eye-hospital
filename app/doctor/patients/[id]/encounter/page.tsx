@@ -381,6 +381,17 @@ export default function DoctorEncounterPage() {
     setMessage("");
     setError("");
 
+    if (
+      savedStatus === "completed" &&
+      status === "completed" &&
+      !encounterId
+    ) {
+      setError(
+        "This encounter is already completed. Save as draft to begin a new consultation, or refresh to review the latest record."
+      );
+      return;
+    }
+
     if (status === "completed" && !diagnosis.trim()) {
       setError("Enter a diagnosis before completing the consultation.");
       document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" });
