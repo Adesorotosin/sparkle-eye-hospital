@@ -30,7 +30,7 @@ type QueueStatus =
 
 interface Appointment {
   id: string;
-  patientRecordId: string;
+  patientRecordId?: string;
   patientName: string;
   physician: string;
   startTime: string;
