@@ -18,17 +18,31 @@ function jsonNoStore(body: unknown, init?: ResponseInit) {
 }
 
 function isValidDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
 }
 
 function isValidTime(value: string) {
-  return /^\d{2}:\d{2}$/.test(value);
+  if (!/^\d{2}:\d{2}$/.test(value)) return false;
+
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
 }
 
 function buildAppointmentDate(date: string, time: string) {
   if (!isValidDate(date) || !isValidTime(time)) return null;
 
-  const parsed = new Date(`${date}T${time}:00`);
+  // Appointment date/time inputs are hospital-local (Lagos, Nigeria),
+  // not the server's timezone. Lagos remains UTC+01:00 year-round.
+  const parsed = new Date(`${date}T${time}:00+01:00`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -74,9 +88,10 @@ export async function GET(request: Request) {
         );
       }
 
-      const dayStart = new Date(`${date}T00:00:00`);
-      const nextDay = new Date(dayStart);
-      nextDay.setDate(nextDay.getDate() + 1);
+      // The selected date is a hospital-local calendar date (Africa/Lagos).
+      // Query the full Lagos day even when the server runs in UTC.
+      const dayStart = new Date(`${date}T00:00:00+01:00`);
+      const nextDay = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
       query = query
         .gte("start_time", dayStart.toISOString())
