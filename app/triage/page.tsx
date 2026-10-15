@@ -623,26 +623,86 @@ function TriageVitalsContent() {
                 </div>
 
                 {/* RBS */}
-                <div className="max-w-xs space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-600 block">
-                    RBS
-                  </span>
+                <div className="space-y-3">
+                  <div className="max-w-xs space-y-1.5">
+                    <label htmlFor="nurse-rbs" className="text-[11px] font-bold text-slate-600 block">
+                      Random Blood Sugar (RBS)
+                    </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={rbs}
-                    onChange={(event) =>
-                      setRbs(event.target.value)
-                    }
-                    placeholder="Enter RBS"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold focus:outline-none focus:border-purple-600"
-                  />
+                    <div className="relative">
+                      <input
+                        id="nurse-rbs"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        inputMode="decimal"
+                        value={rbs}
+                        onChange={(event) => setRbs(event.target.value)}
+                        placeholder="Enter measured result"
+                        aria-describedby="nurse-rbs-unit nurse-rbs-guidance"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 pr-20 text-xs font-bold focus:outline-none focus:border-purple-600"
+                      />
+                      <span id="nurse-rbs-unit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">
+                        mmol/L
+                      </span>
+                    </div>
 
-                  <span className="text-[9px] text-slate-400">
-                    Random Blood Sugar
-                  </span>
+                    <span className="text-[9px] text-slate-400">
+                      Enter the reading shown by the glucose meter.
+                    </span>
+                  </div>
+
+                  <div id="nurse-rbs-guidance" className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-700">
+                      Reference guide — non-pregnant adults
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
+                      <div className="rounded-lg bg-white border border-slate-200 p-2">
+                        <p className="font-bold text-slate-700">Usually below</p>
+                        <p className="mt-1 text-sm font-extrabold text-slate-900">&lt; 7.8 mmol/L</p>
+                        <p className="mt-1 text-slate-500">Not a diagnostic cut-off</p>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-200 p-2">
+                        <p className="font-bold text-slate-700">No standard range</p>
+                        <p className="mt-1 text-sm font-extrabold text-slate-900">7.8–11.0 mmol/L</p>
+                        <p className="mt-1 text-slate-500">Do not label as prediabetes from RBS alone</p>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-200 p-2">
+                        <p className="font-bold text-slate-700">Diabetes threshold</p>
+                        <p className="mt-1 text-sm font-extrabold text-slate-900">≥ 11.1 mmol/L</p>
+                        <p className="mt-1 text-slate-500">Threshold applies with classic symptoms</p>
+                      </div>
+                    </div>
+
+                    {rbs.trim() !== "" && Number.isFinite(Number(rbs)) && Number(rbs) >= 0 && (
+                      <div className={`rounded-lg border p-3 text-[11px] ${
+                        Number(rbs) >= 11.1
+                          ? "border-rose-200 bg-rose-50 text-rose-800"
+                          : Number(rbs) >= 7.8
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}>
+                        <p className="font-extrabold">
+                          {Number(rbs) >= 11.1
+                            ? "High random glucose reading"
+                            : Number(rbs) >= 7.8
+                            ? "Above the usual random glucose level"
+                            : "Entered reading"}
+                        </p>
+                        <p className="mt-1">
+                          {Number(rbs) >= 11.1
+                            ? "If accompanied by excessive thirst, frequent urination, or unexplained weight loss, this meets the supplied diabetes threshold. Escalate for clinician assessment. Without unequivocal hyperglycaemia, a second abnormal test is generally required."
+                            : Number(rbs) >= 7.8
+                            ? "Random glucose has no standard prediabetes range. Record the result and refer for clinical review; do not diagnose prediabetes from this reading alone."
+                            : "A random glucose below 7.8 mmol/L is usually seen, but this is not a diagnostic cut-off. Interpret alongside symptoms and clinical assessment."}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-[10px] leading-relaxed text-slate-500">
+                      This guide supports documentation and escalation only; it does not diagnose diabetes. If symptoms or clinical concern are present, notify the clinician regardless of the displayed band.
+                    </p>
+                  </div>
                 </div>
               </div>
 
