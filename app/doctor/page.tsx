@@ -531,7 +531,9 @@ export default function DoctorDashboard() {
               const displayAppointmentStatus =
                 queueStatus === "completed"
                   ? "completed"
-                  : appointment.status;
+                  : patient?.status === "waiting_doctor"
+                    ? "checked_in"
+                    : appointment.status;
 
               return {
                 id:
