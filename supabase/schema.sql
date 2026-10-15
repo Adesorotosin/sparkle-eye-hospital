@@ -91,7 +91,7 @@ create table prescriptions (
   price_per_unit numeric not null,
   total_price numeric not null,
   status text not null default 'pending_payment'
-    check (status in ('pending_payment','ready_for_dispensing','dispensed')),
+    check (status in ('awaiting_pharmacy_review','reviewed','pending_payment','ready_for_dispensing','dispensed')),
   prescribed_by uuid references staff(id),
   created_at timestamptz not null default now()
 );
