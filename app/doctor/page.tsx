@@ -527,20 +527,27 @@ export default function DoctorDashboard() {
                * completed_today ALWAYS wins over
                * appointment status.
                */
+              const patientLastVisitDate = patient
+                ? getPatientLastVisitDate(patient)
+                : "";
+              const patientCompletedForSelectedDate =
+                patient?.status === "completed_today" &&
+                (patientLastVisitDate === selectedDate ||
+                  (!patientLastVisitDate &&
+                    selectedDate === getLocalDateString()));
+              const patientInConsultationForSelectedDate =
+                patient?.status === "in_consultation" &&
+                (patientLastVisitDate === selectedDate ||
+                  (!patientLastVisitDate &&
+                    selectedDate === getLocalDateString()));
+
               let queueStatus: QueueStatus =
                 "waiting";
 
-              if (
-                patient?.status ===
-                "completed_today"
-              ) {
+              if (patientCompletedForSelectedDate) {
                 queueStatus = "completed";
-              } else if (
-                patient?.status ===
-                "in_consultation"
-              ) {
-                queueStatus =
-                  "in-consultation";
+              } else if (patientInConsultationForSelectedDate) {
+                queueStatus = "in-consultation";
               } else if (
                 appointment.status ===
                 "completed"
@@ -681,10 +688,13 @@ export default function DoctorDashboard() {
                 return true;
               }
 
-              return (
-                !patientDate ||
-                patientDate === selectedDate
-              );
+              // Without a visit timestamp, a current workflow status
+              // cannot be reliably attributed to a historical date.
+              if (!patientDate) {
+                return selectedDate === getLocalDateString();
+              }
+
+              return patientDate === selectedDate;
             })
             .map((patient) => {
               const isCompleted =
