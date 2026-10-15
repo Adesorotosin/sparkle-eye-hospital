@@ -30,6 +30,7 @@ type QueueStatus =
 
 interface Appointment {
   id: string;
+  patientRecordId: string;
   patientName: string;
   physician: string;
   startTime: string;
@@ -199,6 +200,11 @@ function normalizeAppointment(
       ? row.id
       : "";
 
+  const patientRecordId =
+    typeof row.patientId === "string"
+      ? row.patientId
+      : "";
+
   const patientName =
     typeof row.patientName === "string"
       ? row.patientName
@@ -254,6 +260,7 @@ function normalizeAppointment(
 
   return {
     id,
+    patientRecordId,
     patientName,
     physician,
     startTime,
@@ -434,11 +441,22 @@ export default function DoctorDashboard() {
           string,
           PatientRecord
         >();
+        const patientsById = new Map<
+          string,
+          PatientRecord
+        >();
 
         patients.forEach((patient) => {
           if (patient.patientId) {
             patientsByCode.set(
               patient.patientId.toLowerCase(),
+              patient
+            );
+          }
+
+          if (patient.id) {
+            patientsById.set(
+              patient.id.toLowerCase(),
               patient
             );
           }
@@ -449,6 +467,8 @@ export default function DoctorDashboard() {
          * by an appointment.
          */
         const appointmentPatientCodes =
+          new Set<string>();
+        const appointmentPatientIds =
           new Set<string>();
 
         /*
@@ -463,10 +483,30 @@ export default function DoctorDashboard() {
                 appointment.status !== "no_show"
             )
             .map((appointment) => {
-              const patientCode =
+              const extractedPatientCode =
                 extractPatientCode(
                   appointment.patientName
                 );
+
+              // Prefer the appointment's real patient foreign key.
+              // Display names are presentation data and may not contain
+              // a patient code, so they must not be the only join key.
+              const patientById = appointment.patientRecordId
+                ? patientsById.get(
+                    appointment.patientRecordId.toLowerCase()
+                  )
+                : undefined;
+
+              const patient =
+                patientById ??
+                (extractedPatientCode
+                  ? patientsByCode.get(
+                      extractedPatientCode.toLowerCase()
+                    )
+                  : undefined);
+
+              const patientCode =
+                patient?.patientId || extractedPatientCode;
 
               if (patientCode) {
                 appointmentPatientCodes.add(
@@ -474,11 +514,11 @@ export default function DoctorDashboard() {
                 );
               }
 
-              const patient = patientCode
-                ? patientsByCode.get(
-                    patientCode.toLowerCase()
-                  )
-                : undefined;
+              if (patient?.id) {
+                appointmentPatientIds.add(
+                  patient.id.toLowerCase()
+                );
+              }
 
               /*
                * Determine the clinical status.
@@ -609,11 +649,17 @@ export default function DoctorDashboard() {
                 patient.patientId?.toLowerCase();
 
               const alreadyInAppointment =
-                patientCode
+                (patientCode
                   ? appointmentPatientCodes.has(
                       patientCode
                     )
-                  : false;
+                  : false) ||
+                Boolean(
+                  patient.id &&
+                    appointmentPatientIds.has(
+                      patient.id.toLowerCase()
+                    )
+                );
 
               return (
                 validStatus &&
