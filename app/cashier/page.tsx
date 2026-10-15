@@ -30,12 +30,21 @@ import {
   getCashierDashboard,
   type CashierQueueItem,
 } from "@/app/actions/cashier";
+import {
+  getTreatmentBillingRequests,
+  markTreatmentBillingRequestReviewed,
+  type TreatmentBillingRequest,
+} from "@/app/actions/treatment-billing";
 
 export default function CashierDashboard() {
   const router = useRouter();
 
   const [queue, setQueue] =
     useState<CashierQueueItem[]>([]);
+
+  const [treatmentRequests, setTreatmentRequests] =
+    useState<TreatmentBillingRequest[]>([]);
+  const [reviewingRequestId, setReviewingRequestId] = useState("");
 
   const [pendingCount, setPendingCount] =
     useState(0);
@@ -87,6 +96,10 @@ export default function CashierDashboard() {
       }
 
       setQueue(result.data.queue);
+      const treatmentResult = await getTreatmentBillingRequests();
+      if (treatmentResult.success) {
+        setTreatmentRequests(treatmentResult.requests);
+      }
       setPendingCount(
         result.data.pendingCount
       );
@@ -222,6 +235,25 @@ export default function CashierDashboard() {
         dateStyle: "medium",
       }
     ).format(new Date());
+  };
+
+  const handleMarkTreatmentReviewed = async (requestId: string) => {
+    setReviewingRequestId(requestId);
+    setError("");
+    try {
+      const result = await markTreatmentBillingRequestReviewed(requestId);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      const refreshed = await getTreatmentBillingRequests();
+      if (refreshed.success) setTreatmentRequests(refreshed.requests);
+    } catch (reviewError) {
+      console.error("Treatment billing request review failed:", reviewError);
+      setError("Unable to update the treatment-plan request.");
+    } finally {
+      setReviewingRequestId("");
+    }
   };
 
   const handleSelectPatient =
@@ -444,6 +476,55 @@ export default function CashierDashboard() {
             {error}
           </div>
         )}
+
+        <section className="rounded-2xl border border-violet-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900">Doctor treatment-plan requests</h2>
+              <p className="mt-1 text-xs text-slate-500">Review the clinical plan, then choose the correct billable service and price in Billing. Plans do not create charges automatically.</p>
+            </div>
+            <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">
+              {treatmentRequests.filter((request) => request.status === "pending").length} awaiting review
+            </span>
+          </div>
+          {treatmentRequests.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center">
+              <p className="text-sm font-semibold text-slate-600">No treatment-plan requests</p>
+              <p className="mt-1 text-xs text-slate-500">Requests sent by doctors will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {treatmentRequests.map((request) => (
+                <article key={request.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-slate-900">{request.patientName}</h3>
+                        <span className="text-xs text-slate-500">{request.patientCode}</span>
+                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${request.status === "pending" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                          {request.status === "pending" ? "Awaiting review" : "Reviewed"}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">Sent by {request.requestedByName} · {formatTime(request.createdAt)}</p>
+                      <div className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{request.treatmentPlan}</div>
+                      {request.reviewedByName && <p className="mt-2 text-xs text-emerald-700">Reviewed by {request.reviewedByName}</p>}
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <button type="button" onClick={() => handleSelectPatient(request.patientCode)} className="inline-flex items-center gap-1.5 rounded-lg bg-[#5E35B1] px-3 py-2 text-xs font-bold text-white hover:bg-[#4527A0]">
+                        Open Billing <ArrowRight className="h-3.5 w-3.5" />
+                      </button>
+                      {request.status === "pending" && (
+                        <button type="button" onClick={() => handleMarkTreatmentReviewed(request.id)} disabled={reviewingRequestId === request.id} className="rounded-lg border border-emerald-200 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                          {reviewingRequestId === request.id ? "Updating..." : "Mark reviewed"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
         <div className="bg-white/90 rounded-2xl p-6 border border-purple-100 shadow-sm space-y-5">
           {/* TOOLBAR */}
