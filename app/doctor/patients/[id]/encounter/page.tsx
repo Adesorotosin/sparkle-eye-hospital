@@ -296,10 +296,7 @@ export default function DoctorEncounterPage() {
   const [diagnosis, setDiagnosis] = useState("");
   const [treatmentPlan, setTreatmentPlan] = useState("");
 
-  const [medication, setMedication] = useState("");
-  const [dosage, setDosage] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [pricePerUnit, setPricePerUnit] = useState("0");
+  const [prescriptionText, setPrescriptionText] = useState("");
 
   const [requesting, setRequesting] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
@@ -542,18 +539,20 @@ export default function DoctorEncounterPage() {
     setMessage("");
     setError("");
 
-    if (!medication.trim() || !dosage.trim()) {
-      setError("Medication and dosage are required.");
+    if (!prescriptionText.trim()) {
+      setError("Enter the prescription instructions before sending to Pharmacy.");
+      return;
+    }
+
+    if (prescriptionText.trim().length > 5000) {
+      setError("The prescription must be 5,000 characters or fewer.");
       return;
     }
 
     startTransition(async () => {
       const response = await createPrescription({
         patientCode,
-        drugName: medication,
-        dosage,
-        quantity: Number(quantity),
-        pricePerUnit: Number(pricePerUnit),
+        prescriptionText: prescriptionText.trim(),
       });
 
       if (!response.success) {
@@ -563,10 +562,7 @@ export default function DoctorEncounterPage() {
       }
 
       setMessage(response.message);
-      setMedication("");
-      setDosage("");
-      setQuantity("1");
-      setPricePerUnit("0");
+      setPrescriptionText("");
       await refreshPatient();
     });
   };
@@ -972,18 +968,15 @@ export default function DoctorEncounterPage() {
                 <div className="mb-4 flex items-center gap-2">
                   <Pill className="h-5 w-5 text-blue-600" />
                   <div>
-                    <h3 className="font-semibold">Pharmacy request</h3>
-                    <p className="text-xs text-gray-500">Create the prescription and automatically add it to billing.</p>
+                    <h3 className="font-semibold">Prescription</h3>
+                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
                   </div>
                 </div>
-                <div className="grid gap-3 md:grid-cols-4">
-                  <input placeholder="Medication" value={medication} onChange={(e) => setMedication(e.target.value)} className={inputClass} />
-                  <input placeholder="Dosage / instructions" value={dosage} onChange={(e) => setDosage(e.target.value)} className={inputClass} />
-                  <input type="number" min="1" placeholder="Quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} className={inputClass} />
-                  <input type="number" min="0" placeholder="Price/unit" value={pricePerUnit} onChange={(e) => setPricePerUnit(e.target.value)} className={inputClass} />
-                </div>
-                <button onClick={prescribe} disabled={isPending} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  <Send className="h-4 w-4" /> Send to Pharmacy
+                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
+                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
+                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
+                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
                 </button>
               </div>
             </div>
