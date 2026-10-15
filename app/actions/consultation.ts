@@ -247,6 +247,7 @@ export async function saveConsultationEncounter(
           formData.status === "completed"
             ? "completed_today"
             : "in_consultation",
+        last_visit_at: new Date().toISOString(),
       })
       .eq("id", patient.id);
 
