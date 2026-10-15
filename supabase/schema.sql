@@ -106,6 +106,7 @@ create table encounters (
   refraction_od jsonb,          -- { sphere, cylinder, axis }
   refraction_os jsonb,
   diagnosis text,
+  treatment_plan text,
   status text not null default 'draft' check (status in ('draft','completed')),
   recorded_by uuid references staff(id),
   created_at timestamptz not null default now(),
