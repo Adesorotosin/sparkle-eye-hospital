@@ -59,7 +59,7 @@ export async function sendTreatmentPlanToCashier(input: {
 
     const { data: existing, error: existingError } = await supabaseServer
       .from("treatment_billing_requests")
-      .select("id, status")
+      .select("id, status, treatment_plan")
       .eq("encounter_id", encounter.id)
       .maybeSingle();
 
@@ -69,13 +69,39 @@ export async function sendTreatmentPlanToCashier(input: {
     }
 
     if (existing) {
-      return {
-        success: true,
-        id: existing.id,
-        message: existing.status === "pending"
-          ? "This treatment plan is already waiting in the Cashier queue."
-          : "This treatment plan has already been sent to Cashier. Refresh the Cashier dashboard for its current status.",
-      };
+      if (String(existing.treatment_plan ?? "").trim() === treatmentPlan) {
+        return {
+          success: true,
+          id: existing.id,
+          message: existing.status === "pending"
+            ? "This treatment plan is already waiting in the Cashier queue."
+            : "This treatment plan has already been sent to Cashier. Refresh the Cashier dashboard for its current status.",
+        };
+      }
+
+      // If the doctor edits a plan after sending it, update the same request
+      // and return it to the pending queue rather than creating a duplicate.
+      const { error: updateError } = await supabaseServer
+        .from("treatment_billing_requests")
+        .update({
+          treatment_plan: treatmentPlan,
+          status: "pending",
+          requested_by: staff.id,
+          requested_by_name: staff.name,
+          reviewed_by: null,
+          reviewed_by_name: null,
+          reviewed_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        console.error("Treatment billing request update failed:", updateError);
+        return { success: false, message: "The plan was already sent, but its updated version could not be delivered to Cashier." };
+      }
+
+      revalidatePath("/cashier");
+      return { success: true, id: existing.id, message: "Updated treatment plan sent back to Cashier for billing review." };
     }
 
     const { data: request, error: insertError } = await supabaseServer
