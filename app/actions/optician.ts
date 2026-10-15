@@ -49,7 +49,7 @@ export type OpticalOrder = {
   lensMaterial: string;
   lensCoating: string;
 
-  dispensingNotes: string;
+  dispensingNotes?: string;
 
   opticalCharge: number;
   invoiceId: string | null;
