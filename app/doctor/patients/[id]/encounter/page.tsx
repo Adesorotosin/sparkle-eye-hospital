@@ -273,6 +273,7 @@ export default function DoctorEncounterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedStatus, setSavedStatus] = useState<"draft" | "completed">("draft");
+  const [encounterId, setEncounterId] = useState<string | undefined>(undefined);
 
   const [presentingComplaint, setPresentingComplaint] = useState("");
   const [hpi, setHpi] = useState("");
@@ -337,6 +338,11 @@ export default function DoctorEncounterPage() {
 
         const encounter = data.encounters?.[0];
         if (encounter) {
+          // Continue editing a draft in place. A completed encounter is
+          // historical, so the next save starts a new encounter.
+          setEncounterId(
+            encounter.status === "draft" ? encounter.id : undefined
+          );
           setPresentingComplaint(encounter.presentingComplaint ?? "");
           setHpi(encounter.historyOfPresentingComplaint ?? "");
           setPastMedicalHistory(encounter.pastMedicalHistory ?? "");
@@ -384,6 +390,7 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
+        encounterId,
         presentingComplaint,
         historyOfPresentingComplaint: hpi,
         pastMedicalHistory,
@@ -410,6 +417,7 @@ export default function DoctorEncounterPage() {
       }
 
       setSavedStatus(status);
+      setEncounterId(status === "draft" ? response.encounterId : undefined);
       setMessage(response.message);
     });
   };
