@@ -502,8 +502,20 @@ export default function DoctorEncounterPage() {
 
     startTransition(async () => {
       const response = await referPatientToOptometry(patientCode);
-      if (!response.success) setError(response.message);
-      else setMessage(response.message);
+      if (!response.success) {
+        setError(response.message);
+      } else {
+        setMessage(response.message);
+        await refreshPatient();
+        try {
+          const optometry = await getOptometryPatient(patientCode);
+          if (optometry.success) {
+            setOptometryResult(optometry.patient ?? null);
+          }
+        } catch {
+          setOptometryResult(null);
+        }
+      }
       setRequesting("");
     });
   };
