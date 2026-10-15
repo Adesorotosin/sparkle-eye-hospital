@@ -165,15 +165,15 @@ export async function saveConsultationEncounter(
         formData.iopInstrument.trim() || null,
 
       refraction_od: {
-        sphere: formData.refractionOD.sphere.trim(),
-        cylinder: formData.refractionOD.cylinder.trim(),
-        axis: formData.refractionOD.axis.trim(),
+        sphere: String(formData.refractionOD?.sphere ?? "").trim(),
+        cylinder: String(formData.refractionOD?.cylinder ?? "").trim(),
+        axis: String(formData.refractionOD?.axis ?? "").trim(),
       },
 
       refraction_os: {
-        sphere: formData.refractionOS.sphere.trim(),
-        cylinder: formData.refractionOS.cylinder.trim(),
-        axis: formData.refractionOS.axis.trim(),
+        sphere: String(formData.refractionOS?.sphere ?? "").trim(),
+        cylinder: String(formData.refractionOS?.cylinder ?? "").trim(),
+        axis: String(formData.refractionOS?.axis ?? "").trim(),
       },
 
       diagnosis: formData.diagnosis.trim() || null,
