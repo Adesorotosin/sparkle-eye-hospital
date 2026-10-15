@@ -555,6 +555,15 @@ function PharmacyContent() {
       );
       return;
     }
+    const selectedStockItem = drugInventory.find((drug) => drug.name === drugName);
+    if (!selectedStockItem || selectedStockItem.stock <= 0) {
+      setAddMedicationError("Select a medication that is currently in stock.");
+      return;
+    }
+    if (quantity > selectedStockItem.stock) {
+      setAddMedicationError("Only " + selectedStockItem.stock + " unit(s) are currently in stock.");
+      return;
+    }
 
     setIsAddingMedication(true);
 
@@ -565,7 +574,7 @@ function PharmacyContent() {
           drugName,
           dosage,
           quantity,
-          pricePerUnit: unitPrice,
+          pricePerUnit: Number(selectedStockItem.price),
         });
 
       if (!result.success) {
@@ -2568,24 +2577,12 @@ function PharmacyContent() {
 
                   <input
                     type="number"
-                    required
                     min="0"
-                    step="0.01"
-                    placeholder="e.g. 5000"
-                    value={
-                      newDrug.unitPrice
-                    }
-                    onChange={(e) =>
-                      setNewDrug(
-                        (previous) => ({
-                          ...previous,
-                          unitPrice:
-                            e.target.value,
-                        })
-                      )
-                    }
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
+                    readOnly
+                    value={newDrug.unitPrice}
+                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none"
                   />
+                  <p className="mt-1 text-[10px] text-slate-500">Price is taken from the selected stock item.</p>
 
                 </div>
 
