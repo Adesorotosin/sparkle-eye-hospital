@@ -452,6 +452,10 @@ export default function DoctorEncounterPage() {
 
       if (!response.success) {
         setError(response.message);
+        // Some failures happen after the order row is already created.
+        // Refresh when an ID is returned so the doctor can see that order
+        // and avoid retrying blindly.
+        if (response.id) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -474,6 +478,7 @@ export default function DoctorEncounterPage() {
 
       if (!response.success) {
         setError(response.message);
+        if (response.id) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -512,6 +517,7 @@ export default function DoctorEncounterPage() {
       const response = await createOpticalOrder(patientCode);
       if (!response.success) {
         setError(response.message);
+        if (response.orderId) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -540,6 +546,7 @@ export default function DoctorEncounterPage() {
 
       if (!response.success) {
         setError(response.message);
+        if (response.id) await refreshPatient();
         return;
       }
 
