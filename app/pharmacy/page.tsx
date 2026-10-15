@@ -397,6 +397,10 @@ function PharmacyContent() {
         "pending_payment"
     );
 
+  const pharmacyReviewOrders = pharmacyOrders.filter(
+    (item) => item.status === "awaiting_pharmacy_review"
+  );
+
   /*
    * Patients with the currently selected patient
    * displayed as the unfulfilled/current patient.
@@ -1286,6 +1290,27 @@ function PharmacyContent() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex items-center gap-2 px-2 mb-2">
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                DOCTOR REQUESTS TO REVIEW ({isLoadingQueue ? "..." : pharmacyReviewOrders.length})
+              </h2>
+            </div>
+            {pharmacyReviewOrders.length === 0 ? (
+              <p className="px-2 py-3 text-xs text-slate-500">No doctor prescription requests need review.</p>
+            ) : (
+              <div className="space-y-1 mb-5">
+                {pharmacyReviewOrders.map((item) => (
+                  <button key={item.id} type="button" onClick={() => handlePatientSelect(item.id, item.name)} className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between">
+                    <div>
+                      <strong className="text-xs font-bold block">{item.name}</strong>
+                      <span className="text-[10px] text-violet-300 font-medium block mt-0.5">Prescription needs medication and price confirmation • {item.time}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-500" />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2 px-2 mb-2">
               <span className="w-2 h-2 rounded-full bg-amber-500" />
 
@@ -2193,10 +2218,11 @@ function PharmacyContent() {
                             </td>
 
                             <td className="py-3.5 font-bold text-slate-900">
-                              ₦
-                              {Number(
-                                rx.totalPrice
-                              ).toLocaleString()}
+                              {rx.status === "awaiting_pharmacy_review" ? (
+                                <span className="text-violet-700">To be confirmed</span>
+                              ) : (
+                                <>₦{Number(rx.totalPrice).toLocaleString()}</>
+                              )}
                             </td>
 
                             <td className="py-3.5">
