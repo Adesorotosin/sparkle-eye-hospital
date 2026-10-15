@@ -78,6 +78,14 @@ export async function completeDiagnosticOrder(input: {
 
     if (lookupError || !order) return { success: false, message: "Diagnostic order not found." };
 
+    const patient = Array.isArray(order.patients)
+      ? order.patients[0]
+      : order.patients;
+
+    if (!patient) {
+      return { success: false, message: "Patient record not found for this diagnostic order." };
+    }
+
     if (order.status !== "ready_for_test") {
       return {
         success: false,
@@ -110,7 +118,7 @@ export async function completeDiagnosticOrder(input: {
       patientId: order.patient_id,
       details: JSON.stringify({
         diagnosticOrderId: order.id,
-        patientCode: order.patients.patient_code,
+        patientCode: patient.patient_code,
         testName: order.name,
         findings: input.findings.trim(),
         interpretation: input.interpretation?.trim() || null,
@@ -118,7 +126,7 @@ export async function completeDiagnosticOrder(input: {
     });
 
     revalidatePath("/diagnostics");
-    revalidatePath(`/doctor/patients/${order.patients.patient_code}/encounter`);
+    revalidatePath(`/doctor/patients/${patient.patient_code}/encounter`);
 
     return { success: true, message: "Investigation result recorded and sent to the doctor." };
   } catch (error) {
