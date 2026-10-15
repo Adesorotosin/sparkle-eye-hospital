@@ -294,7 +294,7 @@ export async function getPharmacyQueue() {
         continue;
       }
 
-      const queueStatus = prescription.status === "awaiting_pharmacy_review"
+      const queueStatus: PharmacyQueueItem["status"] = prescription.status === "awaiting_pharmacy_review"
         ? "awaiting_pharmacy_review"
         : prescription.status === "pending_payment"
           ? "pending_payment"
