@@ -87,7 +87,7 @@ export type SaveOpticalOrderInput = {
   lensMaterial: string;
   lensCoating: string;
 
-  dispensingNotes: string;
+  dispensingNotes?: string;
 
   /**
    * Total optical charge for the complete eyewear order.
