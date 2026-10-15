@@ -102,11 +102,14 @@ interface NotificationItem {
 }
 
 function getLocalDateString(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  // Use the hospital's timezone consistently, regardless of the
+  // browser or hosting server timezone.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function getAppointmentDateString(startTime: string) {
@@ -134,6 +137,7 @@ function formatAppointmentTime(start: string, end: string) {
     value.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Africa/Lagos",
     });
 
   return `${formatTime(startDate)} – ${formatTime(endDate)}`;
@@ -144,7 +148,7 @@ function formatAppointmentDate(dateString: string) {
     return "Date unavailable";
   }
 
-  const value = new Date(`${dateString}T00:00:00`);
+  const value = new Date(`${dateString}T00:00:00+01:00`);
 
   if (Number.isNaN(value.getTime())) {
     return dateString;
@@ -155,6 +159,7 @@ function formatAppointmentDate(dateString: string) {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Africa/Lagos",
   });
 }
 
