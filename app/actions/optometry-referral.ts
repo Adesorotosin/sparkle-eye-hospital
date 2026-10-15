@@ -71,6 +71,7 @@ export async function referPatientToOptometry(
       .update({
         optometry_status: "referred",
         status: "in_consultation",
+        last_visit_at: new Date().toISOString(),
       })
       .eq("id", patient.id);
 
