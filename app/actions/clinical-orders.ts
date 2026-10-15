@@ -139,7 +139,7 @@ export async function createDiagnosticOrder(
      * so preserve its ID if billing setup fails; the UI can refresh and
      * show the order rather than encouraging a blind retry.
      */
-    let invoice;
+    let invoice: Awaited<ReturnType<typeof getOrCreateDraftInvoice>>;
     try {
       invoice = await getOrCreateDraftInvoice(patient.id);
     } catch (invoiceError) {
@@ -475,7 +475,7 @@ export async function createPrescription(
      * setup fails so the doctor can inspect the saved prescription
      * rather than unknowingly creating a duplicate on retry.
      */
-    let invoice;
+    let invoice: Awaited<ReturnType<typeof getOrCreateDraftInvoice>>;
     try {
       invoice = await getOrCreateDraftInvoice(patient.id);
     } catch (invoiceError) {
