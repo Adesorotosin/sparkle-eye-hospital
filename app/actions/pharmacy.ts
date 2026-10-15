@@ -30,9 +30,11 @@ export interface PharmacyPrescription {
   pricePerUnit: number;
   totalPrice: number;
   status:
+    | "awaiting_pharmacy_review"
     | "pending_payment"
     | "ready_for_dispensing"
-    | "dispensed";
+    | "dispensed"
+    | "reviewed";
 }
 
 export interface PharmacyPatient {
@@ -52,7 +54,7 @@ export interface PharmacyQueueItem {
   prescriptionCount: number;
   totalAmount: number;
   createdAt: string;
-  status: "pending_payment" | "ready_for_dispensing";
+  status: "awaiting_pharmacy_review" | "pending_payment" | "ready_for_dispensing";
 }
 
 export async function getPharmacyPatient(
@@ -156,9 +158,13 @@ export async function getPharmacyPatient(
           status:
             rx.status === "dispensed"
               ? "dispensed"
-              : rx.status === "pending_payment"
-                ? "pending_payment"
-                : "ready_for_dispensing",
+              : rx.status === "awaiting_pharmacy_review"
+                ? "awaiting_pharmacy_review"
+                : rx.status === "reviewed"
+                  ? "reviewed"
+                  : rx.status === "pending_payment"
+                    ? "pending_payment"
+                    : "ready_for_dispensing",
         })
       ),
     };
@@ -219,6 +225,7 @@ export async function getPharmacyQueue() {
           "id, patient_id, quantity, total_price, created_at, status"
         )
         .in("status", [
+          "awaiting_pharmacy_review",
           "pending_payment",
           "ready_for_dispensing",
         ])
@@ -287,43 +294,26 @@ export async function getPharmacyQueue() {
         continue;
       }
 
-      const existing =
-        grouped.get(
-          prescription.patient_id
-        );
+      const queueStatus = prescription.status === "awaiting_pharmacy_review"
+        ? "awaiting_pharmacy_review"
+        : prescription.status === "pending_payment"
+          ? "pending_payment"
+          : "ready_for_dispensing";
+      const groupKey = `${prescription.patient_id}:${queueStatus}`;
+      const existing = grouped.get(groupKey);
 
       if (existing) {
         existing.prescriptionCount += 1;
-
-        existing.totalAmount += Number(
-          prescription.total_price ?? 0
-        );
+        existing.totalAmount += Number(prescription.total_price ?? 0);
       } else {
-        grouped.set(
-          prescription.patient_id,
-          {
-            patientId:
-              patient.patient_code,
-
-            fullName:
-              patient.full_name,
-
-            prescriptionCount: 1,
-
-            totalAmount: Number(
-              prescription.total_price ?? 0
-            ),
-
-            createdAt:
-              prescription.created_at,
-
-            status:
-              prescription.status ===
-              "pending_payment"
-                ? "pending_payment"
-                : "ready_for_dispensing",
-          }
-        );
+        grouped.set(groupKey, {
+          patientId: patient.patient_code,
+          fullName: patient.full_name,
+          prescriptionCount: 1,
+          totalAmount: Number(prescription.total_price ?? 0),
+          createdAt: prescription.created_at,
+          status: queueStatus,
+        });
       }
     }
 
