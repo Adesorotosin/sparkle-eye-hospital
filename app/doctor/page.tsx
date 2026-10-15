@@ -672,9 +672,7 @@ export default function DoctorDashboard() {
                  */
                 appointmentStatus: isCompleted
                   ? "completed"
-                  : patient.status === "waiting_doctor"
-                    ? "scheduled"
-                    : "checked_in",
+                  : "checked_in",
 
                 appointmentStart: "",
 
