@@ -135,9 +135,22 @@ export async function createDiagnosticOrder(
     }
 
     /*
-     * Get the patient's active invoice.
+     * Get the patient's active invoice. The diagnostic row already exists,
+     * so preserve its ID if billing setup fails; the UI can refresh and
+     * show the order rather than encouraging a blind retry.
      */
-    const invoice = await getOrCreateDraftInvoice(patient.id);
+    let invoice;
+    try {
+      invoice = await getOrCreateDraftInvoice(patient.id);
+    } catch (invoiceError) {
+      console.error("Diagnostic invoice lookup failed:", invoiceError);
+      return {
+        success: false,
+        message:
+          "Diagnostic order was created, but the patient's invoice could not be opened. Refresh the patient record before retrying.",
+        id: diagnostic.id,
+      };
+    }
 
     /*
      * Add the diagnostic to the invoice.
@@ -167,7 +180,17 @@ export async function createDiagnosticOrder(
       };
     }
 
-    await recalcInvoice(invoice.id);
+    try {
+      await recalcInvoice(invoice.id);
+    } catch (recalcError) {
+      console.error("Diagnostic invoice recalculation failed:", recalcError);
+      return {
+        success: false,
+        message:
+          "Diagnostic order and billing item were created, but the invoice total could not be recalculated. Refresh the patient record before retrying.",
+        id: diagnostic.id,
+      };
+    }
 
     /*
      * Record the clinical activity using the actual
@@ -448,9 +471,22 @@ export async function createPrescription(
     }
 
     /*
-     * Get the active invoice.
+     * The prescription already exists. Keep its ID visible if invoice
+     * setup fails so the doctor can inspect the saved prescription
+     * rather than unknowingly creating a duplicate on retry.
      */
-    const invoice = await getOrCreateDraftInvoice(patient.id);
+    let invoice;
+    try {
+      invoice = await getOrCreateDraftInvoice(patient.id);
+    } catch (invoiceError) {
+      console.error("Prescription invoice lookup failed:", invoiceError);
+      return {
+        success: false,
+        message:
+          "Prescription was created, but the patient's invoice could not be opened. Refresh the patient record before retrying.",
+        id: prescription.id,
+      };
+    }
 
     /*
      * Add the medication to billing.
@@ -480,7 +516,17 @@ export async function createPrescription(
       };
     }
 
-    await recalcInvoice(invoice.id);
+    try {
+      await recalcInvoice(invoice.id);
+    } catch (recalcError) {
+      console.error("Prescription invoice recalculation failed:", recalcError);
+      return {
+        success: false,
+        message:
+          "Prescription and billing item were created, but the invoice total could not be recalculated. Refresh the patient record before retrying.",
+        id: prescription.id,
+      };
+    }
 
     /*
      * Record the pharmacy activity using the actual
