@@ -709,3 +709,36 @@ export async function dispensePatientPrescriptions(patientCode: string) {
     };
   }
 }
+
+export async function markPrescriptionRequestReviewed(prescriptionId: string) {
+  try {
+    await requireRole([...PHARMACY_WRITE_ROLES]);
+    const id = prescriptionId?.trim();
+    if (!id) return { success: false, message: "Prescription request ID is required." };
+
+    const { data, error } = await supabaseServer
+      .from("prescriptions")
+      .update({ status: "reviewed" })
+      .eq("id", id)
+      .eq("status", "awaiting_pharmacy_review")
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Prescription request review update failed:", error);
+      return { success: false, message: "Could not update the prescription request." };
+    }
+    if (!data) {
+      return { success: false, message: "This request is no longer awaiting review. Refresh the pharmacy record." };
+    }
+
+    revalidatePath("/pharmacy");
+    return { success: true, message: "Prescription request marked as reviewed." };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "UNAUTHENTICATED") return { success: false, message: "Authentication required." };
+    if (message === "FORBIDDEN") return { success: false, message: "Only authorized pharmacy staff can review prescription requests." };
+    console.error("Mark prescription request reviewed error:", error);
+    return { success: false, message: "Could not mark the prescription request as reviewed." };
+  }
+}
