@@ -88,6 +88,7 @@ create table if not exists encounters (
   refraction_od jsonb,
   refraction_os jsonb,
   diagnosis text,
+  treatment_plan text,
   status text not null default 'draft' check (status in ('draft','completed')),
   recorded_by uuid references staff(id),
   created_at timestamptz not null default now(),
@@ -114,6 +115,8 @@ create index if not exists idx_treatment_billing_requests_status_created
 create index if not exists idx_treatment_billing_requests_patient
   on treatment_billing_requests(patient_id);
 alter table treatment_billing_requests enable row level security;
+
+alter table encounters add column if not exists treatment_plan text;
 
 create table if not exists invoices (
   id uuid primary key default gen_random_uuid(),
