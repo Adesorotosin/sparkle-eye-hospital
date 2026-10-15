@@ -722,6 +722,40 @@ export async function markPrescriptionRequestReviewed(prescriptionId: string) {
     const id = prescriptionId?.trim();
     if (!id) return { success: false, message: "Prescription request ID is required." };
 
+    const { data: request, error: requestError } = await supabaseServer
+      .from("prescriptions")
+      .select("id, patient_id, created_at")
+      .eq("id", id)
+      .eq("status", "awaiting_pharmacy_review")
+      .maybeSingle();
+
+    if (requestError) {
+      console.error("Prescription request lookup failed:", requestError);
+      return { success: false, message: "Could not load the prescription request." };
+    }
+    if (!request) {
+      return { success: false, message: "This request is no longer awaiting review. Refresh the pharmacy record." };
+    }
+
+    const { data: billableMedication, error: medicationError } = await supabaseServer
+      .from("prescriptions")
+      .select("id")
+      .eq("patient_id", request.patient_id)
+      .gt("created_at", request.created_at)
+      .neq("id", request.id)
+      .neq("drug_name", "Doctor's prescription request — review required")
+      .in("status", ["pending_payment", "ready_for_dispensing", "dispensed"])
+      .limit(1)
+      .maybeSingle();
+
+    if (medicationError) {
+      console.error("Billable medication verification failed:", medicationError);
+      return { success: false, message: "Could not verify that the approved medication was added." };
+    }
+    if (!billableMedication) {
+      return { success: false, message: "Add the approved medication from available pharmacy stock first, then mark this request reviewed." };
+    }
+
     const { data, error } = await supabaseServer
       .from("prescriptions")
       .update({ status: "reviewed" })
