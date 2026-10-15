@@ -32,6 +32,7 @@ import {
   getPharmacyQueue,
   createPharmacyPrescription,
   dispensePatientPrescriptions,
+  markPrescriptionRequestReviewed,
   type PharmacyPatient,
   type PharmacyQueueItem,
 } from "@/app/actions/pharmacy";
@@ -606,6 +607,18 @@ function PharmacyContent() {
       );
     } finally {
       setIsAddingMedication(false);
+    }
+  };
+
+  const handleMarkRequestReviewed = async (prescriptionId: string) => {
+    setActionError(null);
+    try {
+      const result = await markPrescriptionRequestReviewed(prescriptionId);
+      if (!result.success) throw new Error(result.message);
+      if (patientId) await loadPatient(patientId);
+      await loadQueue();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not update the prescription request.");
     }
   };
 
@@ -2229,12 +2242,9 @@ function PharmacyContent() {
 
                               <button
                                 type="button"
-                                onClick={() =>
-                                  toggleAdminister(
-                                    rx.id
-                                  )
-                                }
-                                className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition ${
+                                disabled={rx.status === "awaiting_pharmacy_review" || rx.status === "reviewed"}
+                                onClick={() => toggleAdminister(rx.id)}
+                                className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                   isAdministered
                                     ? "bg-purple-100 text-purple-800 border border-purple-300"
                                     : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
@@ -2253,23 +2263,21 @@ function PharmacyContent() {
 
                             <td className="py-3.5">
 
-                              <span
-                                className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase border ${
+                              {rx.status === "awaiting_pharmacy_review" ? (
+                                <button type="button" onClick={() => handleMarkRequestReviewed(rx.id)} className="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 font-bold text-[10px] uppercase text-violet-700 hover:bg-violet-100">
+                                  Mark Reviewed
+                                </button>
+                              ) : (
+                                <span className={`px-2.5 py-1 rounded-md font-bold text-[10px] uppercase border ${
                                   isDispensed
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : rx.status ===
-                                        "ready_for_dispensing"
+                                    : rx.status === "ready_for_dispensing"
                                       ? "bg-blue-50 text-blue-700 border-blue-200"
                                       : "bg-amber-50 text-amber-700 border-amber-200"
-                                }`}
-                              >
-                                {isDispensed
-                                  ? "dispensed"
-                                  : rx.status.replace(
-                                      /_/g,
-                                      " "
-                                    )}
-                              </span>
+                                }`}>
+                                  {isDispensed ? "dispensed" : rx.status.replace(/_/g, " ")}
+                                </span>
+                              )}
 
                             </td>
 
