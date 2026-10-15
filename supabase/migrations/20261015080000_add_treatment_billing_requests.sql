@@ -1,3 +1,6 @@
+-- Ensure the saved clinical plan is available in the encounter record.
+alter table public.encounters add column if not exists treatment_plan text;
+
 -- Doctor-to-cashier treatment-plan billing requests.
 -- The clinical plan stays in the encounter; this table is an auditable handoff,
 -- not an invoice and never creates a charge automatically.
