@@ -397,9 +397,6 @@ export async function createPharmacyPrescription(
     const quantity =
       Number(input.quantity);
 
-    const pricePerUnit =
-      Number(input.pricePerUnit);
-
     if (!patientCode) {
       return {
         success: false,
@@ -433,19 +430,28 @@ export async function createPharmacyPrescription(
       };
     }
 
-    if (
-      !Number.isFinite(pricePerUnit) ||
-      pricePerUnit < 0
-    ) {
-      return {
-        success: false,
-        message:
-          "Price per unit is invalid.",
-      };
+
+
+    const { data: stockItem, error: stockError } = await supabaseServer
+      .from("inventory_items")
+      .select("sku, name, stock, price")
+      .eq("domain", "pharmacy")
+      .eq("name", drugName)
+      .maybeSingle();
+
+    if (stockError) {
+      console.error("Pharmacy stock lookup failed:", stockError);
+      return { success: false, message: "Unable to verify medication stock and price." };
+    }
+    if (!stockItem) {
+      return { success: false, message: "Select a medication from the pharmacy inventory before adding it to billing." };
+    }
+    if (Number(stockItem.stock) < quantity) {
+      return { success: false, message: "Only " + Number(stockItem.stock) + " unit(s) of this medication are in stock." };
     }
 
-    const totalPrice =
-      quantity * pricePerUnit;
+    const pricePerUnit = Number(stockItem.price);
+    const totalPrice = quantity * pricePerUnit;
 
     const {
       data: patient,
