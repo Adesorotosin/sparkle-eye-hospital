@@ -20,6 +20,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
+import { sendTreatmentPlanToCashier } from "@/app/actions/treatment-billing";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
@@ -427,6 +428,66 @@ export default function DoctorEncounterPage() {
       setSavedStatus(status);
       setEncounterId(status === "draft" ? response.encounterId : undefined);
       setMessage(response.message);
+    });
+  };
+
+  const sendTreatmentPlanForBilling = () => {
+    setMessage("");
+    setError("");
+
+    if (!treatmentPlan.trim()) {
+      setError("Enter the treatment and follow-up plan before sending it to Cashier.");
+      document.getElementById("treatment")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setRequesting("cashier-treatment");
+    startTransition(async () => {
+      // Save the current clinical documentation first so Cashier receives
+      // the exact plan stored in the encounter, not unsaved text.
+      const saved = await saveConsultationEncounter({
+        patientId: patientCode,
+        encounterId,
+        presentingComplaint,
+        historyOfPresentingComplaint: hpi,
+        pastMedicalHistory,
+        pastOcularHistory,
+        familyOcularHistory,
+        ocularExamOD,
+        ocularExamOS,
+        slitLampOD,
+        slitLampOS,
+        otherExaminationFindings: otherFindings,
+        iopOD: iopOD.trim() ? Number(iopOD) : null,
+        iopOS: iopOS.trim() ? Number(iopOS) : null,
+        iopInstrument,
+        refractionOD,
+        refractionOS,
+        diagnosis,
+        treatmentPlan,
+        status: "draft",
+      });
+
+      if (!saved.success || !saved.encounterId) {
+        setError(saved.message || "Save the consultation before sending the plan to Cashier.");
+        setRequesting("");
+        return;
+      }
+
+      setEncounterId(saved.encounterId);
+      setSavedStatus("draft");
+
+      const result = await sendTreatmentPlanToCashier({
+        patientCode,
+        encounterId: saved.encounterId,
+      });
+
+      if (result.success) {
+        setMessage(result.message);
+      } else {
+        setError(result.message);
+      }
+      setRequesting("");
     });
   };
 
@@ -964,6 +1025,18 @@ export default function DoctorEncounterPage() {
           <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
             <div className="space-y-4">
               <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-violet-950">Send treatment plan to Cashier</h3>
+                    <p className="mt-1 text-xs text-violet-800">The saved plan will appear in the Cashier billing-review queue. Cashier must select and price the actual billable service; this action does not create a charge or invoice.</p>
+                  </div>
+                  <button type="button" onClick={sendTreatmentPlanForBilling} disabled={isPending || requesting === "cashier-treatment" || !treatmentPlan.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    {requesting === "cashier-treatment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {requesting === "cashier-treatment" ? "Sending to Cashier..." : "Send to Cashier"}
+                  </button>
+                </div>
+              </div>
               <div className="rounded-2xl border p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <Pill className="h-5 w-5 text-blue-600" />
