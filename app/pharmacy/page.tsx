@@ -2056,13 +2056,9 @@ function PharmacyContent() {
                 <button
                   type="button"
                   onClick={() => {
-                    setAddMedicationError(
-                      null
-                    );
-
-                    setIsAddModalOpen(
-                      true
-                    );
+                    setAddMedicationError(null);
+                    setIsAddModalOpen(true);
+                    loadDrugInventory();
                   }}
                   className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
                 >
@@ -2479,24 +2475,30 @@ function PharmacyContent() {
                   Drug Name
                 </label>
 
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. Moxifloxacin Eye Drops 0.5%"
-                  value={
-                    newDrug.drugName
-                  }
-                  onChange={(e) =>
-                    setNewDrug(
-                      (previous) => ({
-                        ...previous,
-                        drugName:
-                          e.target.value,
-                      })
-                    )
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600"
-                />
+                  value={newDrug.drugName}
+                  onChange={(e) => {
+                    const selected = drugInventory.find((drug) => drug.name === e.target.value);
+                    setNewDrug((previous) => ({
+                      ...previous,
+                      drugName: selected?.name ?? "",
+                      unitPrice: selected ? String(selected.price) : "",
+                    }));
+                  }}
+                  disabled={isLoadingDrugInventory || drugInventory.filter((drug) => drug.stock > 0).length === 0}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-purple-600 disabled:opacity-60"
+                >
+                  <option value="">{isLoadingDrugInventory ? "Loading stock..." : "Select medication from available stock"}</option>
+                  {drugInventory.filter((drug) => drug.stock > 0).map((drug) => (
+                    <option key={drug.id} value={drug.name}>
+                      {drug.name} — {drug.stock} in stock — ₦{Number(drug.price).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+                {drugInventory.filter((drug) => drug.stock > 0).length === 0 && !isLoadingDrugInventory && (
+                  <p className="mt-1 text-[10px] text-rose-600">No medication is currently in stock. Add or replenish stock before creating a billable prescription.</p>
+                )}
 
               </div>
 
