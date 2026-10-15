@@ -40,12 +40,15 @@ type Patient = {
 type Appointment = {
   id: string;
   patientName: string;
+  patientId?: string | null;
   physician: string;
   startTime: string;
   endTime: string;
   status: string;
   notes?: string | null;
 };
+
+type DoctorOption = { id: string; name: string; role: string };
 
 type ProcedureRegistration = {
   id: string;
@@ -111,6 +114,7 @@ export default function ReceptionistPage() {
   const [date, setDate] = useState(todayIso());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -150,8 +154,9 @@ export default function ReceptionistPage() {
   });
 
   const [appointmentForm, setAppointmentForm] = useState({
+    patientId: "",
     patientName: "",
-    physician: "Dr. James Okoro",
+    doctorStaffId: "",
     date: todayIso(),
     startTime: "09:00",
     endTime: "09:30",
@@ -187,6 +192,7 @@ export default function ReceptionistPage() {
 
       setAppointments(appointmentData.appointments ?? []);
       setPatients(patientData.patients ?? []);
+      setDoctors(appointmentData.doctors ?? []);
       const [procedureData, priceCatalog] = await Promise.all([
         getRecentProcedures(),
         getProcedurePriceCatalog(),
@@ -373,8 +379,9 @@ export default function ReceptionistPage() {
       setShowAppointmentModal(false);
 
       setAppointmentForm({
+        patientId: "",
         patientName: "",
-        physician: "Dr. James Okoro",
+        doctorStaffId: "",
         date,
         startTime: "09:00",
         endTime: "09:30",
@@ -478,6 +485,7 @@ export default function ReceptionistPage() {
   function openAppointmentForPatient(patient: Patient) {
     setAppointmentForm((current) => ({
       ...current,
+      patientId: patient.id,
       patientName: `${patient.fullName} (${patient.patientId})`,
       date,
     }));
@@ -1325,21 +1333,29 @@ export default function ReceptionistPage() {
               {/* PATIENT */}
               <div>
                 <label className="mb-1.5 block text-xs font-bold text-slate-600">
-                  Patient name / code *
+                  Registered patient *
                 </label>
-
-                <input
+                <select
                   required
-                  value={appointmentForm.patientName}
-                  onChange={(event) =>
+                  value={appointmentForm.patientId}
+                  onChange={(event) => {
+                    const selected = patients.find((item) => item.id === event.target.value);
                     setAppointmentForm({
                       ...appointmentForm,
-                      patientName: event.target.value,
-                    })
-                  }
+                      patientId: selected?.id ?? "",
+                      patientName: selected ? `${selected.fullName} (${selected.patientId})` : "",
+                    });
+                  }}
                   className={inputClass}
-                  placeholder="e.g. Adebayo Funmi (SPK-12345)"
-                />
+                >
+                  <option value="">Select a registered patient</option>
+                  {patients.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.fullName} ({item.registrationNumber || item.patientId})
+                    </option>
+                  ))}
+                </select>
+                {patients.length === 0 && <p className="mt-1 text-xs text-amber-700">No patients are loaded. Refresh the Reception page and try again.</p>}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -1348,22 +1364,18 @@ export default function ReceptionistPage() {
                   <label className="mb-1.5 block text-xs font-bold text-slate-600">
                     Physician *
                   </label>
-
                   <select
-                    value={appointmentForm.physician}
-                    onChange={(event) =>
-                      setAppointmentForm({
-                        ...appointmentForm,
-                        physician: event.target.value,
-                      })
-                    }
+                    required
+                    value={appointmentForm.doctorStaffId}
+                    onChange={(event) => setAppointmentForm({ ...appointmentForm, doctorStaffId: event.target.value })}
                     className={inputClass}
                   >
-                    <option>Dr. James Okoro</option>
-                    <option>Dr. Amina Bello</option>
-                    <option>Dr. Sarah Patel</option>
-                    <option>Dr. Fatima Hassan</option>
+                    <option value="">Select an active doctor</option>
+                    {doctors.map((doctor) => (
+                      <option key={doctor.id} value={doctor.id}>{doctor.name} ({doctor.role === "OPHTHALMOLOGIST" ? "Ophthalmologist" : "Doctor"})</option>
+                    ))}
                   </select>
+                  {doctors.length === 0 && <p className="mt-1 text-xs text-amber-700">No active doctors are available. Confirm doctor staff accounts are active.</p>}
                 </div>
 
                 {/* DATE */}
