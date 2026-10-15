@@ -260,7 +260,7 @@ export default function NurseDashboard() {
             <User className="w-4 h-4 text-[#6B21A8]" />
 
             <span className="text-xs font-bold text-[#6B21A8]">
-              Nurse Amaka Eze (NRS-0312)
+              Nurse Dashboard
             </span>
           </div>
 
