@@ -97,8 +97,22 @@ export async function GET(request: Request) {
       );
     }
 
+    const { data: doctors, error: doctorsError } = await supabaseServer
+      .from("staff")
+      .select("id, name, role")
+      .in("role", ["DOCTOR", "OPHTHALMOLOGIST"])
+      .eq("is_active", true)
+      .is("deleted_at", null)
+      .order("name", { ascending: true });
+
+    if (doctorsError) {
+      console.error("Active doctor list database error:", doctorsError);
+      return jsonNoStore({ error: "Failed to load active doctors for appointment booking." }, { status: 500 });
+    }
+
     return jsonNoStore({
       appointments: (data ?? []).map(toAppointment),
+      doctors: doctors ?? [],
       currentStaff: {
         id: staff.id,
         name: staff.name,
