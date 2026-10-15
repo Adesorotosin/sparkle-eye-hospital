@@ -587,14 +587,17 @@ export default function DoctorDashboard() {
         /*
          * NON-APPOINTMENT CLINICAL PATIENTS
          *
-         * This includes:
-         * - in_consultation
-         * - completed_today
+         * waiting_doctor is set by nurse triage and means
+         * the patient is ready for the doctor, not already
+         * being examined. in_consultation is reserved for
+         * a consultation that the doctor has started/saved.
          */
         const triagedPatients: QueuePatient[] =
           patients
             .filter((patient) => {
               const validStatus =
+                patient.status ===
+                  "waiting_doctor" ||
                 patient.status ===
                   "in_consultation" ||
                 patient.status ===
@@ -620,6 +623,15 @@ export default function DoctorDashboard() {
                 getPatientLastVisitDate(
                   patient
                 );
+
+              // A fresh triage handoff belongs in today's queue even
+              // when the patient's last_visit_at field is stale.
+              if (
+                patient.status === "waiting_doctor" &&
+                selectedDate === getLocalDateString()
+              ) {
+                return true;
+              }
 
               return (
                 !patientDate ||
@@ -648,15 +660,19 @@ export default function DoctorDashboard() {
 
                 status: isCompleted
                   ? "completed"
-                  : "in-consultation",
+                  : patient.status === "waiting_doctor"
+                    ? "waiting"
+                    : "in-consultation",
 
                 /*
-                 * Make the appointment status agree
-                 * with the clinical status.
+                 * Keep appointment and clinical statuses aligned
+                 * while distinguishing waiting from active care.
                  */
                 appointmentStatus: isCompleted
                   ? "completed"
-                  : "checked_in",
+                  : patient.status === "waiting_doctor"
+                    ? "scheduled"
+                    : "checked_in",
 
                 appointmentStart: "",
 
