@@ -945,6 +945,11 @@ export async function processBillingPayment(input: {
      */
     let diagnosticsUnlocked = 0;
     const diagnosticIdsToUnlock: string[] = [];
+    const diagnosticPriceUpdates: Array<{
+      id: string;
+      originalPrice: number;
+      approvedPrice: number;
+    }> = [];
 
     if (diagnosticItems.length > 0) {
       const {
@@ -1005,7 +1010,8 @@ export async function processBillingPayment(input: {
 
               return (
                 diagnosticName === invoiceName &&
-                diagnosticPrice === invoicePrice
+                ((diagnosticPrice > 0 && diagnosticPrice === invoicePrice) ||
+                  (diagnosticPrice === 0 && invoicePrice > 0))
               );
             }
           );
@@ -1014,9 +1020,17 @@ export async function processBillingPayment(input: {
           const matched =
             unmatchedDiagnostics[matchIndex];
 
-          diagnosticIdsToUnlock.push(
-            matched.id
-          );
+          diagnosticIdsToUnlock.push(matched.id);
+          const matchedPrice = Number(matched.price ?? 0);
+          if (matchedPrice === 0 && invoicePrice > 0) {
+            // Cashier has now supplied an approved price for an order
+            // that was intentionally created without a price catalogue entry.
+            diagnosticPriceUpdates.push({
+              id: matched.id,
+              originalPrice: matchedPrice,
+              approvedPrice: invoicePrice,
+            });
+          }
 
           unmatchedDiagnostics.splice(
             matchIndex,
@@ -1106,6 +1120,46 @@ export async function processBillingPayment(input: {
           };
         }
 
+        // Persist approved prices for previously unpriced diagnostic
+        // orders so the queue, invoice, and clinical order agree.
+        for (const priceUpdate of diagnosticPriceUpdates) {
+          const { error: approvedPriceError } = await supabaseServer
+            .from("diagnostic_orders")
+            .update({ price: priceUpdate.approvedPrice })
+            .eq("id", priceUpdate.id)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_test");
+
+          if (approvedPriceError) {
+            console.error("Diagnostic approved-price update failed:", approvedPriceError);
+            await supabaseServer
+              .from("diagnostic_orders")
+              .update({ status: "ordered" })
+              .in("id", diagnosticIdsToUnlock)
+              .eq("patient_id", patient.id)
+              .eq("status", "ready_for_test");
+            for (const rollback of diagnosticPriceUpdates) {
+              await supabaseServer
+                .from("diagnostic_orders")
+                .update({ price: rollback.originalPrice })
+                .eq("id", rollback.id)
+                .eq("patient_id", patient.id);
+            }
+            if (prescriptionIdsToUnlock.length > 0) {
+              await supabaseServer
+                .from("prescriptions")
+                .update({ status: "pending_payment" })
+                .in("id", prescriptionIdsToUnlock)
+                .eq("status", "ready_for_dispensing");
+            }
+            return {
+              success: false,
+              message: "Payment could not be completed because the approved diagnostic price could not be saved.",
+              grandTotal,
+            };
+          }
+        }
+
         diagnosticsUnlocked =
           diagnosticIdsToUnlock.length;
       }
@@ -1174,6 +1228,16 @@ export async function processBillingPayment(input: {
             "status",
             "ready_for_test"
           );
+      }
+
+      // If the final invoice transition fails, restore any previously
+      // unpriced diagnostic order to its original price as well as status.
+      for (const priceUpdate of diagnosticPriceUpdates) {
+        await supabaseServer
+          .from("diagnostic_orders")
+          .update({ price: priceUpdate.originalPrice })
+          .eq("id", priceUpdate.id)
+          .eq("patient_id", patient.id);
       }
 
       return {
