@@ -79,9 +79,13 @@ begin
   returning id into v_vitals_id;
 
   -- Only expose the patient to the Doctor queue after vitals save succeeds.
+  -- Only move a patient forward when they are still waiting for triage.
+  -- This RPC is also callable from doctor workflows, so do not move an
+  -- in-consultation or otherwise progressed patient back into the queue.
   update public.patients
   set status = 'waiting_doctor'
-  where id = p_patient_id;
+  where id = p_patient_id
+    and status = 'waiting_triage';
 
   return v_vitals_id;
 end;
