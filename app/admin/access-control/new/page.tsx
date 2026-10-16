@@ -35,7 +35,8 @@ type StaffRole =
   | "RECEPTIONIST"
   | "LAB_SCIENTIST"
   | "OPTICIAN"
-  | "OPTOMETRIST";
+  | "OPTOMETRIST"
+  | "INVENTORY_MANAGER";
 
 type PermissionState =
   | "view_patient_records"
@@ -65,6 +66,7 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   LAB_SCIENTIST: "Laboratory Scientist",
   OPTICIAN: "Optician",
   OPTOMETRIST: "Optometrist",
+  INVENTORY_MANAGER: "Inventory Manager",
 };
 
 const ROLE_DEFAULTS: Record<StaffRole, Record<string, boolean>> = {
@@ -235,6 +237,24 @@ const ROLE_DEFAULTS: Record<StaffRole, Record<string, boolean>> = {
     edit_clinical_notes: true,
     order_diagnostics: true,
     view_lab_results: true,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: false,
+    system_configuration: false,
+    audit_log_access: false,
+    api_key_management: false,
+  },
+
+  INVENTORY_MANAGER: {
+    view_patient_records: false,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
     issue_prescriptions: false,
     controlled_substance_override: false,
     pharmacy_dispensing_approval: false,
@@ -502,6 +522,7 @@ export default function OnboardStaffPage() {
       LAB_SCIENTIST: "Laboratory",
       OPTICIAN: "Optical Services",
       OPTOMETRIST: "Optometry",
+      INVENTORY_MANAGER: "Inventory & Supplies",
     };
 
     setDepartment(departmentByRole[role]);
@@ -1017,6 +1038,11 @@ export default function OnboardStaffPage() {
                       "OPTOMETRIST",
                       Stethoscope,
                       "Eye examination and optometry access",
+                    ],
+                    [
+                      "INVENTORY_MANAGER",
+                      Package,
+                      "Inventory and stock management access",
                     ],
                     [
                       "IT_ADMIN",
