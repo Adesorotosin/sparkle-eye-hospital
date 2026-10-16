@@ -12,10 +12,10 @@ import {
   RefreshCw,
   Search,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
@@ -533,9 +533,14 @@ export default function ReceptionistPage() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur md:px-8">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
-              <Users className="h-5 w-5" />
-            </div>
+            <Image
+              src="/Logo.png"
+              alt="Sparkle Eye Specialist Hospital"
+              width={56}
+              height={46}
+              priority
+              className="h-11 w-14 shrink-0 object-contain"
+            />
 
             <div>
               <h1 className="text-xl font-extrabold tracking-tight text-slate-950">
