@@ -6,7 +6,7 @@ import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
 
 export type HandoffDestination = "CASHIER" | "RECEPTIONIST";
-export type HandoffType = "TREATMENT_PLAN" | "PROCEDURE" | "FOLLOW_UP";
+export type HandoffType = "TREATMENT_PLAN" | "PROCEDURE" | "FOLLOW_UP" | "PRICING_REVIEW";
 export type HandoffStatus = "pending" | "acknowledged" | "completed" | "cancelled";
 
 export type ClinicalHandoff = {
@@ -74,13 +74,13 @@ export async function createClinicalHandoff(input: {
     if (!["CASHIER", "RECEPTIONIST"].includes(input.destination)) {
       return { success: false, message: "Choose a valid receiving department." };
     }
-    if (!["TREATMENT_PLAN", "PROCEDURE", "FOLLOW_UP"].includes(input.handoffType)) {
+    if (!["TREATMENT_PLAN", "PROCEDURE", "FOLLOW_UP", "PRICING_REVIEW"].includes(input.handoffType)) {
       return { success: false, message: "Choose a valid request type." };
     }
-    if (input.handoffType === "TREATMENT_PLAN" && input.destination !== "CASHIER") {
+    if ((input.handoffType === "TREATMENT_PLAN" || input.handoffType === "PRICING_REVIEW") && input.destination !== "CASHIER") {
       return { success: false, message: "Treatment plans must be routed to the Cashier." };
     }
-    if (input.handoffType !== "TREATMENT_PLAN" && input.destination !== "RECEPTIONIST") {
+    if (input.handoffType !== "TREATMENT_PLAN" && input.handoffType !== "PRICING_REVIEW" && input.destination !== "RECEPTIONIST") {
       return { success: false, message: "Procedure and follow-up requests must be routed to Reception." };
     }
 
