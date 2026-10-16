@@ -523,6 +523,7 @@ export async function createPharmacyPrescription(
       );
 
     const {
+      data: invoiceItem,
       error: invoiceItemError,
     } =
       await supabaseServer
@@ -534,9 +535,11 @@ export async function createPharmacyPrescription(
           quantity,
           unit_price: pricePerUnit,
           total_price: totalPrice,
-        });
+        })
+        .select("id")
+        .single();
 
-    if (invoiceItemError) {
+    if (invoiceItemError || !invoiceItem) {
       console.error(
         "Pharmacy invoice item creation failed:",
         invoiceItemError
@@ -551,6 +554,22 @@ export async function createPharmacyPrescription(
         success: false,
         message:
           "The medication could not be added to the patient's bill.",
+      };
+    }
+
+    const { error: prescriptionLinkError } = await supabaseServer
+      .from("prescriptions")
+      .update({ invoice_item_id: invoiceItem.id })
+      .eq("id", prescription.id)
+      .eq("patient_id", patient.id);
+
+    if (prescriptionLinkError) {
+      console.error("Prescription-to-invoice link failed:", prescriptionLinkError);
+      await supabaseServer.from("invoice_items").delete().eq("id", invoiceItem.id);
+      await supabaseServer.from("prescriptions").delete().eq("id", prescription.id);
+      return {
+        success: false,
+        message: "The medication could not be securely linked to the patient's bill. Please retry.",
       };
     }
 
