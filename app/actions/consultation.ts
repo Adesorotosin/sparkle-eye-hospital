@@ -14,6 +14,9 @@ export interface ConsultationFormData {
   pastMedicalHistory: string;
   pastOcularHistory: string;
   familyOcularHistory: string;
+  historyProforma?: Record<string, { selected: string[]; notes: string }>;
+  refractionNotes?: string;
+  lensType?: string;
 
   ocularExamOD: string;
   ocularExamOS: string;
@@ -143,6 +146,10 @@ export async function saveConsultationEncounter(
 
       family_ocular_history:
         formData.familyOcularHistory.trim() || null,
+
+      history_proforma: formData.historyProforma ?? {},
+      refraction_notes: formData.refractionNotes?.trim() || null,
+      lens_type: formData.lensType?.trim() || null,
 
       ocular_exam_od:
         formData.ocularExamOD.trim() || null,
