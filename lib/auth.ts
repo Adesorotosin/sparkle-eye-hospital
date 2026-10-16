@@ -13,6 +13,7 @@ export const ROLE_REDIRECT_MAP: Record<string, string> = {
   LAB_SCIENTIST: "/laboratory",
   OPTICIAN: "/optician",
   OPTOMETRIST: "/optometry",
+  INVENTORY_MANAGER: "/inventory",
 };
 
 export type UserRole =
@@ -25,7 +26,8 @@ export type UserRole =
   | "RECEPTIONIST"
   | "LAB_SCIENTIST"
   | "OPTICIAN"
-  | "OPTOMETRIST";
+  | "OPTOMETRIST"
+  | "INVENTORY_MANAGER";
 
 export async function authenticateStaff(
   username: string,

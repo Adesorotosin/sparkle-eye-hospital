@@ -20,6 +20,7 @@ const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
   LAB_SCIENTIST: "/laboratory",
   OPTICIAN: "/optician",
   OPTOMETRIST: "/optometry",
+  INVENTORY_MANAGER: "/inventory",
 };
 
 function normalizeRole(role: unknown): string {
