@@ -342,6 +342,8 @@ export default function DoctorEncounterPage() {
   const [followUpUnit, setFollowUpUnit] = useState<"days" | "months">("days");
   const [followUpTime, setFollowUpTime] = useState("");
   const [followUpNotes, setFollowUpNotes] = useState("");
+  const [procedureName, setProcedureName] = useState("");
+  const [procedureDetails, setProcedureDetails] = useState("");
   const [ocularExamOD, setOcularExamOD] = useState("");
   const [ocularExamOS, setOcularExamOS] = useState("");
   const [slitLampOD, setSlitLampOD] = useState("");
@@ -826,6 +828,7 @@ export default function DoctorEncounterPage() {
               ["diagnosis", "Diagnosis"],
               ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
               ["appointment", "Appointment"],
@@ -1198,6 +1201,15 @@ export default function DoctorEncounterPage() {
                 </button>
               </div>
             </div>
+          </Section>
+
+          <Section id="procedure-request" title="Procedure request" icon={<Calendar className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Send a procedure request to Reception for registration, pricing confirmation and scheduling. Do not enter an unapproved price here.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Procedure requested" value={procedureName} onChange={setProcedureName} rows={2} placeholder="Enter the procedure name" />
+              <Field label="Clinical instructions / indication" value={procedureDetails} onChange={setProcedureDetails} rows={2} placeholder="Document the clinical indication and relevant instructions." />
+            </div>
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: procedureName.trim(), details: procedureDetails.trim() || "Please review and arrange this procedure request." })} disabled={isPending || !procedureName.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send procedure to Reception"}</button></div>
           </Section>
 
           <Section id="requests" title="Clinical requests" icon={<Send className="h-5 w-5" />}>
