@@ -668,6 +668,42 @@ export default function DoctorEncounterPage() {
     setError("");
 
     startTransition(async () => {
+      // Persist the current clinical notes before handing the optical
+      // order to Optician, so lens type and refraction notes survive a
+      // refresh even when the doctor has not clicked Save separately.
+      const saved = await saveConsultationEncounter({
+        patientId: patientCode,
+        encounterId,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
+        historyProforma,
+        refractionNotes,
+        lensType,
+        ocularExamOD: JSON.stringify(ocularExamODRows),
+        ocularExamOS: JSON.stringify(ocularExamOSRows),
+        slitLampOD: "",
+        slitLampOS: "",
+        otherExaminationFindings: otherFindings,
+        iopOD: iopOD.trim() ? Number(iopOD) : null,
+        iopOS: iopOS.trim() ? Number(iopOS) : null,
+        iopInstrument,
+        refractionOD,
+        refractionOS,
+        diagnosis,
+        treatmentPlan,
+        status: "draft",
+      });
+
+      if (!saved.success || !saved.encounterId) {
+        setError(saved.message || "Save the consultation notes before sending the optical order.");
+        setRequesting("");
+        return;
+      }
+
+      setEncounterId(saved.encounterId);
       const response = await createOpticalOrder(patientCode, { lensType, refractionNotes });
       if (!response.success) {
         setError(response.message);
