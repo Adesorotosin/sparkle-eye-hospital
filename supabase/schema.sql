@@ -248,114 +248,121 @@ create index idx_appointments_time on appointments(start_time);
 create index idx_notifications_created on notifications(created_at);
 
 -- ============================================================
--- PHARMACY DISPENSING
--- Atomically dispenses all paid/ready prescriptions for a patient.
--- Stock is deducted only when sufficient pharmacy inventory exists.
--- ============================================================
+-- Pharmacy dispensing must update the shared inventory movement ledger in the same
+-- transaction as the stock deduction and prescription status change.
+DROP FUNCTION IF EXISTS public.dispense_patient_prescriptions(uuid);
 
-create or replace function public.dispense_patient_prescriptions(
-  p_patient_id uuid
+CREATE OR REPLACE FUNCTION public.dispense_patient_prescriptions(
+  p_patient_id uuid,
+  p_performed_by uuid,
+  p_performed_by_name text
 )
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
   prescription_record record;
   inventory_record record;
   dispensed_count integer := 0;
   total_quantity integer := 0;
   prescription_ids uuid[] := '{}';
-begin
-  if p_patient_id is null then
-    raise exception 'Patient ID is required.';
-  end if;
+  v_new_stock integer;
+BEGIN
+  IF p_patient_id IS NULL THEN
+    RAISE EXCEPTION 'Patient ID is required.';
+  END IF;
+  IF p_performed_by IS NULL OR NULLIF(trim(p_performed_by_name), '') IS NULL THEN
+    RAISE EXCEPTION 'Dispensing staff identity is required.';
+  END IF;
 
-  /*
-   * Only prescriptions that have been unlocked by payment
-   * can be dispensed.
-   */
-  if not exists (
-    select 1
-    from prescriptions
-    where patient_id = p_patient_id
-      and status = 'ready_for_dispensing'
-  ) then
-    raise exception 'No prescriptions are ready for dispensing.';
-  end if;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.prescriptions
+    WHERE patient_id = p_patient_id
+      AND status = 'ready_for_dispensing'
+  ) THEN
+    RAISE EXCEPTION 'No prescriptions are ready for dispensing.';
+  END IF;
 
-  /*
-   * Lock the patient's ready prescriptions and process them
-   * in creation order. The row locks prevent two concurrent
-   * dispensing attempts from consuming the same prescription.
-   */
-  for prescription_record in
-    select id, drug_name, quantity
-    from prescriptions
-    where patient_id = p_patient_id
-      and status = 'ready_for_dispensing'
-    order by created_at asc
-    for update
-  loop
-    /*
-     * Match the prescribed drug to pharmacy inventory.
-     * Matching is case-insensitive and ignores surrounding whitespace.
-     */
-    select id, name, stock
-    into inventory_record
-    from inventory_items
-    where domain = 'pharmacy'
-      and lower(trim(name)) = lower(trim(prescription_record.drug_name))
-    order by created_at asc
-    limit 1
-    for update;
+  -- Lock prescriptions so concurrent requests cannot dispense them twice.
+  FOR prescription_record IN
+    SELECT id, drug_name, quantity
+    FROM public.prescriptions
+    WHERE patient_id = p_patient_id
+      AND status = 'ready_for_dispensing'
+    ORDER BY created_at ASC, id ASC
+    FOR UPDATE
+  LOOP
+    -- Lock the matching active stock row to serialize competing stock deductions.
+    SELECT id, name, stock, unit_cost, unit_of_measure
+    INTO inventory_record
+    FROM public.inventory_items
+    WHERE domain = 'pharmacy'
+      AND is_active = true
+      AND lower(trim(name)) = lower(trim(prescription_record.drug_name))
+    ORDER BY created_at ASC, id ASC
+    LIMIT 1
+    FOR UPDATE;
 
-    if not found then
-      raise exception 'Pharmacy stock item not found for medication: %',
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Active pharmacy stock item not found for medication: %',
         prescription_record.drug_name;
-    end if;
+    END IF;
 
-    if inventory_record.stock < prescription_record.quantity then
-      raise exception 'Insufficient stock for %: % available, % required.',
+    IF inventory_record.stock < prescription_record.quantity THEN
+      RAISE EXCEPTION 'Insufficient stock for %: % available, % required.',
         inventory_record.name,
         inventory_record.stock,
         prescription_record.quantity;
-    end if;
+    END IF;
 
-    update inventory_items
-    set stock = stock - prescription_record.quantity,
+    v_new_stock := inventory_record.stock - prescription_record.quantity;
+
+    UPDATE public.inventory_items
+    SET stock = v_new_stock,
         updated_at = now()
-    where id = inventory_record.id;
+    WHERE id = inventory_record.id;
 
-    update prescriptions
-    set status = 'dispensed'
-    where id = prescription_record.id;
+    UPDATE public.prescriptions
+    SET status = 'dispensed'
+    WHERE id = prescription_record.id
+      AND status = 'ready_for_dispensing';
 
-    prescription_ids := array_append(
-      prescription_ids,
-      prescription_record.id
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Prescription % is no longer ready for dispensing.',
+        prescription_record.id;
+    END IF;
+
+    INSERT INTO public.inventory_movements (
+      item_id, movement_type, quantity, previous_stock, new_stock,
+      unit_cost, department, reference, notes, performed_by, performed_by_name
+    ) VALUES (
+      inventory_record.id, 'SALE', prescription_record.quantity,
+      inventory_record.stock, v_new_stock, inventory_record.unit_cost,
+      'Pharmacy', prescription_record.id::text,
+      'Dispensed for patient ' || p_patient_id::text,
+      p_performed_by, trim(p_performed_by_name)
     );
+
+    prescription_ids := array_append(prescription_ids, prescription_record.id);
     dispensed_count := dispensed_count + 1;
     total_quantity := total_quantity + prescription_record.quantity;
-  end loop;
+  END LOOP;
 
-  return jsonb_build_object(
+  RETURN jsonb_build_object(
     'dispensed_count', dispensed_count,
     'total_quantity', total_quantity,
     'prescription_ids', prescription_ids
   );
-end;
-$;
+END;
+$$;
 
--- This function is intentionally callable only by the server-side
--- Supabase service role. It must not be directly executable by
--- browser clients.
-revoke execute on function public.dispense_patient_prescriptions(uuid)
-from public, anon, authenticated;
-
-grant execute on function public.dispense_patient_prescriptions(uuid)
-to service_role;
+REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, text)
+  TO service_role;
 
 -- ============================================================
 -- Row Level Security
