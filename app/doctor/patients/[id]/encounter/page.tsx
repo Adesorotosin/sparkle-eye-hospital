@@ -1206,8 +1206,11 @@ export default function DoctorEncounterPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700"><CheckCircle2 className="h-4 w-4" /> Optometry assessment completed</span>
+                    <div className="mt-4 flex flex-col items-start">
+                      <span className="inline-flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span>Optometry assessment completed</span>
+                      </span>
                       <button type="button" onClick={async () => {
                         setRequesting("refresh-optometry");
                         setError("");
@@ -1221,7 +1224,7 @@ export default function DoctorEncounterPage() {
                         } finally {
                           setRequesting("");
                         }
-                      }} disabled={requesting === "refresh-optometry"} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                      }} disabled={requesting === "refresh-optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
                         {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
                         Refresh Optometry results
                       </button>
