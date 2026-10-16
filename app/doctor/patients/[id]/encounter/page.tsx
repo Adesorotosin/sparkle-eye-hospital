@@ -1201,26 +1201,50 @@ export default function DoctorEncounterPage() {
                   </div>
                   {refractionComplete && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {[["OD", refractionOD, setRefractionOD], ["OS", refractionOS, setRefractionOS]].map(([eye, value, setter]) => {
-                    const v = value as Refraction;
-                    const setV = setter as React.Dispatch<React.SetStateAction<Refraction>>;
-                    return (
-                      <div key={eye as string} className="rounded-xl border p-4">
-                        <p className="mb-3 text-sm font-semibold">{eye as string}</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          <input placeholder="Sphere" value={v.sphere} onChange={(e) => setV((x) => ({ ...x, sphere: e.target.value }))} className={inputClass} />
-                          <input placeholder="Cylinder" value={v.cylinder} onChange={(e) => setV((x) => ({ ...x, cylinder: e.target.value }))} className={inputClass} />
-                          <input placeholder="Axis" value={v.axis} onChange={(e) => setV((x) => ({ ...x, axis: e.target.value }))} className={inputClass} />
+                {optometryAssessmentCompleted && completedOptometryEncounter ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        { eye: "OD", result: completedOptometryEncounter.refractionOD },
+                        { eye: "OS", result: completedOptometryEncounter.refractionOS },
+                      ].map(({ eye, result }) => (
+                        <div key={eye} className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                          <p className="mb-3 text-sm font-semibold">{eye} — {eye === "OD" ? "Right eye" : "Left eye"}</p>
+                          <p className="text-sm"><strong>Objective:</strong> {formatOptometryRefraction(result, "objective")}</p>
+                          <p className="mt-2 text-sm"><strong>Subjective:</strong> {formatOptometryRefraction(result, "subjective")}</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Send Refraction Request to Optometrist
-                </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-700"><CheckCircle2 className="h-4 w-4" /> Optometry assessment completed</span>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage("Optometry results refreshed.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 p-4">
+                    <p className="text-sm text-gray-600">No completed Optometry refraction result is available yet. OD and OS will populate automatically when the Optometrist saves and completes the assessment.</p>
+                    <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                      {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Send Refraction Request to Optometrist
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
