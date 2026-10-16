@@ -277,7 +277,7 @@ function BillingContent() {
       });
 
       try {
-        localStorage.clear();
+        localStorage.removeItem("sparkle_staff_token");
         sessionStorage.clear();
       } catch {}
 
