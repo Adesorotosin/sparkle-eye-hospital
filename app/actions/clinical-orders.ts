@@ -131,6 +131,34 @@ export async function createDiagnosticOrder(
       };
     }
 
+    if (price === 0) {
+      const { error: pricingHandoffError } = await supabaseServer
+        .from("clinical_handoffs")
+        .insert({
+          patient_id: patient.id,
+          destination: "CASHIER",
+          handoff_type: "PRICING_REVIEW",
+          title: "Pricing review required: " + name,
+          details: "An investigation order was created for " + name + ", but no approved price is configured. Add the approved investigation charge before billing; do not treat this as a free test. Order ID: " + diagnostic.id,
+          requested_by: staff.id,
+        });
+      if (pricingHandoffError) {
+        console.error("Investigation pricing-review handoff failed:", pricingHandoffError);
+        return { success: false, message: "Investigation order was created, but its pricing-review request could not be sent to Cashier. Refresh the patient record and notify the administrator; do not retry blindly.", id: diagnostic.id };
+      }
+      await logActivity({
+        module: "Diagnostics", category: "CLINICAL",
+        action: "Investigation sent for pricing review: " + name,
+        performedBy: staff.name, staffId: staff.id, patientId: patient.id,
+        details: JSON.stringify({ diagnosticOrderId: diagnostic.id, testName: name, pricePending: true }),
+      });
+      revalidatePath("/diagnostics");
+      revalidatePath("/billing");
+      revalidatePath("/cashier");
+      revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
+      return { success: true, message: name + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: diagnostic.id };
+    }
+
     /*
      * Get the patient's active invoice. The diagnostic row already exists,
      * so preserve its ID if billing setup fails; the UI can refresh and
