@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Activity,
