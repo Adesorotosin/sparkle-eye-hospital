@@ -25,6 +25,7 @@ import {
   X,
   UserPlus,
   Boxes,
+  LogOut,
 } from "lucide-react";
 
 import {
@@ -1154,21 +1155,21 @@ function PharmacyContent() {
 
   const handleLogout = async () => {
     try {
-      if (
-        typeof window !==
-        "undefined"
-      ) {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        console.error("Logout request failed:", response.status);
+      }
+    } catch (error) {
+      console.error("Logout request error:", error);
+    } finally {
+      if (typeof window !== "undefined") {
         localStorage.clear();
         sessionStorage.clear();
+        window.location.href = "/";
       }
-
-      router.push("/");
-      router.refresh();
-    } catch (error) {
-      console.error(
-        "Logout error:",
-        error
-      );
     }
   };
 
@@ -1447,11 +1448,20 @@ function PharmacyContent() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-              <span className="w-2 h-2 rounded-full bg-purple-600" />
-              <span>
-                Terminal active — Gate 4
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                <span>Terminal active — Gate 4</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-rose-600"
+                aria-label="Log out of the pharmacy module"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </button>
             </div>
           </header>
 
@@ -1981,14 +1991,20 @@ function PharmacyContent() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-
-            <span className="w-2 h-2 rounded-full bg-purple-600" />
-
-            <span>
-              Terminal active — Gate 4
-            </span>
-
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+              <span className="w-2 h-2 rounded-full bg-purple-600" />
+              <span>Terminal active — Gate 4</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-rose-600"
+              aria-label="Log out of the pharmacy module"
+            >
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
           </div>
 
         </header>
