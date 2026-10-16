@@ -11,8 +11,7 @@ export type BillingPaymentMethod =
   | "cash"
   | "pos"
   | "transfer"
-  | "card"
-  | "hmo";
+  | "card";
 
 export type DiscountType = "fixed" | "percentage";
 
@@ -508,7 +507,6 @@ export async function processBillingPayment(input: {
       "pos",
       "transfer",
       "card",
-      "hmo",
     ];
 
     if (
