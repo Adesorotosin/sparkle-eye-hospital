@@ -162,6 +162,11 @@ create table invoice_items (
   total_price numeric not null
 );
 
+-- Exact invoice line linked to each pharmacy prescription for payment enforcement.
+alter table public.prescriptions
+  add column if not exists invoice_item_id uuid
+  references public.invoice_items(id) on delete set null;
+
 create table activity_logs (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid references patients(id) on delete cascade,
@@ -288,13 +293,30 @@ BEGIN
 
   -- Lock prescriptions so concurrent requests cannot dispense them twice.
   FOR prescription_record IN
-    SELECT id, drug_name, quantity
+    SELECT id, drug_name, quantity, invoice_item_id, price_per_unit
     FROM public.prescriptions
     WHERE patient_id = p_patient_id
       AND status = 'ready_for_dispensing'
     ORDER BY created_at ASC, id ASC
     FOR UPDATE
   LOOP
+    -- Dispensing is allowed only for a prescription linked to its own paid invoice item.
+    IF prescription_record.invoice_item_id IS NULL OR NOT EXISTS (
+      SELECT 1
+      FROM public.invoice_items ii
+      JOIN public.invoices i ON i.id = ii.invoice_id
+      WHERE ii.id = prescription_record.invoice_item_id
+        AND ii.category = 'pharmacy'
+        AND i.patient_id = p_patient_id
+        AND i.status = 'paid'
+        AND lower(trim(ii.name)) = lower(trim(prescription_record.drug_name))
+        AND ii.quantity = prescription_record.quantity
+        AND ii.unit_price = prescription_record.price_per_unit
+    ) THEN
+      RAISE EXCEPTION 'Prescription % is not linked to a paid invoice item. Complete payment before dispensing.',
+        prescription_record.id;
+    END IF;
+
     -- Lock the matching active stock row to serialize competing stock deductions.
     SELECT id, name, stock, unit_cost, unit_of_measure
     INTO inventory_record
