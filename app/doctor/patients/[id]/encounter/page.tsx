@@ -1230,10 +1230,29 @@ export default function DoctorEncounterPage() {
                 ) : (
                   <div className="rounded-xl border border-dashed border-gray-300 p-4">
                     <p className="text-sm text-gray-600">No completed Optometry refraction result is available yet. OD and OS will populate automatically when the Optometrist saves and completes the assessment.</p>
-                    <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                      {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Send Refraction Request to Optometrist
-                    </button>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                        {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Send Refraction Request to Optometrist
+                      </button>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage(result.patient?.previousOptometryEncounter?.status === "completed" ? "Completed Optometry results loaded." : "No completed Optometry result is available yet.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
