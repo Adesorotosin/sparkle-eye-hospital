@@ -196,7 +196,7 @@ export default function InventoryPage() {
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span><button onClick={() => setError("")} className="ml-auto"><X className="h-4 w-4" /></button></div>}
         {notice && <div role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" /><span>{notice}</span><button onClick={() => setNotice("")} className="ml-auto"><X className="h-4 w-4" /></button></div>}
-        {!loading && error.includes("migration") && <p className="text-xs text-slate-500">Before using this page, apply <code>supabase/migrations/20261013000000_shared_inventory_module.sql</code> in the project’s Supabase SQL editor.</p>}
+        {!loading && error.includes("migration") && <p className="text-xs text-slate-500">The inventory database setup or permissions may be incomplete. Ask an administrator to verify the approved inventory migrations and access controls before making stock changes.</p>}
 
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
