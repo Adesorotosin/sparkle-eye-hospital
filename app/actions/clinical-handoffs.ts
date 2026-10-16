@@ -232,7 +232,7 @@ export async function getClinicalHandoffs(destination: HandoffDestination) {
       return {
         success: false,
         requests: [] as ClinicalHandoff[],
-        message: "The doctor-request inbox is not configured in the database yet. Apply migration 20261014010000_clinical_handoffs.sql in Supabase, then refresh this page.",
+        message: "The doctor-request inbox is not configured in the database yet. Apply migration 20261016100000_restore_doctor_proforma_and_handoffs.sql in the approved development database, then refresh this page.",
       };
     }
     if (code === "42501") {
