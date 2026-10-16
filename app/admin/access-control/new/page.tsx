@@ -18,6 +18,7 @@ import {
   CreditCard,
   Calendar,
   Pill,
+  Package,
   Copy,
   Check,
   Loader2,
