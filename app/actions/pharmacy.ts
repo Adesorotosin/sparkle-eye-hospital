@@ -688,6 +688,7 @@ export async function dispensePatientPrescriptions(patientCode: string) {
     });
 
     revalidatePath("/pharmacy");
+    revalidatePath("/inventory");
 
     return {
       success: true,
