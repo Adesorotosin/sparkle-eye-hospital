@@ -476,7 +476,8 @@ export async function getOpticianQueue(): Promise<{
  * Optometry → Doctor review → Optician
  */
 export async function createOpticalOrder(
-  patientCode: string
+  patientCode: string,
+  instructions: { lensType?: string; refractionNotes?: string } = {}
 ): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole([
@@ -594,12 +595,20 @@ export async function createOpticalOrder(
     }
 
     if (existingOrder) {
+      const orderUpdates: Record<string, string> = {};
+      if (instructions.lensType?.trim()) orderUpdates.lens_type = instructions.lensType.trim();
+      if (instructions.refractionNotes?.trim()) orderUpdates.dispensing_notes = instructions.refractionNotes.trim();
+      if (Object.keys(orderUpdates).length > 0) {
+        const { error: updateOrderError } = await supabaseServer
+          .from("optical_orders")
+          .update({ ...orderUpdates, updated_at: new Date().toISOString() })
+          .eq("id", existingOrder.id);
+        if (updateOrderError) throw updateOrderError;
+      }
       return {
         success: true,
-        message:
-          "This patient already has an active Optical Order.",
-        orderId:
-          existingOrder.id,
+        message: "This patient already has an active Optical Order. The latest lens instructions have been saved.",
+        orderId: existingOrder.id,
       };
     }
 
@@ -617,6 +626,9 @@ export async function createOpticalOrder(
 
         status:
           "referred",
+
+        lens_type: instructions.lensType?.trim() || null,
+        dispensing_notes: instructions.refractionNotes?.trim() || null,
 
         referred_at:
           new Date().toISOString(),
