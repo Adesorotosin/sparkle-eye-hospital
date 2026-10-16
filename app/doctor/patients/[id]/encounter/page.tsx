@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Activity,
@@ -338,6 +338,8 @@ export default function DoctorEncounterPage() {
   const [refractionNotes, setRefractionNotes] = useState("");
   const [lensType, setLensType] = useState("");
   const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [supplierContacts, setSupplierContacts] = useState<Array<{ name: string; phone: string }>>([]);
   const [followUpInterval, setFollowUpInterval] = useState("7");
   const [followUpUnit, setFollowUpUnit] = useState<"days" | "months">("days");
   const [followUpTime, setFollowUpTime] = useState("");
@@ -370,6 +372,18 @@ export default function DoctorEncounterPage() {
   const latestEncounter = patient?.encounters?.[0];
   const optometryAssessmentCompleted =
     optometryResult?.previousOptometryEncounter?.status === "completed";
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("sparkle-eye-supplier-contacts");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setSupplierContacts(parsed.filter((item) => item && typeof item.name === "string" && typeof item.phone === "string"));
+      }
+    } catch {
+      // Supplier shortcuts are optional; manual entry remains available.
+    }
+  }, []);
 
   useEffect(() => {
     if (!patientCode) return;
@@ -760,6 +774,23 @@ export default function DoctorEncounterPage() {
     }));
   };
 
+  const saveSupplierContact = () => {
+    const name = supplierName.trim();
+    const phone = supplierWhatsApp.replace(/\D/g, "");
+    if (!name) { setError("Enter a supplier name before saving this contact."); return; }
+    if (!phone) { setError("Enter the supplier WhatsApp number, including country code."); return; }
+    const updated = [...supplierContacts.filter((contact) => contact.phone !== phone), { name, phone }];
+    setSupplierContacts(updated);
+    try {
+      window.localStorage.setItem("sparkle-eye-supplier-contacts", JSON.stringify(updated));
+    } catch {
+      setError("Supplier contact could not be saved in this browser. You can still use the number for this message.");
+      return;
+    }
+    setMessage(`Supplier contact saved: ${name}.`);
+    setError("");
+  };
+
   const sendSupplierWhatsApp = () => {
     const phone = supplierWhatsApp.replace(/\D/g, "");
     if (!phone) { setError("Enter the supplier's WhatsApp number, including country code."); return; }
@@ -767,10 +798,10 @@ export default function DoctorEncounterPage() {
       "Sparkle Eye Hospital — Lens Order",
       `Patient reference: ${patient?.patientId ?? patientCode}`,
       `Lens type: ${lensType || "To be confirmed"}`,
-      `OD objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "objective") : [refractionOD.sphere, refractionOD.cylinder, refractionOD.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
-      `OD subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
-      `OS objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "objective") : [refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
-      `OS subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
+      `OD objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "objective") : "Not recorded"}`,
+      `OD subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
+      `OS objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "objective") : "Not recorded"}`,
+      `OS subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
       `Notes: ${refractionNotes || "None"}`,
       "Please confirm availability and quotation before processing.",
     ].join("\n");
@@ -789,18 +820,9 @@ export default function DoctorEncounterPage() {
     });
   };
 
-  const refractionComplete = useMemo(
-    () =>
-      Boolean(
-        refractionOD.sphere ||
-          refractionOD.cylinder ||
-          refractionOD.axis ||
-          refractionOS.sphere ||
-          refractionOS.cylinder ||
-          refractionOS.axis
-      ),
-    [refractionOD, refractionOS]
-  );
+  const completedOptometryEncounter = optometryAssessmentCompleted
+    ? optometryResult?.previousOptometryEncounter ?? null
+    : null;
 
   if (loading) {
     return (
@@ -1127,9 +1149,29 @@ export default function DoctorEncounterPage() {
               <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Send prescription to Optician"}</button>
               {!optometryAssessmentCompleted && <p className="self-center text-xs text-amber-700">The Optometrist must complete the refraction assessment before an optical order can be created.</p>}
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <Field label="Supplier WhatsApp number (include country code)" value={supplierWhatsApp} onChange={setSupplierWhatsApp} rows={1} placeholder="e.g. 2348012345678" />
-              <button type="button" onClick={sendSupplierWhatsApp} className="rounded-xl border border-green-300 px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+            <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <label htmlFor="saved-supplier" className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</label>
+                <select id="saved-supplier" value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass + " min-h-11"}>
+                  <option value="">Enter a new supplier below</option>
+                  {supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="supplier-name" className="mb-2 block text-sm font-medium text-gray-700">Supplier name</label>
+                  <input id="supplier-name" type="text" autoComplete="organization" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. Preferred lens supplier" className={inputClass + " h-11"} />
+                </div>
+                <div>
+                  <label htmlFor="supplier-whatsapp" className="mb-2 block text-sm font-medium text-gray-700">Supplier WhatsApp number (include country code)</label>
+                  <input id="supplier-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={supplierWhatsApp} onChange={(event) => setSupplierWhatsApp(event.target.value)} placeholder="e.g. 2348012345678" className={inputClass + " h-11"} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={saveSupplierContact} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button>
+                <button type="button" onClick={sendSupplierWhatsApp} className="min-h-11 rounded-xl border border-green-300 bg-white px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+              </div>
+              <p className="text-xs text-gray-600">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
             </div>
           </Section>
 
@@ -1146,30 +1188,76 @@ export default function DoctorEncounterPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold">Refraction → Optometrist</h3>
-                    <p className="text-xs text-gray-500">Send the patient to Optometry for formal refraction.</p>
+                    <p className="text-xs text-gray-500">Completed refraction results return here automatically from the Optometry assessment.</p>
                   </div>
-                  {refractionComplete && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                  {optometryAssessmentCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {[["OD", refractionOD, setRefractionOD], ["OS", refractionOS, setRefractionOS]].map(([eye, value, setter]) => {
-                    const v = value as Refraction;
-                    const setV = setter as React.Dispatch<React.SetStateAction<Refraction>>;
-                    return (
-                      <div key={eye as string} className="rounded-xl border p-4">
-                        <p className="mb-3 text-sm font-semibold">{eye as string}</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          <input placeholder="Sphere" value={v.sphere} onChange={(e) => setV((x) => ({ ...x, sphere: e.target.value }))} className={inputClass} />
-                          <input placeholder="Cylinder" value={v.cylinder} onChange={(e) => setV((x) => ({ ...x, cylinder: e.target.value }))} className={inputClass} />
-                          <input placeholder="Axis" value={v.axis} onChange={(e) => setV((x) => ({ ...x, axis: e.target.value }))} className={inputClass} />
+                {optometryAssessmentCompleted && completedOptometryEncounter ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        { eye: "OD", result: completedOptometryEncounter.refractionOD },
+                        { eye: "OS", result: completedOptometryEncounter.refractionOS },
+                      ].map(({ eye, result }) => (
+                        <div key={eye} className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                          <p className="mb-3 text-sm font-semibold">{eye} — {eye === "OD" ? "Right eye" : "Left eye"}</p>
+                          <p className="text-sm"><strong>Objective:</strong> {formatOptometryRefraction(result, "objective")}</p>
+                          <p className="mt-2 text-sm"><strong>Subjective:</strong> {formatOptometryRefraction(result, "subjective")}</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Send Refraction Request to Optometrist
-                </button>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-col items-start">
+                      <span className="inline-flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span>Optometry assessment completed</span>
+                      </span>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage("Optometry results refreshed.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 p-4">
+                    <p className="text-sm text-gray-600">No completed Optometry refraction result is available yet. OD and OS will populate automatically when the Optometrist saves and completes the assessment.</p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                        {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Send Refraction Request to Optometrist
+                      </button>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage(result.patient?.previousOptometryEncounter?.status === "completed" ? "Completed Optometry results loaded." : "No completed Optometry result is available yet.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
