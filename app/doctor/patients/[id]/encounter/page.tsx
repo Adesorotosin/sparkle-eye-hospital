@@ -1158,13 +1158,30 @@ export default function DoctorEncounterPage() {
               <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Send prescription to Optician"}</button>
               {!optometryAssessmentCompleted && <p className="self-center text-xs text-amber-700">The Optometrist must complete the refraction assessment before an optical order can be created.</p>}
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2 md:items-end">
-              <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</span><select value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass}><option value="">Enter a new supplier below</option>{supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}</select></label>
-              <Field label="Supplier name" value={supplierName} onChange={setSupplierName} rows={1} placeholder="e.g. Preferred lens supplier" />
-              <Field label="Supplier WhatsApp number (include country code)" value={supplierWhatsApp} onChange={setSupplierWhatsApp} rows={1} placeholder="e.g. 2348012345678" />
-              <div className="flex flex-wrap items-end gap-2"><button type="button" onClick={saveSupplierContact} className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button><button type="button" onClick={sendSupplierWhatsApp} className="rounded-xl border border-green-300 px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button></div>
+            <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <label htmlFor="saved-supplier" className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</label>
+                <select id="saved-supplier" value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass + " min-h-11"}>
+                  <option value="">Enter a new supplier below</option>
+                  {supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="supplier-name" className="mb-2 block text-sm font-medium text-gray-700">Supplier name</label>
+                  <input id="supplier-name" type="text" autoComplete="organization" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. Preferred lens supplier" className={inputClass + " h-11"} />
+                </div>
+                <div>
+                  <label htmlFor="supplier-whatsapp" className="mb-2 block text-sm font-medium text-gray-700">Supplier WhatsApp number (include country code)</label>
+                  <input id="supplier-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={supplierWhatsApp} onChange={(event) => setSupplierWhatsApp(event.target.value)} placeholder="e.g. 2348012345678" className={inputClass + " h-11"} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={saveSupplierContact} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button>
+                <button type="button" onClick={sendSupplierWhatsApp} className="min-h-11 rounded-xl border border-green-300 bg-white px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+              </div>
+              <p className="text-xs text-gray-600">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
             </div>
-            <p className="mt-2 text-xs text-gray-500">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
           </Section>
 
           <Section id="diagnosis" title="Diagnosis" icon={<Hospital className="h-5 w-5" />}>
