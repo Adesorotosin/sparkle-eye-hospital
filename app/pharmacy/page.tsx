@@ -1155,7 +1155,13 @@ function PharmacyContent() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        console.error("Logout request failed:", response.status);
+      }
     } catch (error) {
       console.error("Logout request error:", error);
     } finally {
