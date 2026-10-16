@@ -664,6 +664,8 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       "dispense_patient_prescriptions",
       {
         p_patient_id: patient.id,
+        p_performed_by: staff.id,
+        p_performed_by_name: staff.name,
       }
     );
 
