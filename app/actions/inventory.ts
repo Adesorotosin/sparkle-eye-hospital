@@ -188,6 +188,17 @@ export async function receiveInventoryStock(input: {
     if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
       return { success: false, message: "Select an item and enter a whole-number quantity greater than zero." };
     }
+    const { data: itemForReceipt, error: itemForReceiptError } = await supabaseServer
+      .from("inventory_items")
+      .select("id, domain, is_active")
+      .eq("id", input.itemId)
+      .maybeSingle();
+    if (itemForReceiptError || !itemForReceipt || !itemForReceipt.is_active) {
+      return { success: false, message: "The selected inventory item is unavailable. Refresh inventory and try again." };
+    }
+    if (itemForReceipt.domain === "pharmacy" && staff.role !== "IT_ADMIN") {
+      return { success: false, message: "Only an IT administrator can receive pharmacy stock. Pharmacy stock must be replenished through the authorized stock-receiving process." };
+    }
     if (input.unitCost !== null && input.unitCost !== undefined && (!Number.isFinite(input.unitCost) || input.unitCost < 0)) {
       return { success: false, message: "Unit cost must be zero or greater." };
     }
@@ -229,6 +240,23 @@ export async function issueInventoryStock(input: {
     }
     const department = input.department?.trim();
     if (!department) return { success: false, message: "Choose the department receiving the stock." };
+
+    const { data: itemForIssue, error: itemForIssueError } = await supabaseServer
+      .from("inventory_items")
+      .select("id, domain, is_active")
+      .eq("id", input.itemId)
+      .maybeSingle();
+    if (itemForIssueError || !itemForIssue || !itemForIssue.is_active) {
+      return { success: false, message: "The selected inventory item is unavailable. Refresh inventory and try again." };
+    }
+    if (itemForIssue.domain === "pharmacy") {
+      if (staff.role !== "IT_ADMIN" && staff.role !== "INVENTORY_MANAGER") {
+        return { success: false, message: "Pharmacy medicines must be dispensed through the Pharmacy workflow. Contact an administrator for an authorized stock adjustment." };
+      }
+      if (!input.reference?.trim() || !input.notes?.trim()) {
+        return { success: false, message: "A reference and reason are required when issuing pharmacy stock outside the dispensing workflow." };
+      }
+    }
 
     const permittedDepartment: Record<string, string> = {
       OPTICIAN: "Optician",
