@@ -338,6 +338,8 @@ export default function DoctorEncounterPage() {
   const [refractionNotes, setRefractionNotes] = useState("");
   const [lensType, setLensType] = useState("");
   const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [supplierContacts, setSupplierContacts] = useState<Array<{ name: string; phone: string }>>([]);
   const [followUpInterval, setFollowUpInterval] = useState("7");
   const [followUpUnit, setFollowUpUnit] = useState<"days" | "months">("days");
   const [followUpTime, setFollowUpTime] = useState("");
@@ -370,6 +372,18 @@ export default function DoctorEncounterPage() {
   const latestEncounter = patient?.encounters?.[0];
   const optometryAssessmentCompleted =
     optometryResult?.previousOptometryEncounter?.status === "completed";
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("sparkle-eye-supplier-contacts");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setSupplierContacts(parsed.filter((item) => item && typeof item.name === "string" && typeof item.phone === "string"));
+      }
+    } catch {
+      // Supplier shortcuts are optional; manual entry remains available.
+    }
+  }, []);
 
   useEffect(() => {
     if (!patientCode) return;
@@ -760,6 +774,23 @@ export default function DoctorEncounterPage() {
     }));
   };
 
+  const saveSupplierContact = () => {
+    const name = supplierName.trim();
+    const phone = supplierWhatsApp.replace(/\D/g, "");
+    if (!name) { setError("Enter a supplier name before saving this contact."); return; }
+    if (!phone) { setError("Enter the supplier WhatsApp number, including country code."); return; }
+    const updated = [...supplierContacts.filter((contact) => contact.phone !== phone), { name, phone }];
+    setSupplierContacts(updated);
+    try {
+      window.localStorage.setItem("sparkle-eye-supplier-contacts", JSON.stringify(updated));
+    } catch {
+      setError("Supplier contact could not be saved in this browser. You can still use the number for this message.");
+      return;
+    }
+    setMessage(`Supplier contact saved: ${name}.`);
+    setError("");
+  };
+
   const sendSupplierWhatsApp = () => {
     const phone = supplierWhatsApp.replace(/\D/g, "");
     if (!phone) { setError("Enter the supplier's WhatsApp number, including country code."); return; }
@@ -1127,10 +1158,13 @@ export default function DoctorEncounterPage() {
               <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Send prescription to Optician"}</button>
               {!optometryAssessmentCompleted && <p className="self-center text-xs text-amber-700">The Optometrist must complete the refraction assessment before an optical order can be created.</p>}
             </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <div className="mt-5 grid gap-3 md:grid-cols-2 md:items-end">
+              <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</span><select value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass}><option value="">Enter a new supplier below</option>{supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}</select></label>
+              <Field label="Supplier name" value={supplierName} onChange={setSupplierName} rows={1} placeholder="e.g. Preferred lens supplier" />
               <Field label="Supplier WhatsApp number (include country code)" value={supplierWhatsApp} onChange={setSupplierWhatsApp} rows={1} placeholder="e.g. 2348012345678" />
-              <button type="button" onClick={sendSupplierWhatsApp} className="rounded-xl border border-green-300 px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+              <div className="flex flex-wrap items-end gap-2"><button type="button" onClick={saveSupplierContact} className="rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button><button type="button" onClick={sendSupplierWhatsApp} className="rounded-xl border border-green-300 px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button></div>
             </div>
+            <p className="mt-2 text-xs text-gray-500">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
           </Section>
 
           <Section id="diagnosis" title="Diagnosis" icon={<Hospital className="h-5 w-5" />}>
