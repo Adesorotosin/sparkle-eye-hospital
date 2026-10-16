@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.clinical_handoffs (
   patient_id uuid NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
   encounter_id uuid REFERENCES public.encounters(id) ON DELETE SET NULL,
   destination text NOT NULL CHECK (destination IN ('CASHIER', 'RECEPTIONIST')),
-  handoff_type text NOT NULL CHECK (handoff_type IN ('TREATMENT_PLAN', 'PROCEDURE', 'FOLLOW_UP')),
+  handoff_type text NOT NULL CHECK (handoff_type IN ('TREATMENT_PLAN', 'PROCEDURE', 'FOLLOW_UP', 'PRICING_REVIEW')),
   title text NOT NULL,
   details text NOT NULL DEFAULT '',
   interval_value integer,
@@ -36,3 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_clinical_handoffs_destination_status_created
 CREATE INDEX IF NOT EXISTS idx_clinical_handoffs_patient
   ON public.clinical_handoffs(patient_id, created_at DESC);
 ALTER TABLE public.clinical_handoffs ENABLE ROW LEVEL SECURITY;
+
+-- Keep the allowed request types compatible if the table was created by an earlier migration.
+ALTER TABLE public.clinical_handoffs DROP CONSTRAINT IF EXISTS clinical_handoffs_handoff_type_check;
+ALTER TABLE public.clinical_handoffs
+  ADD CONSTRAINT clinical_handoffs_handoff_type_check
+  CHECK (handoff_type IN ('TREATMENT_PLAN', 'PROCEDURE', 'FOLLOW_UP', 'PRICING_REVIEW'));
