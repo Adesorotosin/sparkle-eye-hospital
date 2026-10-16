@@ -409,7 +409,14 @@ export default function DoctorEncounterPage() {
           setPastMedicalHistory(encounter.pastMedicalHistory ?? "");
           setPastOcularHistory(encounter.pastOcularHistory ?? "");
           setFamilyOcularHistory(encounter.familyOcularHistory ?? "");
-          setHistoryProforma(encounter.historyProforma ?? {});
+          const savedProforma = encounter.historyProforma ?? {};
+          setHistoryProforma(Object.keys(savedProforma).length > 0 ? savedProforma : {
+            presentingComplaints: { selected: [], notes: encounter.presentingComplaint ?? "" },
+            historyOfPresentingComplaints: { selected: [], notes: encounter.historyOfPresentingComplaint ?? "" },
+            pastMedicalHistory: { selected: [], notes: encounter.pastMedicalHistory ?? "" },
+            pastOcularHistory: { selected: [], notes: encounter.pastOcularHistory ?? "" },
+            familyOcularHistory: { selected: [], notes: encounter.familyOcularHistory ?? "" },
+          });
           setRefractionNotes(encounter.refractionNotes ?? "");
           setLensType(encounter.lensType ?? "");
           setOcularExamODRows(parseEyeExam(encounter.ocularExamOD, encounter.slitLampOD));
@@ -429,6 +436,9 @@ export default function DoctorEncounterPage() {
           setSavedStatus(encounter.status);
         } else if (data.vitals?.primaryComplaint) {
           setPresentingComplaint(data.vitals.primaryComplaint);
+          setHistoryProforma({
+            presentingComplaints: { selected: [], notes: data.vitals.primaryComplaint },
+          });
         }
       })
       .catch((err) => {
@@ -468,11 +478,11 @@ export default function DoctorEncounterPage() {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
         encounterId,
-        presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
-        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints") || hpi,
-        pastMedicalHistory: historyText("pastMedicalHistory") || pastMedicalHistory,
-        pastOcularHistory: historyText("pastOcularHistory") || pastOcularHistory,
-        familyOcularHistory: historyText("familyOcularHistory") || familyOcularHistory,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
         historyProforma,
         refractionNotes,
         lensType,
@@ -519,11 +529,11 @@ export default function DoctorEncounterPage() {
       const saved = await saveConsultationEncounter({
         patientId: patientCode,
         encounterId,
-        presentingComplaint: historyText("presentingComplaints") || presentingComplaint,
-        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints") || hpi,
-        pastMedicalHistory: historyText("pastMedicalHistory") || pastMedicalHistory,
-        pastOcularHistory: historyText("pastOcularHistory") || pastOcularHistory,
-        familyOcularHistory: historyText("familyOcularHistory") || familyOcularHistory,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
         historyProforma,
         refractionNotes,
         lensType,
