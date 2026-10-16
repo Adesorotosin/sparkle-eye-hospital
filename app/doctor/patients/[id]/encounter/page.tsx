@@ -798,10 +798,10 @@ export default function DoctorEncounterPage() {
       "Sparkle Eye Hospital — Lens Order",
       `Patient reference: ${patient?.patientId ?? patientCode}`,
       `Lens type: ${lensType || "To be confirmed"}`,
-      `OD objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "objective") : [refractionOD.sphere, refractionOD.cylinder, refractionOD.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
-      `OD subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
-      `OS objective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "objective") : [refractionOS.sphere, refractionOS.cylinder, refractionOS.axis].filter(Boolean).join(" / ") || "Not recorded"}`,
-      `OS subjective: ${optometryResult?.previousOptometryEncounter ? formatOptometryRefraction(optometryResult.previousOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
+      `OD objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "objective") : "Not recorded"}`,
+      `OD subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
+      `OS objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "objective") : "Not recorded"}`,
+      `OS subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
       `Notes: ${refractionNotes || "None"}`,
       "Please confirm availability and quotation before processing.",
     ].join("\n");
@@ -820,18 +820,9 @@ export default function DoctorEncounterPage() {
     });
   };
 
-  const refractionComplete = useMemo(
-    () =>
-      Boolean(
-        refractionOD.sphere ||
-          refractionOD.cylinder ||
-          refractionOD.axis ||
-          refractionOS.sphere ||
-          refractionOS.cylinder ||
-          refractionOS.axis
-      ),
-    [refractionOD, refractionOS]
-  );
+  const completedOptometryEncounter = optometryAssessmentCompleted
+    ? optometryResult?.previousOptometryEncounter ?? null
+    : null;
 
   if (loading) {
     return (
@@ -1197,9 +1188,9 @@ export default function DoctorEncounterPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold">Refraction → Optometrist</h3>
-                    <p className="text-xs text-gray-500">Send the patient to Optometry for formal refraction.</p>
+                    <p className="text-xs text-gray-500">Completed refraction results return here automatically from the Optometry assessment.</p>
                   </div>
-                  {refractionComplete && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                  {optometryAssessmentCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                 </div>
                 {optometryAssessmentCompleted && completedOptometryEncounter ? (
                   <div className="space-y-3">
