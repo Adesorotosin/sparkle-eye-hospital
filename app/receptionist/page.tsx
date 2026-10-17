@@ -12,12 +12,13 @@ import {
   RefreshCw,
   Search,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
+import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 
 type Patient = {
   id: string;
@@ -44,6 +45,14 @@ type Appointment = {
   endTime: string;
   status: string;
   notes?: string | null;
+};
+
+type DoctorOption = {
+  id: string;
+  staffId: string;
+  name: string;
+  role: string;
+  title?: string | null;
 };
 
 type ProcedureRegistration = {
@@ -110,6 +119,8 @@ export default function ReceptionistPage() {
   const [date, setDate] = useState(todayIso());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
+  const [doctorLoadError, setDoctorLoadError] = useState("");
   const [search, setSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -150,7 +161,8 @@ export default function ReceptionistPage() {
 
   const [appointmentForm, setAppointmentForm] = useState({
     patientName: "",
-    physician: "Dr. James Okoro",
+    patientId: "",
+    doctorStaffId: "",
     date: todayIso(),
     startTime: "09:00",
     endTime: "09:30",
@@ -162,17 +174,38 @@ export default function ReceptionistPage() {
     setError("");
 
     try {
-      const [appointmentResponse, patientResponse] = await Promise.all([
+      const [appointmentResponse, patientResponse, doctorResponse] = await Promise.all([
         fetch(`/api/appointments?date=${encodeURIComponent(date)}`, {
           cache: "no-store",
         }),
         fetch(`/api/patients?search=${encodeURIComponent(search)}`, {
           cache: "no-store",
         }),
+        fetch("/api/doctors", { cache: "no-store" }),
       ]);
 
-      const appointmentData = await appointmentResponse.json();
-      const patientData = await patientResponse.json();
+      const [appointmentData, patientData, doctorData] = await Promise.all([
+        appointmentResponse.json(),
+        patientResponse.json(),
+        doctorResponse.json(),
+      ]);
+
+      if (!doctorResponse.ok) {
+        setDoctors([]);
+        setDoctorLoadError(
+          doctorData?.error || "Unable to load the doctor directory."
+        );
+      } else {
+        const activeDoctors: DoctorOption[] = Array.isArray(doctorData?.doctors)
+          ? doctorData.doctors
+          : [];
+        setDoctors(activeDoctors);
+        setDoctorLoadError(
+          activeDoctors.length === 0
+            ? "No active doctors are available. Activate a doctor in staff management before booking."
+            : ""
+        );
+      }
 
       if (!appointmentResponse.ok) {
         throw new Error(
@@ -373,7 +406,8 @@ export default function ReceptionistPage() {
 
       setAppointmentForm({
         patientName: "",
-        physician: "Dr. James Okoro",
+        patientId: "",
+        doctorStaffId: doctors[0]?.id ?? "",
         date,
         startTime: "09:00",
         endTime: "09:30",
@@ -478,6 +512,8 @@ export default function ReceptionistPage() {
     setAppointmentForm((current) => ({
       ...current,
       patientName: `${patient.fullName} (${patient.patientId})`,
+      patientId: patient.id,
+      doctorStaffId: current.doctorStaffId || doctors[0]?.id || "",
       date,
     }));
 
@@ -497,9 +533,14 @@ export default function ReceptionistPage() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur md:px-8">
         <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-purple-100 text-purple-700">
-              <Users className="h-5 w-5" />
-            </div>
+            <Image
+              src="/Logo.png"
+              alt="Sparkle Eye Specialist Hospital"
+              width={56}
+              height={46}
+              priority
+              className="h-11 w-14 shrink-0 object-contain"
+            />
 
             <div>
               <h1 className="text-xl font-extrabold tracking-tight text-slate-950">
@@ -549,6 +590,7 @@ export default function ReceptionistPage() {
       </header>
 
       <main className="mx-auto max-w-[1500px] space-y-6 p-6 md:p-8">
+        <ClinicalHandoffInbox destination="RECEPTIONIST" />
         {/* ERROR */}
         {error && (
           <div className="flex items-start justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -612,7 +654,11 @@ export default function ReceptionistPage() {
 
             <button
               onClick={() => {
-                setAppointmentForm((current) => ({ ...current, date }));
+                setAppointmentForm((current) => ({
+                  ...current,
+                  date,
+                  doctorStaffId: current.doctorStaffId || doctors[0]?.id || "",
+                }));
                 setShowAppointmentModal(true);
               }}
               className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
@@ -627,7 +673,7 @@ export default function ReceptionistPage() {
             </button>
 
             <button
-              onClick={() => router.push("/triage")}
+              onClick={() => router.push("/nurse")}
               className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
@@ -693,6 +739,7 @@ export default function ReceptionistPage() {
                     setAppointmentForm((current) => ({
                       ...current,
                       date,
+                      doctorStaffId: current.doctorStaffId || doctors[0]?.id || "",
                     }));
 
                     setShowAppointmentModal(true);
@@ -1333,6 +1380,7 @@ export default function ReceptionistPage() {
                     setAppointmentForm({
                       ...appointmentForm,
                       patientName: event.target.value,
+                      patientId: "",
                     })
                   }
                   className={inputClass}
@@ -1348,20 +1396,29 @@ export default function ReceptionistPage() {
                   </label>
 
                   <select
-                    value={appointmentForm.physician}
+                    required
+                    value={appointmentForm.doctorStaffId}
                     onChange={(event) =>
                       setAppointmentForm({
                         ...appointmentForm,
-                        physician: event.target.value,
+                        doctorStaffId: event.target.value,
                       })
                     }
                     className={inputClass}
+                    disabled={doctors.length === 0}
                   >
-                    <option>Dr. James Okoro</option>
-                    <option>Dr. Amina Bello</option>
-                    <option>Dr. Sarah Patel</option>
-                    <option>Dr. Fatima Hassan</option>
+                    <option value="">Select an active doctor</option>
+                    {doctors.map((doctor) => (
+                      <option key={doctor.id} value={doctor.id}>
+                        {doctor.name}{doctor.title ? ` — ${doctor.title}` : ""}
+                      </option>
+                    ))}
                   </select>
+                  {doctorLoadError && (
+                    <p className="mt-1.5 text-xs font-semibold text-rose-600">
+                      {doctorLoadError}
+                    </p>
+                  )}
                 </div>
 
                 {/* DATE */}

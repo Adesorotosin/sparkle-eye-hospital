@@ -7,12 +7,16 @@ import { requireRole } from "@/lib/server-auth";
 
 export interface ConsultationFormData {
   patientId: string;
+  encounterId?: string;
 
   presentingComplaint: string;
   historyOfPresentingComplaint: string;
   pastMedicalHistory: string;
   pastOcularHistory: string;
   familyOcularHistory: string;
+  historyProforma?: Record<string, { selected: string[]; notes: string }>;
+  refractionNotes?: string;
+  lensType?: string;
 
   ocularExamOD: string;
   ocularExamOS: string;
@@ -121,82 +125,123 @@ export async function saveConsultationEncounter(
     }
 
     /*
-     * Save the consultation as a new encounter.
-     *
-     * We intentionally INSERT instead of UPDATE because an encounter
-     * represents a clinical event/history item.
+     * Reuse the active draft when the doctor is continuing the same
+     * encounter. A completed encounter remains a historical clinical
+     * event; a new visit without a draft creates a new row.
      */
-    const { data: encounter, error: encounterError } =
-      await supabaseServer
-        .from("encounters")
-        .insert({
-          patient_id: patient.id,
+    const encounterValues = {
+      patient_id: patient.id,
 
-          presenting_complaint:
-            formData.presentingComplaint.trim() || null,
+      presenting_complaint:
+        formData.presentingComplaint.trim() || null,
 
-          history_of_presenting_complaint:
-            formData.historyOfPresentingComplaint.trim() || null,
+      history_of_presenting_complaint:
+        formData.historyOfPresentingComplaint.trim() || null,
 
-          past_medical_history:
-            formData.pastMedicalHistory.trim() || null,
+      past_medical_history:
+        formData.pastMedicalHistory.trim() || null,
 
-          past_ocular_history:
-            formData.pastOcularHistory.trim() || null,
+      past_ocular_history:
+        formData.pastOcularHistory.trim() || null,
 
-          family_ocular_history:
-            formData.familyOcularHistory.trim() || null,
+      family_ocular_history:
+        formData.familyOcularHistory.trim() || null,
 
-          ocular_exam_od:
-            formData.ocularExamOD.trim() || null,
+      history_proforma: formData.historyProforma ?? {},
+      refraction_notes: formData.refractionNotes?.trim() || null,
+      lens_type: formData.lensType?.trim() || null,
 
-          ocular_exam_os:
-            formData.ocularExamOS.trim() || null,
+      ocular_exam_od:
+        formData.ocularExamOD.trim() || null,
 
-          slit_lamp_od:
-            formData.slitLampOD.trim() || null,
+      ocular_exam_os:
+        formData.ocularExamOS.trim() || null,
 
-          slit_lamp_os:
-            formData.slitLampOS.trim() || null,
+      slit_lamp_od:
+        formData.slitLampOD.trim() || null,
 
-          other_examination_findings:
-            formData.otherExaminationFindings.trim() || null,
+      slit_lamp_os:
+        formData.slitLampOS.trim() || null,
 
-          iop_od: formData.iopOD,
-          iop_os: formData.iopOS,
-          iop_instrument:
-            formData.iopInstrument.trim() || null,
+      other_examination_findings:
+        formData.otherExaminationFindings.trim() || null,
 
-          refraction_od: {
-            sphere: formData.refractionOD.sphere.trim(),
-            cylinder: formData.refractionOD.cylinder.trim(),
-            axis: formData.refractionOD.axis.trim(),
-          },
+      iop_od: formData.iopOD,
+      iop_os: formData.iopOS,
+      iop_instrument:
+        formData.iopInstrument.trim() || null,
 
-          refraction_os: {
-            sphere: formData.refractionOS.sphere.trim(),
-            cylinder: formData.refractionOS.cylinder.trim(),
-            axis: formData.refractionOS.axis.trim(),
-          },
+      refraction_od: {
+        sphere: String(formData.refractionOD?.sphere ?? "").trim(),
+        cylinder: String(formData.refractionOD?.cylinder ?? "").trim(),
+        axis: String(formData.refractionOD?.axis ?? "").trim(),
+      },
 
-          diagnosis: formData.diagnosis.trim() || null,
+      refraction_os: {
+        sphere: String(formData.refractionOS?.sphere ?? "").trim(),
+        cylinder: String(formData.refractionOS?.cylinder ?? "").trim(),
+        axis: String(formData.refractionOS?.axis ?? "").trim(),
+      },
 
-          treatment_plan:
-            formData.treatmentPlan.trim() || null,
+      diagnosis: formData.diagnosis.trim() || null,
 
-          status: formData.status,
-          recorded_by: staff.id,
-        })
-        .select("id")
-        .single();
+      treatment_plan:
+        formData.treatmentPlan.trim() || null,
 
-    if (encounterError) {
-      console.error("Encounter save failed:", encounterError);
+      status: formData.status,
+    };
 
-      return {
-        success: false,
-        message: "Failed to save the consultation record.",
-      };
+    let encounterId = "";
+    const requestedEncounterId = formData.encounterId?.trim();
+
+    if (requestedEncounterId) {
+      const { data: updatedEncounter, error: updateEncounterError } =
+        await supabaseServer
+          .from("encounters")
+          .update(encounterValues)
+          .eq("id", requestedEncounterId)
+          .eq("patient_id", patient.id)
+          .eq("status", "draft")
+          .select("id")
+          .maybeSingle();
+
+      if (updateEncounterError) {
+        console.error("Encounter draft update failed:", updateEncounterError);
+        return {
+          success: false,
+          message: "Failed to update the consultation draft.",
+        };
+      }
+
+      if (!updatedEncounter) {
+        return {
+          success: false,
+          message:
+            "This consultation draft is no longer editable. Refresh the patient record before saving again.",
+        };
+      }
+
+      encounterId = updatedEncounter.id;
+    } else {
+      const { data: createdEncounter, error: encounterError } =
+        await supabaseServer
+          .from("encounters")
+          .insert({
+            ...encounterValues,
+            recorded_by: staff.id,
+          })
+          .select("id")
+          .single();
+
+      if (encounterError) {
+        console.error("Encounter save failed:", encounterError);
+        return {
+          success: false,
+          message: "Failed to save the consultation record.",
+        };
+      }
+
+      encounterId = createdEncounter.id;
     }
 
     /*
@@ -209,19 +254,17 @@ export async function saveConsultationEncounter(
           formData.status === "completed"
             ? "completed_today"
             : "in_consultation",
+        last_visit_at: new Date().toISOString(),
       })
       .eq("id", patient.id);
 
+    const patientStatusUpdateFailed = Boolean(patientUpdateError);
+
     if (patientUpdateError) {
       console.error(
-        "Patient status update failed:",
+        "Patient status update failed after encounter save:",
         patientUpdateError
       );
-
-      /*
-       * The encounter itself was successfully saved, so we don't
-       * report the whole operation as failed.
-       */
     }
 
     /*
@@ -247,7 +290,7 @@ export async function saveConsultationEncounter(
       patientId: patient.id,
 
       details: JSON.stringify({
-        encounterId: encounter.id,
+        encounterId,
         patientCode: patient.patient_code,
         patientName: patient.full_name,
         status: formData.status,
@@ -270,12 +313,13 @@ export async function saveConsultationEncounter(
     return {
       success: true,
 
-      message:
-        formData.status === "completed"
+      message: patientStatusUpdateFailed
+        ? "Consultation record saved, but the patient's queue status could not be updated. Refresh and verify the queue before proceeding."
+        : formData.status === "completed"
           ? "Consultation completed successfully."
           : "Consultation draft saved successfully.",
 
-      encounterId: encounter.id,
+      encounterId,
     };
   } catch (error) {
     if (error instanceof Error) {

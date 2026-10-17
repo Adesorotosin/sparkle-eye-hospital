@@ -24,6 +24,7 @@ function emptyPatientFor(code: string): PatientRecord {
     fullName: "Loading…",
     coveragePlan: "",
     diagnostics: [],
+    laboratoryResults: [],
     prescriptions: [],
 
     invoice: {

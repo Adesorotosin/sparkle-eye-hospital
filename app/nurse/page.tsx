@@ -20,6 +20,11 @@ import {
   Loader2,
 } from "lucide-react";
 
+interface AuthenticatedStaffProfile {
+  name?: string | null;
+  staffId?: string | null;
+}
+
 interface ApiPatient {
   patientId: string;
   fullName: string;
@@ -117,6 +122,7 @@ export default function NurseDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [currentStaffLabel, setCurrentStaffLabel] = useState("Loading staff...");
 
   const loadPatients = useCallback(async (showRefreshState = false) => {
     try {
@@ -163,6 +169,33 @@ export default function NurseDashboard() {
   useEffect(() => {
     void loadPatients();
   }, [loadPatients]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCurrentStaff() {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const data = await response.json();
+        const user = data?.user as AuthenticatedStaffProfile | undefined;
+        if (!cancelled && response.ok && user?.name?.trim()) {
+          const staffId = user.staffId?.trim();
+          setCurrentStaffLabel(
+            staffId ? `${user.name.trim()} (${staffId})` : user.name.trim()
+          );
+        } else if (!cancelled) {
+          setCurrentStaffLabel("Signed-in staff");
+        }
+      } catch {
+        if (!cancelled) setCurrentStaffLabel("Signed-in staff");
+      }
+    }
+
+    void loadCurrentStaff();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -260,7 +293,7 @@ export default function NurseDashboard() {
             <User className="w-4 h-4 text-[#6B21A8]" />
 
             <span className="text-xs font-bold text-[#6B21A8]">
-              Nurse Amaka Eze (NRS-0312)
+              {currentStaffLabel}
             </span>
           </div>
 

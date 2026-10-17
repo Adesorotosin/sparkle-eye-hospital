@@ -269,6 +269,29 @@ export async function createLabOrder(
       };
     }
 
+    if (price === 0) {
+      const { error: pricingHandoffError } = await supabaseServer
+        .from("clinical_handoffs")
+        .insert({
+          patient_id: patient.id,
+          destination: "CASHIER",
+          handoff_type: "PRICING_REVIEW",
+          title: "Pricing review required: " + testName,
+          details: "A laboratory order was created for " + testName + " (" + testCode + "), but no approved price is configured. Add the approved laboratory charge before billing; do not treat this as a free test. Order ID: " + labOrderId,
+          requested_by: staff.id,
+        });
+      if (pricingHandoffError) {
+        console.error("Laboratory pricing-review handoff failed:", pricingHandoffError);
+        return { success: false, message: "Laboratory order was created, but its pricing-review request could not be sent to Cashier. Refresh the patient record and notify the administrator; do not retry blindly.", id: labOrderId };
+      }
+      await logLabActivity({ action: "Laboratory order sent for pricing review: " + testName, staff, patientId: patient.id, details: { labOrderId, testCode, testName, pricePending: true } });
+      revalidatePath("/laboratory");
+      revalidatePath("/billing");
+      revalidatePath("/cashier");
+      revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
+      return { success: true, message: testName + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: labOrderId };
+    }
+
     let invoice;
 
     try {

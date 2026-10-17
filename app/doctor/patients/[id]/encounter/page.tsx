@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useTransition } from "react";
+import React, { useEffect, useState, useTransition } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Activity,
@@ -20,11 +20,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
+import { sendTreatmentPlanToCashier } from "@/app/actions/treatment-billing";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
 import { createOpticalOrder } from "@/app/actions/optician";
 import { getOptometryPatient } from "@/app/actions/optometry";
+import { createClinicalHandoff } from "@/app/actions/clinical-handoffs";
 
 type Refraction = {
   sphere: string;
@@ -39,6 +41,9 @@ type Encounter = {
   pastMedicalHistory?: string;
   pastOcularHistory?: string;
   familyOcularHistory?: string;
+  historyProforma?: Record<string, { selected: string[]; notes: string }>;
+  refractionNotes?: string;
+  lensType?: string;
   ocularExamOD?: string;
   ocularExamOS?: string;
   slitLampOD?: string;
@@ -151,6 +156,53 @@ const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
   { name: "Fundus Photograph", price: 9000 },
   { name: "Autorefraction", price: 0 },
 ];
+
+const HISTORY_SECTIONS = [
+  { key: "presentingComplaints", title: "1. Presenting complaints", options: ["Reduced vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Double vision", "Lid swelling", "Trauma", "Other", "Right / OD", "Left / OS", "Both", "Sudden onset", "Gradual onset"] },
+  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Worsening", "Unchanged", "Constant", "Intermittent", "First episode", "Recurrent", "Associated symptoms / triggers", "Treatment tried"] },
+  { key: "pastOcularHistory", title: "3. Past ocular history", options: ["None known", "Glaucoma", "Cataract", "Refractive error", "Other eye disease", "Spectacles / contact lenses", "Eye injury", "Surgery / laser / injection"] },
+  { key: "pastMedicalHistory", title: "4. Past medical history", options: ["None known", "Diabetes", "Hypertension", "Asthma", "Sickle cell disease", "Other", "Previous surgery"] },
+  { key: "medicationAllergyHistory", title: "5. Medication and allergy history", options: ["No medication", "Eye drops", "Systemic medicines", "Steroids", "Traditional remedies", "No known allergies", "Allergy present", "Allergy status unknown"] },
+  { key: "familyHistory", title: "6. Family history", options: ["None known", "Unknown", "Diabetes", "Hypertension", "Sickle cell disease", "Other"] },
+  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Unknown", "Glaucoma", "Blindness", "Cataract", "Other"] },
+  { key: "socialOccupationalHistory", title: "8. Social / occupational history", options: ["Smoking", "Alcohol use", "Dust / chemical exposure", "Prolonged screen use"] },
+] as const;
+
+const OCULAR_PARTS = [
+  "Lid", "Globe", "Extraocular muscle movement", "Conjunctiva", "Cornea",
+  "Anterior chamber", "Pupil", "Lens", "Vitreous", "Fundus",
+] as const;
+
+type EyeExamRows = Record<string, { penlight: string; slitLamp: string }>;
+const emptyEyeExam = (): EyeExamRows => Object.fromEntries(
+  OCULAR_PARTS.map((part) => [part, { penlight: "", slitLamp: "" }])
+);
+function parseEyeExam(value?: string, legacySlitLamp?: string): EyeExamRows {
+  const rows = emptyEyeExam();
+  if (value) {
+    try {
+      const parsed = JSON.parse(value) as Record<string, { penlight?: string; slitLamp?: string }>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const part of OCULAR_PARTS) {
+          if (parsed[part]) rows[part] = { penlight: parsed[part].penlight ?? "", slitLamp: parsed[part].slitLamp ?? "" };
+        }
+      } else {
+        rows.Lid.penlight = value;
+      }
+    } catch {
+      rows.Lid.penlight = value;
+    }
+  }
+  if (legacySlitLamp) {
+    try {
+      const parsed = JSON.parse(legacySlitLamp) as Record<string, { penlight?: string; slitLamp?: string }>;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const part of OCULAR_PARTS) if (parsed[part]) rows[part].slitLamp = parsed[part].slitLamp ?? rows[part].slitLamp;
+      } else rows.Lid.slitLamp = legacySlitLamp;
+    } catch { rows.Lid.slitLamp = legacySlitLamp; }
+  }
+  return rows;
+}
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -273,12 +325,27 @@ export default function DoctorEncounterPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedStatus, setSavedStatus] = useState<"draft" | "completed">("draft");
+  const [encounterId, setEncounterId] = useState<string | undefined>(undefined);
 
   const [presentingComplaint, setPresentingComplaint] = useState("");
   const [hpi, setHpi] = useState("");
   const [pastMedicalHistory, setPastMedicalHistory] = useState("");
   const [pastOcularHistory, setPastOcularHistory] = useState("");
   const [familyOcularHistory, setFamilyOcularHistory] = useState("");
+  const [historyProforma, setHistoryProforma] = useState<Record<string, { selected: string[]; notes: string }>>({});
+  const [ocularExamODRows, setOcularExamODRows] = useState<EyeExamRows>(() => emptyEyeExam());
+  const [ocularExamOSRows, setOcularExamOSRows] = useState<EyeExamRows>(() => emptyEyeExam());
+  const [refractionNotes, setRefractionNotes] = useState("");
+  const [lensType, setLensType] = useState("");
+  const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [supplierContacts, setSupplierContacts] = useState<Array<{ name: string; phone: string }>>([]);
+  const [followUpInterval, setFollowUpInterval] = useState("7");
+  const [followUpUnit, setFollowUpUnit] = useState<"days" | "months">("days");
+  const [followUpTime, setFollowUpTime] = useState("");
+  const [followUpNotes, setFollowUpNotes] = useState("");
+  const [procedureName, setProcedureName] = useState("");
+  const [procedureDetails, setProcedureDetails] = useState("");
   const [ocularExamOD, setOcularExamOD] = useState("");
   const [ocularExamOS, setOcularExamOS] = useState("");
   const [slitLampOD, setSlitLampOD] = useState("");
@@ -295,10 +362,7 @@ export default function DoctorEncounterPage() {
   const [diagnosis, setDiagnosis] = useState("");
   const [treatmentPlan, setTreatmentPlan] = useState("");
 
-  const [medication, setMedication] = useState("");
-  const [dosage, setDosage] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [pricePerUnit, setPricePerUnit] = useState("0");
+  const [prescriptionText, setPrescriptionText] = useState("");
 
   const [requesting, setRequesting] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
@@ -308,6 +372,18 @@ export default function DoctorEncounterPage() {
   const latestEncounter = patient?.encounters?.[0];
   const optometryAssessmentCompleted =
     optometryResult?.previousOptometryEncounter?.status === "completed";
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("sparkle-eye-supplier-contacts");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setSupplierContacts(parsed.filter((item) => item && typeof item.name === "string" && typeof item.phone === "string"));
+      }
+    } catch {
+      // Supplier shortcuts are optional; manual entry remains available.
+    }
+  }, []);
 
   useEffect(() => {
     if (!patientCode) return;
@@ -337,11 +413,28 @@ export default function DoctorEncounterPage() {
 
         const encounter = data.encounters?.[0];
         if (encounter) {
+          // Continue editing a draft in place. A completed encounter is
+          // historical, so the next save starts a new encounter.
+          setEncounterId(
+            encounter.status === "draft" ? encounter.id : undefined
+          );
           setPresentingComplaint(encounter.presentingComplaint ?? "");
           setHpi(encounter.historyOfPresentingComplaint ?? "");
           setPastMedicalHistory(encounter.pastMedicalHistory ?? "");
           setPastOcularHistory(encounter.pastOcularHistory ?? "");
           setFamilyOcularHistory(encounter.familyOcularHistory ?? "");
+          const savedProforma = encounter.historyProforma ?? {};
+          setHistoryProforma(Object.keys(savedProforma).length > 0 ? savedProforma : {
+            presentingComplaints: { selected: [], notes: encounter.presentingComplaint ?? "" },
+            historyOfPresentingComplaints: { selected: [], notes: encounter.historyOfPresentingComplaint ?? "" },
+            pastMedicalHistory: { selected: [], notes: encounter.pastMedicalHistory ?? "" },
+            pastOcularHistory: { selected: [], notes: encounter.pastOcularHistory ?? "" },
+            familyOcularHistory: { selected: [], notes: encounter.familyOcularHistory ?? "" },
+          });
+          setRefractionNotes(encounter.refractionNotes ?? "");
+          setLensType(encounter.lensType ?? "");
+          setOcularExamODRows(parseEyeExam(encounter.ocularExamOD, encounter.slitLampOD));
+          setOcularExamOSRows(parseEyeExam(encounter.ocularExamOS, encounter.slitLampOS));
           setOcularExamOD(encounter.ocularExamOD ?? "");
           setOcularExamOS(encounter.ocularExamOS ?? "");
           setSlitLampOD(encounter.slitLampOD ?? "");
@@ -357,6 +450,9 @@ export default function DoctorEncounterPage() {
           setSavedStatus(encounter.status);
         } else if (data.vitals?.primaryComplaint) {
           setPresentingComplaint(data.vitals.primaryComplaint);
+          setHistoryProforma({
+            presentingComplaints: { selected: [], notes: data.vitals.primaryComplaint },
+          });
         }
       })
       .catch((err) => {
@@ -375,6 +471,17 @@ export default function DoctorEncounterPage() {
     setMessage("");
     setError("");
 
+    if (
+      savedStatus === "completed" &&
+      status === "completed" &&
+      !encounterId
+    ) {
+      setError(
+        "This encounter is already completed. Save as draft to begin a new consultation, or refresh to review the latest record."
+      );
+      return;
+    }
+
     if (status === "completed" && !diagnosis.trim()) {
       setError("Enter a diagnosis before completing the consultation.");
       document.getElementById("diagnosis")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -384,15 +491,19 @@ export default function DoctorEncounterPage() {
     startTransition(async () => {
       const response = await saveConsultationEncounter({
         patientId: patientCode,
-        presentingComplaint,
-        historyOfPresentingComplaint: hpi,
-        pastMedicalHistory,
-        pastOcularHistory,
-        familyOcularHistory,
-        ocularExamOD,
-        ocularExamOS,
-        slitLampOD,
-        slitLampOS,
+        encounterId,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
+        historyProforma,
+        refractionNotes,
+        lensType,
+        ocularExamOD: JSON.stringify(ocularExamODRows),
+        ocularExamOS: JSON.stringify(ocularExamOSRows),
+        slitLampOD: "",
+        slitLampOS: "",
         otherExaminationFindings: otherFindings,
         iopOD: iopOD.trim() ? Number(iopOD) : null,
         iopOS: iopOS.trim() ? Number(iopOS) : null,
@@ -410,7 +521,71 @@ export default function DoctorEncounterPage() {
       }
 
       setSavedStatus(status);
+      setEncounterId(status === "draft" ? response.encounterId : undefined);
       setMessage(response.message);
+    });
+  };
+
+  const sendTreatmentPlanForBilling = () => {
+    setMessage("");
+    setError("");
+
+    if (!treatmentPlan.trim()) {
+      setError("Enter the treatment and follow-up plan before sending it to Cashier.");
+      document.getElementById("treatment")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    setRequesting("cashier-treatment");
+    startTransition(async () => {
+      // Save the current clinical documentation first so Cashier receives
+      // the exact plan stored in the encounter, not unsaved text.
+      const saved = await saveConsultationEncounter({
+        patientId: patientCode,
+        encounterId,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
+        historyProforma,
+        refractionNotes,
+        lensType,
+        ocularExamOD: JSON.stringify(ocularExamODRows),
+        ocularExamOS: JSON.stringify(ocularExamOSRows),
+        slitLampOD: "",
+        slitLampOS: "",
+        otherExaminationFindings: otherFindings,
+        iopOD: iopOD.trim() ? Number(iopOD) : null,
+        iopOS: iopOS.trim() ? Number(iopOS) : null,
+        iopInstrument,
+        refractionOD,
+        refractionOS,
+        diagnosis,
+        treatmentPlan,
+        status: "draft",
+      });
+
+      if (!saved.success || !saved.encounterId) {
+        setError(saved.message || "Save the consultation before sending the plan to Cashier.");
+        setRequesting("");
+        return;
+      }
+
+      setEncounterId(saved.encounterId);
+      setSavedStatus("draft");
+
+      const result = await sendTreatmentPlanToCashier({
+        patientCode,
+        encounterId: saved.encounterId,
+      });
+
+      if (result.success) {
+        setMessage(result.message);
+      } else {
+        setError(result.message);
+      }
+      setRequesting("");
     });
   };
 
@@ -433,6 +608,10 @@ export default function DoctorEncounterPage() {
 
       if (!response.success) {
         setError(response.message);
+        // Some failures happen after the order row is already created.
+        // Refresh when an ID is returned so the doctor can see that order
+        // and avoid retrying blindly.
+        if (response.id) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -455,6 +634,7 @@ export default function DoctorEncounterPage() {
 
       if (!response.success) {
         setError(response.message);
+        if (response.id) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -478,8 +658,20 @@ export default function DoctorEncounterPage() {
 
     startTransition(async () => {
       const response = await referPatientToOptometry(patientCode);
-      if (!response.success) setError(response.message);
-      else setMessage(response.message);
+      if (!response.success) {
+        setError(response.message);
+      } else {
+        setMessage(response.message);
+        await refreshPatient();
+        try {
+          const optometry = await getOptometryPatient(patientCode);
+          if (optometry.success) {
+            setOptometryResult(optometry.patient ?? null);
+          }
+        } catch {
+          setOptometryResult(null);
+        }
+      }
       setRequesting("");
     });
   };
@@ -490,9 +682,46 @@ export default function DoctorEncounterPage() {
     setError("");
 
     startTransition(async () => {
-      const response = await createOpticalOrder(patientCode);
+      // Persist the current clinical notes before handing the optical
+      // order to Optician, so lens type and refraction notes survive a
+      // refresh even when the doctor has not clicked Save separately.
+      const saved = await saveConsultationEncounter({
+        patientId: patientCode,
+        encounterId,
+        presentingComplaint: historyText("presentingComplaints"),
+        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
+        pastMedicalHistory: historyText("pastMedicalHistory"),
+        pastOcularHistory: historyText("pastOcularHistory"),
+        familyOcularHistory: historyText("familyOcularHistory"),
+        historyProforma,
+        refractionNotes,
+        lensType,
+        ocularExamOD: JSON.stringify(ocularExamODRows),
+        ocularExamOS: JSON.stringify(ocularExamOSRows),
+        slitLampOD: "",
+        slitLampOS: "",
+        otherExaminationFindings: otherFindings,
+        iopOD: iopOD.trim() ? Number(iopOD) : null,
+        iopOS: iopOS.trim() ? Number(iopOS) : null,
+        iopInstrument,
+        refractionOD,
+        refractionOS,
+        diagnosis,
+        treatmentPlan,
+        status: "draft",
+      });
+
+      if (!saved.success || !saved.encounterId) {
+        setError(saved.message || "Save the consultation notes before sending the optical order.");
+        setRequesting("");
+        return;
+      }
+
+      setEncounterId(saved.encounterId);
+      const response = await createOpticalOrder(patientCode, { lensType, refractionNotes });
       if (!response.success) {
         setError(response.message);
+        if (response.orderId) await refreshPatient();
       } else {
         setMessage(response.message);
         await refreshPatient();
@@ -505,46 +734,95 @@ export default function DoctorEncounterPage() {
     setMessage("");
     setError("");
 
-    if (!medication.trim() || !dosage.trim()) {
-      setError("Medication and dosage are required.");
+    if (!prescriptionText.trim()) {
+      setError("Enter the prescription instructions before sending to Pharmacy.");
+      return;
+    }
+
+    if (prescriptionText.trim().length > 5000) {
+      setError("The prescription must be 5,000 characters or fewer.");
       return;
     }
 
     startTransition(async () => {
       const response = await createPrescription({
         patientCode,
-        drugName: medication,
-        dosage,
-        quantity: Number(quantity),
-        pricePerUnit: Number(pricePerUnit),
+        prescriptionText: prescriptionText.trim(),
       });
 
       if (!response.success) {
         setError(response.message);
+        if (response.id) await refreshPatient();
         return;
       }
 
       setMessage(response.message);
-      setMedication("");
-      setDosage("");
-      setQuantity("1");
-      setPricePerUnit("0");
+      setPrescriptionText("");
       await refreshPatient();
     });
   };
 
-  const refractionComplete = useMemo(
-    () =>
-      Boolean(
-        refractionOD.sphere ||
-          refractionOD.cylinder ||
-          refractionOD.axis ||
-          refractionOS.sphere ||
-          refractionOS.cylinder ||
-          refractionOS.axis
-      ),
-    [refractionOD, refractionOS]
-  );
+  const historyText = (key: string) => {
+    const section = historyProforma[key];
+    return [...(section?.selected ?? []), section?.notes?.trim() ?? ""].filter(Boolean).join("; ");
+  };
+
+  const updateHistorySection = (key: string, update: Partial<{ selected: string[]; notes: string }>) => {
+    setHistoryProforma((current) => ({
+      ...current,
+      [key]: { selected: current[key]?.selected ?? [], notes: current[key]?.notes ?? "", ...update },
+    }));
+  };
+
+  const saveSupplierContact = () => {
+    const name = supplierName.trim();
+    const phone = supplierWhatsApp.replace(/\D/g, "");
+    if (!name) { setError("Enter a supplier name before saving this contact."); return; }
+    if (!phone) { setError("Enter the supplier WhatsApp number, including country code."); return; }
+    const updated = [...supplierContacts.filter((contact) => contact.phone !== phone), { name, phone }];
+    setSupplierContacts(updated);
+    try {
+      window.localStorage.setItem("sparkle-eye-supplier-contacts", JSON.stringify(updated));
+    } catch {
+      setError("Supplier contact could not be saved in this browser. You can still use the number for this message.");
+      return;
+    }
+    setMessage(`Supplier contact saved: ${name}.`);
+    setError("");
+  };
+
+  const sendSupplierWhatsApp = () => {
+    const phone = supplierWhatsApp.replace(/\D/g, "");
+    if (!phone) { setError("Enter the supplier's WhatsApp number, including country code."); return; }
+    const messageText = [
+      "Sparkle Eye Hospital — Lens Order",
+      `Patient reference: ${patient?.patientId ?? patientCode}`,
+      `Lens type: ${lensType || "To be confirmed"}`,
+      `OD objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "objective") : "Not recorded"}`,
+      `OD subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOD, "subjective") : "Not recorded"}`,
+      `OS objective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "objective") : "Not recorded"}`,
+      `OS subjective: ${completedOptometryEncounter ? formatOptometryRefraction(completedOptometryEncounter.refractionOS, "subjective") : "Not recorded"}`,
+      `Notes: ${refractionNotes || "None"}`,
+      "Please confirm availability and quotation before processing.",
+    ].join("\n");
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageText)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const sendHandoff = (input: Parameters<typeof createClinicalHandoff>[0]) => {
+    setMessage("");
+    setError("");
+    setRequesting("handoff-" + input.handoffType);
+    startTransition(async () => {
+      const response = await createClinicalHandoff(input);
+      if (!response.success) setError(response.message);
+      else setMessage(response.message);
+      setRequesting("");
+    });
+  };
+
+  const completedOptometryEncounter = optometryAssessmentCompleted
+    ? optometryResult?.previousOptometryEncounter ?? null
+    : null;
 
   if (loading) {
     return (
@@ -614,11 +892,11 @@ export default function DoctorEncounterPage() {
               ["history", "History"],
               ["exam", "Ocular examination"],
               ["gonioscopy", "Gonioscopy"],
-              ["slit-lamp", "Slit lamp"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
               ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
               ["appointment", "Appointment"],
@@ -723,21 +1001,48 @@ export default function DoctorEncounterPage() {
             )}
           </Section>
 
-          <Section id="history" title="History" icon={<ClipboardList className="h-5 w-5" />}>
-            <div className="grid gap-4">
-              <Field label="Presenting complaint" value={presentingComplaint} onChange={setPresentingComplaint} />
-              <Field label="History of presenting complaint" value={hpi} onChange={setHpi} rows={5} />
-              <Field label="Past medical history" value={pastMedicalHistory} onChange={setPastMedicalHistory} />
-              <Field label="Past ocular history" value={pastOcularHistory} onChange={setPastOcularHistory} />
-              <Field label="Family ocular history" value={familyOcularHistory} onChange={setFamilyOcularHistory} />
+          <Section id="history" title="Ophthalmology history proforma" icon={<ClipboardList className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Select every applicable option in each section. Add details in the notes field; multiple options may be selected.</p>
+            <div className="space-y-5">
+              {HISTORY_SECTIONS.map((section) => {
+                const value = historyProforma[section.key] ?? { selected: [], notes: "" };
+                return (
+                  <div key={section.key} className="rounded-xl border p-4">
+                    <h3 className="mb-3 font-semibold">{section.title}</h3>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {section.options.map((option) => (
+                        <label key={option} className="flex cursor-pointer items-start gap-2 rounded-lg bg-gray-50 p-2.5 text-sm">
+                          <input type="checkbox" checked={value.selected.includes(option)} onChange={(event) => updateHistorySection(section.key, { selected: event.target.checked ? [...value.selected, option] : value.selected.filter((item) => item !== option) })} className="mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          <span>{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3">
+                      <Field label="Additional notes / duration / treatment tried" value={value.notes} onChange={(notes) => updateHistorySection(section.key, { notes })} rows={2} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Section>
 
-          <Section id="exam" title="Ocular examination" icon={<Stethoscope className="h-5 w-5" />}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Right eye (OD)" value={ocularExamOD} onChange={setOcularExamOD} rows={5} placeholder="Document ocular examination findings..." />
-              <Field label="Left eye (OS)" value={ocularExamOS} onChange={setOcularExamOS} rows={5} placeholder="Document ocular examination findings..." />
+          <Section id="exam" title="Combined ocular examination — penlight and slit lamp" icon={<Stethoscope className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Record findings for each ocular part. Penlight and slit-lamp findings are grouped in one examination table.</p>
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead className="bg-gray-50"><tr><th className="border-b p-3 text-left">Right eye (OD)</th><th className="border-b p-3 text-left">Ocular parts</th><th className="border-b p-3 text-left">Left eye (OS)</th></tr></thead>
+                <tbody>
+                  {OCULAR_PARTS.map((part) => (
+                    <tr key={part} className="align-top">
+                      <td className="w-[40%] border-b p-3"><div className="space-y-2"><label className="block text-xs font-medium text-gray-500">Penlight</label><textarea rows={2} value={ocularExamODRows[part]?.penlight ?? ""} onChange={(e) => setOcularExamODRows((current) => ({ ...current, [part]: { ...current[part], penlight: e.target.value } }))} className={inputClass} aria-label={`OD ${part} penlight findings`} /><label className="block text-xs font-medium text-gray-500">Slit lamp</label><textarea rows={2} value={ocularExamODRows[part]?.slitLamp ?? ""} onChange={(e) => setOcularExamODRows((current) => ({ ...current, [part]: { ...current[part], slitLamp: e.target.value } }))} className={inputClass} aria-label={`OD ${part} slit lamp findings`} /></div></td>
+                      <th scope="row" className="border-b bg-gray-50/70 p-3 text-left font-semibold">{part}</th>
+                      <td className="w-[40%] border-b p-3"><div className="space-y-2"><label className="block text-xs font-medium text-gray-500">Penlight</label><textarea rows={2} value={ocularExamOSRows[part]?.penlight ?? ""} onChange={(e) => setOcularExamOSRows((current) => ({ ...current, [part]: { ...current[part], penlight: e.target.value } }))} className={inputClass} aria-label={`OS ${part} penlight findings`} /><label className="block text-xs font-medium text-gray-500">Slit lamp</label><textarea rows={2} value={ocularExamOSRows[part]?.slitLamp ?? ""} onChange={(e) => setOcularExamOSRows((current) => ({ ...current, [part]: { ...current[part], slitLamp: e.target.value } }))} className={inputClass} aria-label={`OS ${part} slit lamp findings`} /></div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            <div className="mt-4"><Field label="Other examination notes" value={otherFindings} onChange={setOtherFindings} rows={3} /></div>
           </Section>
 
           <Section id="gonioscopy" title="Gonioscopy" icon={<Activity className="h-5 w-5" />}>
@@ -817,16 +1122,6 @@ export default function DoctorEncounterPage() {
             )}
           </Section>
 
-          <Section id="slit-lamp" title="Slit-lamp examination" icon={<Activity className="h-5 w-5" />}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="OD — slit lamp" value={slitLampOD} onChange={setSlitLampOD} rows={6} />
-              <Field label="OS — slit lamp" value={slitLampOS} onChange={setSlitLampOS} rows={6} />
-            </div>
-            <div className="mt-4">
-              <Field label="Other examination findings" value={otherFindings} onChange={setOtherFindings} rows={4} />
-            </div>
-          </Section>
-
           <Section id="iop" title="Intraocular pressure" icon={<Activity className="h-5 w-5" />}>
             <div className="grid gap-4 md:grid-cols-3">
               <label className="block">
@@ -844,6 +1139,42 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
+          <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Review the optometry result above where available, record the lens type and instructions, then send the order to the Optician. Supplier messages open in WhatsApp for staff review and manual sending.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Lens type" value={lensType} onChange={setLensType} rows={2} placeholder="e.g. single vision, bifocal or progressive, according to the prescription" />
+              <Field label="Refraction / lens notes" value={refractionNotes} onChange={setRefractionNotes} rows={2} placeholder="Document prescribed lens material, coatings or dispensing instructions." />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Send prescription to Optician"}</button>
+              {!optometryAssessmentCompleted && <p className="self-center text-xs text-amber-700">The Optometrist must complete the refraction assessment before an optical order can be created.</p>}
+            </div>
+            <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <label htmlFor="saved-supplier" className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</label>
+                <select id="saved-supplier" value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass + " min-h-11"}>
+                  <option value="">Enter a new supplier below</option>
+                  {supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="supplier-name" className="mb-2 block text-sm font-medium text-gray-700">Supplier name</label>
+                  <input id="supplier-name" type="text" autoComplete="organization" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. Preferred lens supplier" className={inputClass + " h-11"} />
+                </div>
+                <div>
+                  <label htmlFor="supplier-whatsapp" className="mb-2 block text-sm font-medium text-gray-700">Supplier WhatsApp number (include country code)</label>
+                  <input id="supplier-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={supplierWhatsApp} onChange={(event) => setSupplierWhatsApp(event.target.value)} placeholder="e.g. 2348012345678" className={inputClass + " h-11"} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={saveSupplierContact} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button>
+                <button type="button" onClick={sendSupplierWhatsApp} className="min-h-11 rounded-xl border border-green-300 bg-white px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+              </div>
+              <p className="text-xs text-gray-600">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
+            </div>
+          </Section>
+
           <Section id="diagnosis" title="Diagnosis" icon={<Hospital className="h-5 w-5" />}>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-gray-700">Diagnosis / clinical impression</span>
@@ -857,30 +1188,76 @@ export default function DoctorEncounterPage() {
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold">Refraction → Optometrist</h3>
-                    <p className="text-xs text-gray-500">Send the patient to Optometry for formal refraction.</p>
+                    <p className="text-xs text-gray-500">Completed refraction results return here automatically from the Optometry assessment.</p>
                   </div>
-                  {refractionComplete && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                  {optometryAssessmentCompleted && <CheckCircle2 className="h-5 w-5 text-green-600" />}
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {[["OD", refractionOD, setRefractionOD], ["OS", refractionOS, setRefractionOS]].map(([eye, value, setter]) => {
-                    const v = value as Refraction;
-                    const setV = setter as React.Dispatch<React.SetStateAction<Refraction>>;
-                    return (
-                      <div key={eye as string} className="rounded-xl border p-4">
-                        <p className="mb-3 text-sm font-semibold">{eye as string}</p>
-                        <div className="grid grid-cols-3 gap-2">
-                          <input placeholder="Sphere" value={v.sphere} onChange={(e) => setV((x) => ({ ...x, sphere: e.target.value }))} className={inputClass} />
-                          <input placeholder="Cylinder" value={v.cylinder} onChange={(e) => setV((x) => ({ ...x, cylinder: e.target.value }))} className={inputClass} />
-                          <input placeholder="Axis" value={v.axis} onChange={(e) => setV((x) => ({ ...x, axis: e.target.value }))} className={inputClass} />
+                {optometryAssessmentCompleted && completedOptometryEncounter ? (
+                  <div className="space-y-3">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {[
+                        { eye: "OD", result: completedOptometryEncounter.refractionOD },
+                        { eye: "OS", result: completedOptometryEncounter.refractionOS },
+                      ].map(({ eye, result }) => (
+                        <div key={eye} className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                          <p className="mb-3 text-sm font-semibold">{eye} — {eye === "OD" ? "Right eye" : "Left eye"}</p>
+                          <p className="text-sm"><strong>Objective:</strong> {formatOptometryRefraction(result, "objective")}</p>
+                          <p className="mt-2 text-sm"><strong>Subjective:</strong> {formatOptometryRefraction(result, "subjective")}</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Send Refraction Request to Optometrist
-                </button>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-col items-start">
+                      <span className="inline-flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span>Optometry assessment completed</span>
+                      </span>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage("Optometry results refreshed.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-gray-300 p-4">
+                    <p className="text-sm text-gray-600">No completed Optometry refraction result is available yet. OD and OS will populate automatically when the Optometrist saves and completes the assessment.</p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button onClick={referOptometry} disabled={isPending || requesting === "optometry"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                        {requesting === "optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Send Refraction Request to Optometrist
+                      </button>
+                      <button type="button" onClick={async () => {
+                        setRequesting("refresh-optometry");
+                        setError("");
+                        try {
+                          const result = await getOptometryPatient(patientCode);
+                          if (!result.success) throw new Error(result.message || "Unable to refresh Optometry results.");
+                          setOptometryResult(result.patient ?? null);
+                          setMessage(result.patient?.previousOptometryEncounter?.status === "completed" ? "Completed Optometry results loaded." : "No completed Optometry result is available yet.");
+                        } catch (refreshError) {
+                          setError(refreshError instanceof Error ? refreshError.message : "Unable to refresh Optometry results.");
+                        } finally {
+                          setRequesting("");
+                        }
+                      }} disabled={requesting === "refresh-optometry"} className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                        {requesting === "refresh-optometry" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                        Refresh Optometry results
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -930,25 +1307,43 @@ export default function DoctorEncounterPage() {
           <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
             <div className="space-y-4">
               <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-violet-950">Send treatment plan to Cashier</h3>
+                    <p className="mt-1 text-xs text-violet-800">The saved plan will appear in the Cashier billing-review queue. Cashier must select and price the actual billable service; this action does not create a charge or invoice.</p>
+                  </div>
+                  <button type="button" onClick={sendTreatmentPlanForBilling} disabled={isPending || requesting === "cashier-treatment" || !treatmentPlan.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">
+                    {requesting === "cashier-treatment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {requesting === "cashier-treatment" ? "Sending to Cashier..." : "Send to Cashier"}
+                  </button>
+                </div>
+              </div>
               <div className="rounded-2xl border p-4">
                 <div className="mb-4 flex items-center gap-2">
                   <Pill className="h-5 w-5 text-blue-600" />
                   <div>
-                    <h3 className="font-semibold">Pharmacy request</h3>
-                    <p className="text-xs text-gray-500">Create the prescription and automatically add it to billing.</p>
+                    <h3 className="font-semibold">Prescription</h3>
+                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
                   </div>
                 </div>
-                <div className="grid gap-3 md:grid-cols-4">
-                  <input placeholder="Medication" value={medication} onChange={(e) => setMedication(e.target.value)} className={inputClass} />
-                  <input placeholder="Dosage / instructions" value={dosage} onChange={(e) => setDosage(e.target.value)} className={inputClass} />
-                  <input type="number" min="1" placeholder="Quantity" value={quantity} onChange={(e) => setQuantity(e.target.value)} className={inputClass} />
-                  <input type="number" min="0" placeholder="Price/unit" value={pricePerUnit} onChange={(e) => setPricePerUnit(e.target.value)} className={inputClass} />
-                </div>
-                <button onClick={prescribe} disabled={isPending} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  <Send className="h-4 w-4" /> Send to Pharmacy
+                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
+                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
+                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
+                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
                 </button>
               </div>
             </div>
+          </Section>
+
+          <Section id="procedure-request" title="Procedure request" icon={<Calendar className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Send a procedure request to Reception for registration, pricing confirmation and scheduling. Do not enter an unapproved price here.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Procedure requested" value={procedureName} onChange={setProcedureName} rows={2} placeholder="Enter the procedure name" />
+              <Field label="Clinical instructions / indication" value={procedureDetails} onChange={setProcedureDetails} rows={2} placeholder="Document the clinical indication and relevant instructions." />
+            </div>
+            <div className="mt-4 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId, destination: "RECEPTIONIST", handoffType: "PROCEDURE", title: procedureName.trim(), details: procedureDetails.trim() || "Please review and arrange this procedure request." })} disabled={isPending || !procedureName.trim() || requesting === "handoff-PROCEDURE"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "handoff-PROCEDURE" ? "Sending..." : "Send procedure to Reception"}</button></div>
           </Section>
 
           <Section id="requests" title="Clinical requests" icon={<Send className="h-5 w-5" />}>
@@ -1096,7 +1491,18 @@ export default function DoctorEncounterPage() {
               </div>
             </div>
             <p className="mt-3 text-xs text-gray-500">The appointment module remains the source of truth for booking and scheduling.</p>
-          </Section>
+                      <div className="mt-6 border-t pt-5">
+              <h3 className="font-semibold text-gray-900">Request follow-up appointment</h3>
+              <p className="mt-1 text-sm text-gray-500">This sends the requested interval to Reception. Reception confirms the actual booking with the patient.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Follow up in</span><input type="number" min="1" max="120" step="1" value={followUpInterval} onChange={(e) => setFollowUpInterval(e.target.value)} className={inputClass} /></label>
+                <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Interval unit</span><select value={followUpUnit} onChange={(e) => setFollowUpUnit(e.target.value as "days" | "months")} className={inputClass}><option value="days">Days</option><option value="months">Months</option></select></label>
+                <label className="block"><span className="mb-2 block text-sm font-medium text-gray-700">Preferred time (optional)</span><input type="time" value={followUpTime} onChange={(e) => setFollowUpTime(e.target.value)} className={inputClass} /></label>
+              </div>
+              <div className="mt-3"><Field label="Follow-up instructions / reason" value={followUpNotes} onChange={setFollowUpNotes} rows={2} placeholder="e.g. review response to treatment, repeat IOP..." /></div>
+              <div className="mt-3 flex justify-end"><button type="button" onClick={() => sendHandoff({ patientCode, encounterId, destination: "RECEPTIONIST", handoffType: "FOLLOW_UP", title: "Follow-up appointment request", details: followUpNotes.trim() || "Please arrange the doctor's requested follow-up appointment.", intervalValue: Number(followUpInterval), intervalUnit: followUpUnit, preferredTime: followUpTime })} disabled={isPending || !Number.isInteger(Number(followUpInterval)) || Number(followUpInterval) < 1 || Number(followUpInterval) > 120 || requesting === "handoff-FOLLOW_UP"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Calendar className="h-4 w-4" />{requesting === "handoff-FOLLOW_UP" ? "Sending..." : "Send follow-up to Reception"}</button></div>
+            </div>
+</Section>
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-white p-5 shadow-sm">
             <div>

@@ -42,12 +42,13 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
       return;
     }
 
+    const resolvedPatientCode: string = patientCode;
     let cancelled = false;
 
     async function loadActivePatient() {
       try {
         const response = await fetch(
-          `/api/patients/${encodeURIComponent(patientCode)}`,
+          `/api/patients/${encodeURIComponent(resolvedPatientCode)}`,
           { cache: "no-store" },
         );
 

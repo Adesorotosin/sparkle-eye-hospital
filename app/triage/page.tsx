@@ -64,6 +64,31 @@ function TriageVitalsContent() {
   const [spo2, setSpo2] = useState("98");
   const [rbs, setRbs] = useState("");
 
+  const rbsValue = rbs.trim() === "" ? null : Number(rbs);
+  const rbsGuidance =
+    rbsValue === null || !Number.isFinite(rbsValue)
+      ? null
+      : rbsValue >= 11.1
+      ? {
+          tone: "review" as const,
+          title: "Prompt clinical review",
+          description:
+            "A random plasma glucose of 11.1 mmol/L or above is in the diabetes diagnostic range when classic symptoms are present. This reading alone should not be treated as a diagnosis; clinician review and confirmation may be required.",
+        }
+      : rbsValue >= 7.8
+      ? {
+          tone: "context" as const,
+          title: "Interpret in clinical context",
+          description:
+            "There is no standard diagnostic prediabetes range for random blood glucose. Do not label this result as prediabetes based on RBS alone; the clinician may consider appropriate confirmatory testing.",
+        }
+      : {
+          tone: "usual" as const,
+          title: "Within the usual random-glucose range",
+          description:
+            "Random plasma glucose is usually below 7.8 mmol/L, but this is not a diagnostic cut-off. Interpret alongside the patient's clinical presentation.",
+        };
+
   // ------------------------------------------------------------
   // SAVE STATE
   // ------------------------------------------------------------
@@ -622,27 +647,52 @@ function TriageVitalsContent() {
                   </div>
                 </div>
 
-                {/* RBS */}
-                <div className="max-w-xs space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-600 block">
-                    RBS
-                  </span>
+                {/* RBS — reference guidance for non-pregnant adults */}
+                <div className="space-y-3">
+                  <div className="max-w-xs space-y-1.5">
+                    <label
+                      htmlFor="rbs-value"
+                      className="text-[11px] font-bold text-slate-600 block"
+                    >
+                      Random Blood Sugar (RBS) — mmol/L
+                    </label>
 
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={rbs}
-                    onChange={(event) =>
-                      setRbs(event.target.value)
-                    }
-                    placeholder="Enter RBS"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold focus:outline-none focus:border-purple-600"
-                  />
+                    <input
+                      id="rbs-value"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={rbs}
+                      onChange={(event) => setRbs(event.target.value)}
+                      placeholder="Enter RBS in mmol/L"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-3 text-xs font-bold focus:outline-none focus:border-purple-600"
+                    />
+                  </div>
 
-                  <span className="text-[9px] text-slate-400">
-                    Random Blood Sugar
-                  </span>
+                  {rbsGuidance && (
+                    <div
+                      aria-live="polite"
+                      className={`rounded-xl border p-3 text-xs leading-5 ${
+                        rbsGuidance.tone === "review"
+                          ? "border-rose-200 bg-rose-50 text-rose-800"
+                          : rbsGuidance.tone === "context"
+                          ? "border-amber-200 bg-amber-50 text-amber-800"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      }`}
+                    >
+                      <p className="font-bold">{rbsGuidance.title}</p>
+                      <p className="mt-1">{rbsGuidance.description}</p>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[10px] leading-5 text-slate-600">
+                    <p className="font-bold text-slate-700">
+                      Reference guidance — non-pregnant adults
+                    </p>
+                    <p className="mt-1">
+                      Random glucose has no standard diagnostic prediabetes range. The 7.8–11.0 mmol/L prediabetes range applies to a 2-hour 75-g oral glucose tolerance test, not an ordinary random test. A result must be interpreted by a clinician; this guidance is not a diagnosis.
+                    </p>
+                  </div>
                 </div>
               </div>
 

@@ -272,11 +272,11 @@ export default function OptometryExaminationPage() {
         );
 
         setRefractionOD(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setRefractionOS(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setSlitLampOD("");
@@ -292,11 +292,11 @@ export default function OptometryExaminationPage() {
         setWithCorrection(false);
 
         setRefractionOD(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setRefractionOS(
-          emptyRefraction()
+          emptyRefractionSet()
         );
 
         setSlitLampOD("");

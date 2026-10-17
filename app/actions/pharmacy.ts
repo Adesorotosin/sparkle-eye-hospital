@@ -30,9 +30,11 @@ export interface PharmacyPrescription {
   pricePerUnit: number;
   totalPrice: number;
   status:
+    | "awaiting_pharmacy_review"
     | "pending_payment"
     | "ready_for_dispensing"
-    | "dispensed";
+    | "dispensed"
+    | "reviewed";
 }
 
 export interface PharmacyPatient {
@@ -52,7 +54,7 @@ export interface PharmacyQueueItem {
   prescriptionCount: number;
   totalAmount: number;
   createdAt: string;
-  status: "pending_payment" | "ready_for_dispensing";
+  status: "awaiting_pharmacy_review" | "pending_payment" | "ready_for_dispensing";
 }
 
 export async function getPharmacyPatient(
@@ -156,9 +158,13 @@ export async function getPharmacyPatient(
           status:
             rx.status === "dispensed"
               ? "dispensed"
-              : rx.status === "pending_payment"
-                ? "pending_payment"
-                : "ready_for_dispensing",
+              : rx.status === "awaiting_pharmacy_review"
+                ? "awaiting_pharmacy_review"
+                : rx.status === "reviewed"
+                  ? "reviewed"
+                  : rx.status === "pending_payment"
+                    ? "pending_payment"
+                    : "ready_for_dispensing",
         })
       ),
     };
@@ -219,6 +225,7 @@ export async function getPharmacyQueue() {
           "id, patient_id, quantity, total_price, created_at, status"
         )
         .in("status", [
+          "awaiting_pharmacy_review",
           "pending_payment",
           "ready_for_dispensing",
         ])
@@ -287,43 +294,26 @@ export async function getPharmacyQueue() {
         continue;
       }
 
-      const existing =
-        grouped.get(
-          prescription.patient_id
-        );
+      const queueStatus: PharmacyQueueItem["status"] = prescription.status === "awaiting_pharmacy_review"
+        ? "awaiting_pharmacy_review"
+        : prescription.status === "pending_payment"
+          ? "pending_payment"
+          : "ready_for_dispensing";
+      const groupKey = `${prescription.patient_id}:${queueStatus}`;
+      const existing = grouped.get(groupKey);
 
       if (existing) {
         existing.prescriptionCount += 1;
-
-        existing.totalAmount += Number(
-          prescription.total_price ?? 0
-        );
+        existing.totalAmount += Number(prescription.total_price ?? 0);
       } else {
-        grouped.set(
-          prescription.patient_id,
-          {
-            patientId:
-              patient.patient_code,
-
-            fullName:
-              patient.full_name,
-
-            prescriptionCount: 1,
-
-            totalAmount: Number(
-              prescription.total_price ?? 0
-            ),
-
-            createdAt:
-              prescription.created_at,
-
-            status:
-              prescription.status ===
-              "pending_payment"
-                ? "pending_payment"
-                : "ready_for_dispensing",
-          }
-        );
+        grouped.set(groupKey, {
+          patientId: patient.patient_code,
+          fullName: patient.full_name,
+          prescriptionCount: 1,
+          totalAmount: Number(prescription.total_price ?? 0),
+          createdAt: prescription.created_at,
+          status: queueStatus,
+        });
       }
     }
 
@@ -407,9 +397,6 @@ export async function createPharmacyPrescription(
     const quantity =
       Number(input.quantity);
 
-    const pricePerUnit =
-      Number(input.pricePerUnit);
-
     if (!patientCode) {
       return {
         success: false,
@@ -443,19 +430,28 @@ export async function createPharmacyPrescription(
       };
     }
 
-    if (
-      !Number.isFinite(pricePerUnit) ||
-      pricePerUnit < 0
-    ) {
-      return {
-        success: false,
-        message:
-          "Price per unit is invalid.",
-      };
+
+
+    const { data: stockItem, error: stockError } = await supabaseServer
+      .from("inventory_items")
+      .select("sku, name, stock, price")
+      .eq("domain", "pharmacy")
+      .eq("name", drugName)
+      .maybeSingle();
+
+    if (stockError) {
+      console.error("Pharmacy stock lookup failed:", stockError);
+      return { success: false, message: "Unable to verify medication stock and price." };
+    }
+    if (!stockItem) {
+      return { success: false, message: "Select a medication from the pharmacy inventory before adding it to billing." };
+    }
+    if (Number(stockItem.stock) < quantity) {
+      return { success: false, message: "Only " + Number(stockItem.stock) + " unit(s) of this medication are in stock." };
     }
 
-    const totalPrice =
-      quantity * pricePerUnit;
+    const pricePerUnit = Number(stockItem.price);
+    const totalPrice = quantity * pricePerUnit;
 
     const {
       data: patient,
@@ -527,6 +523,7 @@ export async function createPharmacyPrescription(
       );
 
     const {
+      data: invoiceItem,
       error: invoiceItemError,
     } =
       await supabaseServer
@@ -538,9 +535,11 @@ export async function createPharmacyPrescription(
           quantity,
           unit_price: pricePerUnit,
           total_price: totalPrice,
-        });
+        })
+        .select("id")
+        .single();
 
-    if (invoiceItemError) {
+    if (invoiceItemError || !invoiceItem) {
       console.error(
         "Pharmacy invoice item creation failed:",
         invoiceItemError
@@ -555,6 +554,22 @@ export async function createPharmacyPrescription(
         success: false,
         message:
           "The medication could not be added to the patient's bill.",
+      };
+    }
+
+    const { error: prescriptionLinkError } = await supabaseServer
+      .from("prescriptions")
+      .update({ invoice_item_id: invoiceItem.id })
+      .eq("id", prescription.id)
+      .eq("patient_id", patient.id);
+
+    if (prescriptionLinkError) {
+      console.error("Prescription-to-invoice link failed:", prescriptionLinkError);
+      await supabaseServer.from("invoice_items").delete().eq("id", invoiceItem.id);
+      await supabaseServer.from("prescriptions").delete().eq("id", prescription.id);
+      return {
+        success: false,
+        message: "The medication could not be securely linked to the patient's bill. Please retry.",
       };
     }
 
@@ -668,6 +683,8 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       "dispense_patient_prescriptions",
       {
         p_patient_id: patient.id,
+        p_performed_by: staff.id,
+        p_performed_by_name: staff.name,
       }
     );
 
@@ -690,6 +707,7 @@ export async function dispensePatientPrescriptions(patientCode: string) {
     });
 
     revalidatePath("/pharmacy");
+    revalidatePath("/inventory");
 
     return {
       success: true,
@@ -717,5 +735,72 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       success: false,
       message: "Failed to dispense patient prescriptions.",
     };
+  }
+}
+
+export async function markPrescriptionRequestReviewed(prescriptionId: string) {
+  try {
+    await requireRole([...PHARMACY_WRITE_ROLES]);
+    const id = prescriptionId?.trim();
+    if (!id) return { success: false, message: "Prescription request ID is required." };
+
+    const { data: request, error: requestError } = await supabaseServer
+      .from("prescriptions")
+      .select("id, patient_id, created_at")
+      .eq("id", id)
+      .eq("status", "awaiting_pharmacy_review")
+      .maybeSingle();
+
+    if (requestError) {
+      console.error("Prescription request lookup failed:", requestError);
+      return { success: false, message: "Could not load the prescription request." };
+    }
+    if (!request) {
+      return { success: false, message: "This request is no longer awaiting review. Refresh the pharmacy record." };
+    }
+
+    const { data: billableMedication, error: medicationError } = await supabaseServer
+      .from("prescriptions")
+      .select("id")
+      .eq("patient_id", request.patient_id)
+      .gt("created_at", request.created_at)
+      .neq("id", request.id)
+      .neq("drug_name", "Doctor's prescription request — review required")
+      .in("status", ["pending_payment", "ready_for_dispensing", "dispensed"])
+      .limit(1)
+      .maybeSingle();
+
+    if (medicationError) {
+      console.error("Billable medication verification failed:", medicationError);
+      return { success: false, message: "Could not verify that the approved medication was added." };
+    }
+    if (!billableMedication) {
+      return { success: false, message: "Add the approved medication from available pharmacy stock first, then mark this request reviewed." };
+    }
+
+    const { data, error } = await supabaseServer
+      .from("prescriptions")
+      .update({ status: "reviewed" })
+      .eq("id", id)
+      .eq("status", "awaiting_pharmacy_review")
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Prescription request review update failed:", error);
+      return { success: false, message: "Could not update the prescription request." };
+    }
+    if (!data) {
+      return { success: false, message: "This request is no longer awaiting review. Refresh the pharmacy record." };
+    }
+
+    revalidatePath("/pharmacy");
+    return { success: true, message: "Prescription request marked as reviewed." };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "UNAUTHENTICATED") return { success: false, message: "Authentication required." };
+    if (message === "FORBIDDEN") return { success: false, message: "Only authorized pharmacy staff can review prescription requests." };
+    console.error("Mark prescription request reviewed error:", error);
+    return { success: false, message: "Could not mark the prescription request as reviewed." };
   }
 }

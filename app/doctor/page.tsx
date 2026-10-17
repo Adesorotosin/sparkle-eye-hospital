@@ -30,6 +30,7 @@ type QueueStatus =
 
 interface Appointment {
   id: string;
+  patientRecordId?: string;
   patientName: string;
   physician: string;
   startTime: string;
@@ -101,11 +102,14 @@ interface NotificationItem {
 }
 
 function getLocalDateString(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
+  // Use the hospital's timezone consistently, regardless of the
+  // browser or hosting server timezone.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
 function getAppointmentDateString(startTime: string) {
@@ -133,6 +137,7 @@ function formatAppointmentTime(start: string, end: string) {
     value.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Africa/Lagos",
     });
 
   return `${formatTime(startDate)} – ${formatTime(endDate)}`;
@@ -143,7 +148,7 @@ function formatAppointmentDate(dateString: string) {
     return "Date unavailable";
   }
 
-  const value = new Date(`${dateString}T00:00:00`);
+  const value = new Date(`${dateString}T00:00:00+01:00`);
 
   if (Number.isNaN(value.getTime())) {
     return dateString;
@@ -154,6 +159,7 @@ function formatAppointmentDate(dateString: string) {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "Africa/Lagos",
   });
 }
 
@@ -197,6 +203,11 @@ function normalizeAppointment(
   const id =
     typeof row.id === "string"
       ? row.id
+      : "";
+
+  const patientRecordId =
+    typeof row.patientId === "string"
+      ? row.patientId
       : "";
 
   const patientName =
@@ -254,6 +265,7 @@ function normalizeAppointment(
 
   return {
     id,
+    patientRecordId,
     patientName,
     physician,
     startTime,
@@ -434,11 +446,22 @@ export default function DoctorDashboard() {
           string,
           PatientRecord
         >();
+        const patientsById = new Map<
+          string,
+          PatientRecord
+        >();
 
         patients.forEach((patient) => {
           if (patient.patientId) {
             patientsByCode.set(
               patient.patientId.toLowerCase(),
+              patient
+            );
+          }
+
+          if (patient.id) {
+            patientsById.set(
+              patient.id.toLowerCase(),
               patient
             );
           }
@@ -449,6 +472,8 @@ export default function DoctorDashboard() {
          * by an appointment.
          */
         const appointmentPatientCodes =
+          new Set<string>();
+        const appointmentPatientIds =
           new Set<string>();
 
         /*
@@ -463,10 +488,30 @@ export default function DoctorDashboard() {
                 appointment.status !== "no_show"
             )
             .map((appointment) => {
-              const patientCode =
+              const extractedPatientCode =
                 extractPatientCode(
                   appointment.patientName
                 );
+
+              // Prefer the appointment's real patient foreign key.
+              // Display names are presentation data and may not contain
+              // a patient code, so they must not be the only join key.
+              const patientById = appointment.patientRecordId
+                ? patientsById.get(
+                    appointment.patientRecordId.toLowerCase()
+                  )
+                : undefined;
+
+              const patient =
+                patientById ??
+                (extractedPatientCode
+                  ? patientsByCode.get(
+                      extractedPatientCode.toLowerCase()
+                    )
+                  : undefined);
+
+              const patientCode =
+                patient?.patientId || extractedPatientCode;
 
               if (patientCode) {
                 appointmentPatientCodes.add(
@@ -474,11 +519,11 @@ export default function DoctorDashboard() {
                 );
               }
 
-              const patient = patientCode
-                ? patientsByCode.get(
-                    patientCode.toLowerCase()
-                  )
-                : undefined;
+              if (patient?.id) {
+                appointmentPatientIds.add(
+                  patient.id.toLowerCase()
+                );
+              }
 
               /*
                * Determine the clinical status.
@@ -487,20 +532,27 @@ export default function DoctorDashboard() {
                * completed_today ALWAYS wins over
                * appointment status.
                */
+              const patientLastVisitDate = patient
+                ? getPatientLastVisitDate(patient)
+                : "";
+              const patientCompletedForSelectedDate =
+                patient?.status === "completed_today" &&
+                (patientLastVisitDate === selectedDate ||
+                  (!patientLastVisitDate &&
+                    selectedDate === getLocalDateString()));
+              const patientInConsultationForSelectedDate =
+                patient?.status === "in_consultation" &&
+                (patientLastVisitDate === selectedDate ||
+                  (!patientLastVisitDate &&
+                    selectedDate === getLocalDateString()));
+
               let queueStatus: QueueStatus =
                 "waiting";
 
-              if (
-                patient?.status ===
-                "completed_today"
-              ) {
+              if (patientCompletedForSelectedDate) {
                 queueStatus = "completed";
-              } else if (
-                patient?.status ===
-                "in_consultation"
-              ) {
-                queueStatus =
-                  "in-consultation";
+              } else if (patientInConsultationForSelectedDate) {
+                queueStatus = "in-consultation";
               } else if (
                 appointment.status ===
                 "completed"
@@ -609,11 +661,17 @@ export default function DoctorDashboard() {
                 patient.patientId?.toLowerCase();
 
               const alreadyInAppointment =
-                patientCode
+                (patientCode
                   ? appointmentPatientCodes.has(
                       patientCode
                     )
-                  : false;
+                  : false) ||
+                Boolean(
+                  patient.id &&
+                    appointmentPatientIds.has(
+                      patient.id.toLowerCase()
+                    )
+                );
 
               return (
                 validStatus &&
@@ -635,10 +693,13 @@ export default function DoctorDashboard() {
                 return true;
               }
 
-              return (
-                !patientDate ||
-                patientDate === selectedDate
-              );
+              // Without a visit timestamp, a current workflow status
+              // cannot be reliably attributed to a historical date.
+              if (!patientDate) {
+                return selectedDate === getLocalDateString();
+              }
+
+              return patientDate === selectedDate;
             })
             .map((patient) => {
               const isCompleted =

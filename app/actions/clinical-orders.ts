@@ -18,10 +18,7 @@ export type DiagnosticOrderInput = {
 
 export type PrescriptionInput = {
   patientCode: string;
-  drugName: string;
-  dosage: string;
-  quantity: number;
-  pricePerUnit: number;
+  prescriptionText: string;
 };
 
 export type ClinicalOrderResponse = {
@@ -134,10 +131,51 @@ export async function createDiagnosticOrder(
       };
     }
 
+    if (price === 0) {
+      const { error: pricingHandoffError } = await supabaseServer
+        .from("clinical_handoffs")
+        .insert({
+          patient_id: patient.id,
+          destination: "CASHIER",
+          handoff_type: "PRICING_REVIEW",
+          title: "Pricing review required: " + name,
+          details: "An investigation order was created for " + name + ", but no approved price is configured. Add the approved investigation charge before billing; do not treat this as a free test. Order ID: " + diagnostic.id,
+          requested_by: staff.id,
+        });
+      if (pricingHandoffError) {
+        console.error("Investigation pricing-review handoff failed:", pricingHandoffError);
+        return { success: false, message: "Investigation order was created, but its pricing-review request could not be sent to Cashier. Refresh the patient record and notify the administrator; do not retry blindly.", id: diagnostic.id };
+      }
+      await logActivity({
+        module: "Diagnostics", category: "CLINICAL",
+        action: "Investigation sent for pricing review: " + name,
+        performedBy: staff.name, staffId: staff.id, patientId: patient.id,
+        details: JSON.stringify({ diagnosticOrderId: diagnostic.id, testName: name, pricePending: true }),
+      });
+      revalidatePath("/diagnostics");
+      revalidatePath("/billing");
+      revalidatePath("/cashier");
+      revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
+      return { success: true, message: name + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: diagnostic.id };
+    }
+
     /*
-     * Get the patient's active invoice.
+     * Get the patient's active invoice. The diagnostic row already exists,
+     * so preserve its ID if billing setup fails; the UI can refresh and
+     * show the order rather than encouraging a blind retry.
      */
-    const invoice = await getOrCreateDraftInvoice(patient.id);
+    let invoice: Awaited<ReturnType<typeof getOrCreateDraftInvoice>>;
+    try {
+      invoice = await getOrCreateDraftInvoice(patient.id);
+    } catch (invoiceError) {
+      console.error("Diagnostic invoice lookup failed:", invoiceError);
+      return {
+        success: false,
+        message:
+          "Diagnostic order was created, but the patient's invoice could not be opened. Refresh the patient record before retrying.",
+        id: diagnostic.id,
+      };
+    }
 
     /*
      * Add the diagnostic to the invoice.
@@ -167,7 +205,17 @@ export async function createDiagnosticOrder(
       };
     }
 
-    await recalcInvoice(invoice.id);
+    try {
+      await recalcInvoice(invoice.id);
+    } catch (recalcError) {
+      console.error("Diagnostic invoice recalculation failed:", recalcError);
+      return {
+        success: false,
+        message:
+          "Diagnostic order and billing item were created, but the invoice total could not be recalculated. Refresh the patient record before retrying.",
+        id: diagnostic.id,
+      };
+    }
 
     /*
      * Record the clinical activity using the actual
@@ -371,176 +419,69 @@ export async function createPrescription(
       "DOCTOR",
     ]);
 
-    const drugName = input.drugName?.trim();
-    const dosage = input.dosage?.trim();
-
-    const quantity = Number(input.quantity);
-    const pricePerUnit = Number(input.pricePerUnit);
-
-    if (!drugName) {
-      return {
-        success: false,
-        message: "Medication name is required.",
-      };
+    const prescriptionText = input.prescriptionText?.trim();
+    if (!prescriptionText) {
+      return { success: false, message: "Prescription instructions are required." };
     }
-
-    if (!dosage) {
-      return {
-        success: false,
-        message: "Dosage and medication instructions are required.",
-      };
+    if (prescriptionText.length > 5000) {
+      return { success: false, message: "Prescription instructions must be 5,000 characters or fewer." };
     }
-
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      return {
-        success: false,
-        message: "Quantity must be a whole number greater than zero.",
-      };
-    }
-
-    if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
-      return {
-        success: false,
-        message: "Price per unit is invalid.",
-      };
-    }
-
-    const totalPrice = quantity * pricePerUnit;
 
     const { patient, error } = await findPatient(input.patientCode);
-
     if (!patient) {
-      return {
-        success: false,
-        message: error ?? "Patient not found.",
-      };
+      return { success: false, message: error ?? "Patient not found." };
     }
 
-    /*
-     * Create the actual prescription.
-     */
-    const { data: prescription, error: prescriptionError } =
-      await supabaseServer
-        .from("prescriptions")
-        .insert({
-          patient_id: patient.id,
-          drug_name: drugName,
-          dosage,
-          quantity,
-          price_per_unit: pricePerUnit,
-          total_price: totalPrice,
-          status: "pending_payment",
-          prescribed_by: staff.id,
-        })
-        .select("id")
-        .single();
+    // This is a clinical request only. Pharmacy confirms the stock item,
+    // quantity and approved price before creating the billable medication.
+    const { data: prescription, error: prescriptionError } = await supabaseServer
+      .from("prescriptions")
+      .insert({
+        patient_id: patient.id,
+        drug_name: "Doctor's prescription request — review required",
+        dosage: prescriptionText,
+        quantity: 1,
+        price_per_unit: 0,
+        total_price: 0,
+        status: "awaiting_pharmacy_review",
+        prescribed_by: staff.id,
+      })
+      .select("id")
+      .single();
 
     if (prescriptionError) {
-      console.error(
-        "Prescription creation failed:",
-        prescriptionError
-      );
-
-      return {
-        success: false,
-        message: "Failed to create the prescription.",
-      };
+      console.error("Prescription request creation failed:", prescriptionError);
+      return { success: false, message: "Failed to send the prescription request to Pharmacy." };
     }
 
-    /*
-     * Get the active invoice.
-     */
-    const invoice = await getOrCreateDraftInvoice(patient.id);
-
-    /*
-     * Add the medication to billing.
-     */
-    const { error: itemError } = await supabaseServer
-      .from("invoice_items")
-      .insert({
-        invoice_id: invoice.id,
-        category: "pharmacy",
-        name: drugName,
-        quantity,
-        unit_price: pricePerUnit,
-        total_price: totalPrice,
-      });
-
-    if (itemError) {
-      console.error(
-        "Prescription invoice item creation failed:",
-        itemError
-      );
-
-      return {
-        success: false,
-        message:
-          "Prescription was created, but it could not be added to the invoice.",
-        id: prescription.id,
-      };
-    }
-
-    await recalcInvoice(invoice.id);
-
-    /*
-     * Record the pharmacy activity using the actual
-     * authenticated staff member.
-     */
     await logActivity({
       module: "Pharmacy",
       category: "CLINICAL",
-      action: `Prescription created: ${drugName}`,
+      action: "Prescription request sent for pharmacy review",
       performedBy: staff.name,
       staffId: staff.id,
       patientId: patient.id,
-      details: JSON.stringify({
-        prescriptionId: prescription.id,
-        drugName,
-        dosage,
-        quantity,
-        pricePerUnit,
-        totalPrice,
-      }),
-      financialAmount: totalPrice,
+      details: JSON.stringify({ prescriptionRequestId: prescription.id }),
     });
 
-    revalidatePath(
-      `/doctor/patients/${patient.patient_code}/encounter`
-    );
-
-    revalidatePath("/billing");
-    revalidatePath("/cashier");
+    revalidatePath(`/doctor/patients/${patient.patient_code}/encounter`);
     revalidatePath("/pharmacy");
 
     return {
       success: true,
-      message: `${drugName} has been prescribed and added to the patient's bill.`,
+      message: "Prescription sent to Pharmacy for review. No charge has been added; Pharmacy must confirm the medication and price.",
       id: prescription.id,
     };
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "UNAUTHENTICATED") {
-        return {
-          success: false,
-          message: "You must be signed in to perform this action.",
-        };
+        return { success: false, message: "You must be signed in to perform this action." };
       }
-
       if (error.message === "FORBIDDEN") {
-        return {
-          success: false,
-          message:
-            "You are not authorized to create prescriptions.",
-        };
+        return { success: false, message: "You are not authorized to create prescription requests." };
       }
     }
-
-    console.error("Create prescription error:", error);
-
-    return {
-      success: false,
-      message:
-        "An unexpected error occurred while creating the prescription.",
-    };
+    console.error("Create prescription request error:", error);
+    return { success: false, message: "An unexpected error occurred while sending the prescription request." };
   }
 }

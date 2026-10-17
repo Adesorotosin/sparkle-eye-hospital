@@ -13,7 +13,17 @@ create table staff (
   name text not null,
   email text unique not null,
   role text not null check (role in (
-    'IT_ADMIN','OPHTHALMOLOGIST','DOCTOR','PHARMACIST','NURSE','CASHIER','RECEPTIONIST'
+    'IT_ADMIN',
+    'OPHTHALMOLOGIST',
+    'DOCTOR',
+    'OPTOMETRIST',
+    'OPTICIAN',
+    'LAB_SCIENTIST',
+    'NURSE',
+    'PHARMACIST',
+    'CASHIER',
+    'RECEPTIONIST',
+    'INVENTORY_MANAGER'
   )),
   title text,                                 -- human-readable job title, e.g. "Senior Ophthalmologist"
                                                -- (separate from `role`, which drives login/route access)
@@ -91,7 +101,7 @@ create table prescriptions (
   price_per_unit numeric not null,
   total_price numeric not null,
   status text not null default 'pending_payment'
-    check (status in ('pending_payment','ready_for_dispensing','dispensed')),
+    check (status in ('awaiting_pharmacy_review','reviewed','pending_payment','ready_for_dispensing','dispensed')),
   prescribed_by uuid references staff(id),
   created_at timestamptz not null default now()
 );
@@ -106,11 +116,33 @@ create table encounters (
   refraction_od jsonb,          -- { sphere, cylinder, axis }
   refraction_os jsonb,
   diagnosis text,
+  treatment_plan text,
   status text not null default 'draft' check (status in ('draft','completed')),
   recorded_by uuid references staff(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Doctor-to-cashier treatment-plan billing requests. This handoff is not an invoice.
+create table if not exists treatment_billing_requests (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references patients(id) on delete cascade,
+  encounter_id uuid not null unique references encounters(id) on delete cascade,
+  treatment_plan text not null check (length(trim(treatment_plan)) > 0),
+  status text not null default 'pending' check (status in ('pending','reviewed','cancelled')),
+  requested_by uuid references staff(id) on delete set null,
+  requested_by_name text not null,
+  reviewed_by uuid references staff(id) on delete set null,
+  reviewed_by_name text,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists idx_treatment_billing_requests_status_created
+  on treatment_billing_requests(status, created_at desc);
+create index if not exists idx_treatment_billing_requests_patient
+  on treatment_billing_requests(patient_id);
+alter table treatment_billing_requests enable row level security;
 
 -- ============================================================
 -- BILLING
@@ -139,6 +171,11 @@ create table invoice_items (
   unit_price numeric not null,
   total_price numeric not null
 );
+
+-- Exact invoice line linked to each pharmacy prescription for payment enforcement.
+alter table public.prescriptions
+  add column if not exists invoice_item_id uuid
+  references public.invoice_items(id) on delete set null;
 
 create table activity_logs (
   id uuid primary key default gen_random_uuid(),
@@ -225,115 +262,363 @@ create index idx_security_logs_created on security_logs(created_at);
 create index idx_appointments_time on appointments(start_time);
 create index idx_notifications_created on notifications(created_at);
 
--- ============================================================
--- PHARMACY DISPENSING
--- Atomically dispenses all paid/ready prescriptions for a patient.
--- Stock is deducted only when sufficient pharmacy inventory exists.
--- ============================================================
+-- Shared inventory foundation for optical products and hospital consumables.
+-- Existing inventory_items rows are preserved; pharmacy dispensing keeps using domain='pharmacy'.
 
-create or replace function public.dispense_patient_prescriptions(
-  p_patient_id uuid
+ALTER TABLE public.inventory_items
+  DROP CONSTRAINT IF EXISTS inventory_items_domain_check;
+
+ALTER TABLE public.inventory_items
+  ADD CONSTRAINT inventory_items_domain_check
+  CHECK (domain IN ('optical', 'pharmacy', 'hospital'));
+
+ALTER TABLE public.inventory_items
+  ADD COLUMN IF NOT EXISTS unit_of_measure text NOT NULL DEFAULT 'unit',
+  ADD COLUMN IF NOT EXISTS unit_cost numeric(12,2) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
+CREATE TABLE IF NOT EXISTS public.inventory_suppliers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  contact_person text,
+  phone text,
+  email text,
+  address text,
+  notes text,
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.inventory_movements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id uuid NOT NULL REFERENCES public.inventory_items(id) ON DELETE RESTRICT,
+  movement_type text NOT NULL CHECK (
+    movement_type IN ('RECEIVE', 'ISSUE', 'RETURN', 'ADJUSTMENT', 'SALE', 'DAMAGE', 'EXPIRED')
+  ),
+  quantity integer NOT NULL CHECK (quantity > 0),
+  previous_stock integer NOT NULL CHECK (previous_stock >= 0),
+  new_stock integer NOT NULL CHECK (new_stock >= 0),
+  unit_cost numeric(12,2),
+  supplier_id uuid REFERENCES public.inventory_suppliers(id) ON DELETE SET NULL,
+  department text,
+  reference text,
+  notes text,
+  performed_by uuid REFERENCES public.staff(id) ON DELETE SET NULL,
+  performed_by_name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_item_created
+  ON public.inventory_movements(item_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_created
+  ON public.inventory_movements(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_domain_category
+  ON public.inventory_items(domain, category);
+CREATE INDEX IF NOT EXISTS idx_inventory_suppliers_active
+  ON public.inventory_suppliers(is_active, name);
+
+ALTER TABLE public.inventory_suppliers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
+
+-- Receive stock and write its audit ledger row in one database transaction.
+CREATE OR REPLACE FUNCTION public.inventory_receive_stock(
+  p_item_id uuid,
+  p_quantity integer,
+  p_performed_by uuid,
+  p_performed_by_name text,
+  p_unit_cost numeric DEFAULT NULL,
+  p_supplier_id uuid DEFAULT NULL,
+  p_reference text DEFAULT NULL,
+  p_notes text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item public.inventory_items%ROWTYPE;
+  v_new_stock integer;
+BEGIN
+  IF p_item_id IS NULL OR p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Select an item and enter a quantity greater than zero.';
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.inventory_items
+  WHERE id = p_item_id AND is_active = true
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'The inventory item was not found or is inactive.';
+  END IF;
+
+  IF p_unit_cost IS NOT NULL AND p_unit_cost < 0 THEN
+    RAISE EXCEPTION 'Unit cost cannot be negative.';
+  END IF;
+
+  v_new_stock := v_item.stock + p_quantity;
+
+  UPDATE public.inventory_items
+  SET stock = v_new_stock,
+      unit_cost = COALESCE(p_unit_cost, unit_cost),
+      updated_at = now()
+  WHERE id = p_item_id;
+
+  INSERT INTO public.inventory_movements (
+    item_id, movement_type, quantity, previous_stock, new_stock,
+    unit_cost, supplier_id, reference, notes, performed_by, performed_by_name
+  ) VALUES (
+    p_item_id, 'RECEIVE', p_quantity, v_item.stock, v_new_stock,
+    COALESCE(p_unit_cost, v_item.unit_cost), p_supplier_id,
+    NULLIF(trim(p_reference), ''), NULLIF(trim(p_notes), ''),
+    p_performed_by, p_performed_by_name
+  );
+
+  RETURN jsonb_build_object('item_id', p_item_id, 'previous_stock', v_item.stock, 'new_stock', v_new_stock);
+END;
+$$;
+
+-- Department issues are atomic and cannot drive stock below zero.
+CREATE OR REPLACE FUNCTION public.inventory_issue_stock(
+  p_item_id uuid,
+  p_quantity integer,
+  p_department text,
+  p_performed_by uuid,
+  p_performed_by_name text,
+  p_reference text DEFAULT NULL,
+  p_notes text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item public.inventory_items%ROWTYPE;
+  v_new_stock integer;
+BEGIN
+  IF p_item_id IS NULL OR p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Select an item and enter a quantity greater than zero.';
+  END IF;
+
+  IF NULLIF(trim(p_department), '') IS NULL THEN
+    RAISE EXCEPTION 'Select the department receiving the stock.';
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.inventory_items
+  WHERE id = p_item_id AND is_active = true
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'The inventory item was not found or is inactive.';
+  END IF;
+
+  IF v_item.stock < p_quantity THEN
+    RAISE EXCEPTION 'Insufficient stock. Only % % available.',
+      v_item.stock, v_item.unit_of_measure;
+  END IF;
+
+  v_new_stock := v_item.stock - p_quantity;
+
+  UPDATE public.inventory_items
+  SET stock = v_new_stock, updated_at = now()
+  WHERE id = p_item_id;
+
+  INSERT INTO public.inventory_movements (
+    item_id, movement_type, quantity, previous_stock, new_stock,
+    department, reference, notes, performed_by, performed_by_name
+  ) VALUES (
+    p_item_id, 'ISSUE', p_quantity, v_item.stock, v_new_stock,
+    trim(p_department), NULLIF(trim(p_reference), ''),
+    NULLIF(trim(p_notes), ''), p_performed_by, p_performed_by_name
+  );
+
+  RETURN jsonb_build_object('item_id', p_item_id, 'previous_stock', v_item.stock, 'new_stock', v_new_stock);
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.inventory_receive_stock(uuid, integer, uuid, text, numeric, uuid, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.inventory_receive_stock(uuid, integer, uuid, text, numeric, uuid, text, text)
+  TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.inventory_issue_stock(uuid, integer, text, uuid, text, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.inventory_issue_stock(uuid, integer, text, uuid, text, text, text)
+  TO service_role;
+
+-- ============================================================
+-- Pharmacy dispensing must update the shared inventory movement ledger in the same
+-- transaction as the stock deduction and prescription status change.
+DROP FUNCTION IF EXISTS public.dispense_patient_prescriptions(uuid);
+
+CREATE OR REPLACE FUNCTION public.dispense_patient_prescriptions(
+  p_patient_id uuid,
+  p_performed_by uuid,
+  p_performed_by_name text
 )
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
   prescription_record record;
   inventory_record record;
   dispensed_count integer := 0;
   total_quantity integer := 0;
   prescription_ids uuid[] := '{}';
-begin
-  if p_patient_id is null then
-    raise exception 'Patient ID is required.';
-  end if;
+  v_new_stock integer;
+  inventory_match_count integer := 0;
+BEGIN
+  IF p_patient_id IS NULL THEN
+    RAISE EXCEPTION 'Patient ID is required.';
+  END IF;
+  IF p_performed_by IS NULL OR NULLIF(trim(p_performed_by_name), '') IS NULL THEN
+    RAISE EXCEPTION 'Dispensing staff identity is required.';
+  END IF;
 
-  /*
-   * Only prescriptions that have been unlocked by payment
-   * can be dispensed.
-   */
-  if not exists (
-    select 1
-    from prescriptions
-    where patient_id = p_patient_id
-      and status = 'ready_for_dispensing'
-  ) then
-    raise exception 'No prescriptions are ready for dispensing.';
-  end if;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.prescriptions
+    WHERE patient_id = p_patient_id
+      AND status = 'ready_for_dispensing'
+  ) THEN
+    RAISE EXCEPTION 'No prescriptions are ready for dispensing.';
+  END IF;
 
-  /*
-   * Lock the patient's ready prescriptions and process them
-   * in creation order. The row locks prevent two concurrent
-   * dispensing attempts from consuming the same prescription.
-   */
-  for prescription_record in
-    select id, drug_name, quantity
-    from prescriptions
-    where patient_id = p_patient_id
-      and status = 'ready_for_dispensing'
-    order by created_at asc
-    for update
-  loop
-    /*
-     * Match the prescribed drug to pharmacy inventory.
-     * Matching is case-insensitive and ignores surrounding whitespace.
-     */
-    select id, name, stock
-    into inventory_record
-    from inventory_items
-    where domain = 'pharmacy'
-      and lower(trim(name)) = lower(trim(prescription_record.drug_name))
-    order by created_at asc
-    limit 1
-    for update;
+  -- Lock prescriptions so concurrent requests cannot dispense them twice.
+  FOR prescription_record IN
+    SELECT id, drug_name, quantity, invoice_item_id, price_per_unit
+    FROM public.prescriptions
+    WHERE patient_id = p_patient_id
+      AND status = 'ready_for_dispensing'
+    ORDER BY created_at ASC, id ASC
+    FOR UPDATE
+  LOOP
+    -- Dispensing is allowed only for a prescription linked to its own paid invoice item.
+    IF prescription_record.invoice_item_id IS NULL OR NOT EXISTS (
+      SELECT 1
+      FROM public.invoice_items ii
+      JOIN public.invoices i ON i.id = ii.invoice_id
+      WHERE ii.id = prescription_record.invoice_item_id
+        AND ii.category = 'pharmacy'
+        AND i.patient_id = p_patient_id
+        AND i.status = 'paid'
+        AND lower(trim(ii.name)) = lower(trim(prescription_record.drug_name))
+        AND ii.quantity = prescription_record.quantity
+        AND ii.unit_price = prescription_record.price_per_unit
+    ) THEN
+      RAISE EXCEPTION 'Prescription % is not linked to a paid invoice item. Complete payment before dispensing.',
+        prescription_record.id;
+    END IF;
 
-    if not found then
-      raise exception 'Pharmacy stock item not found for medication: %',
+    -- Do not silently choose the oldest row if duplicate active stock names exist.
+    SELECT count(*) INTO inventory_match_count
+    FROM public.inventory_items
+    WHERE domain = 'pharmacy'
+      AND is_active = true
+      AND lower(trim(name)) = lower(trim(prescription_record.drug_name));
+
+    IF inventory_match_count = 0 THEN
+      RAISE EXCEPTION 'Active pharmacy stock item not found for medication: %',
         prescription_record.drug_name;
-    end if;
+    ELSIF inventory_match_count > 1 THEN
+      RAISE EXCEPTION 'Multiple active pharmacy stock items match medication: %. Resolve duplicate inventory names before dispensing.',
+        prescription_record.drug_name;
+    END IF;
 
-    if inventory_record.stock < prescription_record.quantity then
-      raise exception 'Insufficient stock for %: % available, % required.',
+    -- Lock the matching active stock row to serialize competing stock deductions.
+    SELECT id, name, stock, unit_cost, unit_of_measure
+    INTO inventory_record
+    FROM public.inventory_items
+    WHERE domain = 'pharmacy'
+      AND is_active = true
+      AND lower(trim(name)) = lower(trim(prescription_record.drug_name))
+    ORDER BY created_at ASC, id ASC
+    LIMIT 1
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Active pharmacy stock item not found for medication: %',
+        prescription_record.drug_name;
+    END IF;
+
+    IF inventory_record.stock < prescription_record.quantity THEN
+      RAISE EXCEPTION 'Insufficient stock for %: % available, % required.',
         inventory_record.name,
         inventory_record.stock,
         prescription_record.quantity;
-    end if;
+    END IF;
 
-    update inventory_items
-    set stock = stock - prescription_record.quantity,
+    v_new_stock := inventory_record.stock - prescription_record.quantity;
+
+    UPDATE public.inventory_items
+    SET stock = v_new_stock,
         updated_at = now()
-    where id = inventory_record.id;
+    WHERE id = inventory_record.id;
 
-    update prescriptions
-    set status = 'dispensed'
-    where id = prescription_record.id;
+    UPDATE public.prescriptions
+    SET status = 'dispensed'
+    WHERE id = prescription_record.id
+      AND status = 'ready_for_dispensing';
 
-    prescription_ids := array_append(
-      prescription_ids,
-      prescription_record.id
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Prescription % is no longer ready for dispensing.',
+        prescription_record.id;
+    END IF;
+
+    INSERT INTO public.inventory_movements (
+      item_id, movement_type, quantity, previous_stock, new_stock,
+      unit_cost, department, reference, notes, performed_by, performed_by_name
+    ) VALUES (
+      inventory_record.id, 'SALE', prescription_record.quantity,
+      inventory_record.stock, v_new_stock, inventory_record.unit_cost,
+      'Pharmacy', prescription_record.id::text,
+      'Dispensed for patient ' || p_patient_id::text,
+      p_performed_by, trim(p_performed_by_name)
     );
+
+    prescription_ids := array_append(prescription_ids, prescription_record.id);
     dispensed_count := dispensed_count + 1;
     total_quantity := total_quantity + prescription_record.quantity;
-  end loop;
+  END LOOP;
 
-  return jsonb_build_object(
+  RETURN jsonb_build_object(
     'dispensed_count', dispensed_count,
     'total_quantity', total_quantity,
     'prescription_ids', prescription_ids
   );
-end;
-$;
+END;
+$$;
 
--- This function is intentionally callable only by the server-side
--- Supabase service role. It must not be directly executable by
--- browser clients.
-revoke execute on function public.dispense_patient_prescriptions(uuid)
-from public, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, text)
+  TO service_role;
 
-grant execute on function public.dispense_patient_prescriptions(uuid)
-to service_role;
+
+-- Compatibility overload for an older deployed application that still calls the
+-- one-argument RPC. It deliberately fails closed; it must never bypass payment,
+-- staff identity, or inventory-ledger checks.
+CREATE OR REPLACE FUNCTION public.dispense_patient_prescriptions(
+  p_patient_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Pharmacy dispensing requires the updated application. Please retry after the hospital system has been updated.';
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
+  TO service_role;
 
 -- ============================================================
 -- Row Level Security
@@ -353,6 +638,8 @@ alter table invoice_items enable row level security;
 alter table activity_logs enable row level security;
 alter table security_logs enable row level security;
 alter table inventory_items enable row level security;
+alter table inventory_suppliers enable row level security;
+alter table inventory_movements enable row level security;
 alter table appointments enable row level security;
 alter table notifications enable row level security;
 

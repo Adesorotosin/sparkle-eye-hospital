@@ -788,6 +788,10 @@ export async function getPatientRecord(
           encounter.family_ocular_history ??
           undefined,
 
+        historyProforma: encounter.history_proforma ?? {},
+        refractionNotes: encounter.refraction_notes ?? undefined,
+        lensType: encounter.lens_type ?? undefined,
+
         ocularExamOD:
           encounter.ocular_exam_od ??
           undefined,

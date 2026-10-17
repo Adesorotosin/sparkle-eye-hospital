@@ -277,7 +277,7 @@ function BillingContent() {
       });
 
       try {
-        localStorage.clear();
+        localStorage.removeItem("sparkle_staff_token");
         sessionStorage.clear();
       } catch {}
 
@@ -737,7 +737,7 @@ function BillingContent() {
                   { id: "pos", name: "POS Terminal" },
                   { id: "transfer", name: "Bank Transfer" },
                   { id: "card", name: "Debit/Credit Card" },
-                  { id: "hmo", name: "HMO / Health Insurance" },
+                  { id: "hmo", name: "HMO / Health Insurance (not enabled)", disabled: true },
                 ].map((method) => (
                   <label
                     key={method.id}
@@ -751,6 +751,7 @@ function BillingContent() {
                       <input
                         type="radio"
                         name="payment"
+                        disabled={Boolean(method.disabled)}
                         checked={selectedPayment === method.id}
                         onChange={() =>
                           setSelectedPayment(
