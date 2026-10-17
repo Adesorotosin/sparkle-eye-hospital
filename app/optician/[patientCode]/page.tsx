@@ -102,7 +102,14 @@ function formatRefraction(refraction?: Refraction | null) {
   // Newer Optometry records store objective and subjective results together.
   // Use the final subjective prescription first, falling back to objective
   // values and then to legacy flat records.
-  const values = refraction.subjective ?? refraction.objective ?? refraction;
+  const hasValues = (values?: RefractionValues | null) =>
+    Boolean(values && [values.sphere, values.cylinder, values.axis, values.add]
+      .some((value) => value !== null && value !== undefined && String(value).trim() !== ""));
+  const values = hasValues(refraction.subjective)
+    ? refraction.subjective!
+    : hasValues(refraction.objective)
+      ? refraction.objective!
+      : refraction;
   const parts: string[] = [];
 
   if (values.sphere !== null && values.sphere !== undefined && values.sphere !== "") {
