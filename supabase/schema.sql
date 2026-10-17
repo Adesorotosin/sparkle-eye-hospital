@@ -588,6 +588,28 @@ REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, tex
 GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid, uuid, text)
   TO service_role;
 
+
+-- Compatibility overload for an older deployed application that still calls the
+-- one-argument RPC. It deliberately fails closed; it must never bypass payment,
+-- staff identity, or inventory-ledger checks.
+CREATE OR REPLACE FUNCTION public.dispense_patient_prescriptions(
+  p_patient_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $
+BEGIN
+  RAISE EXCEPTION 'Pharmacy dispensing requires the updated application. Please retry after the hospital system has been updated.';
+END;
+$;
+
+REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
+  TO service_role;
+
 -- ============================================================
 -- Row Level Security
 -- All access in this app goes through server-side API routes using the
