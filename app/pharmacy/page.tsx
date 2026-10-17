@@ -2373,6 +2373,7 @@ function PharmacyContent() {
                 </tbody>
 
               </table>
+            </div>
 
             {selectedDeferralIds.length > 0 && (
               <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
