@@ -22,6 +22,7 @@ import {
 import {
   getOptometryQueue,
   startOptometryExam,
+  addVisitingPatientToQueue,
   type OptometryPatient,
 } from "@/app/actions/optometry";
 
@@ -48,6 +49,7 @@ export default function OptometryDashboard() {
 
   const [feedback, setFeedback] =
     useState("");
+  const [visitingPatientCode, setVisitingPatientCode] = useState("");
 
   const [isPending, startTransition] =
     useTransition();
@@ -201,6 +203,26 @@ export default function OptometryDashboard() {
     });
   }
 
+  function handleAddVisitingPatient(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const patientCode = visitingPatientCode.trim();
+    if (!patientCode) {
+      setFeedback("Enter the registered patient's code.");
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await addVisitingPatientToQueue(patientCode);
+      if (!result.success) {
+        setFeedback(result.message);
+        return;
+      }
+      await loadQueue();
+      setVisitingPatientCode("");
+      setFeedback(result.message);
+    });
+  }
+
   async function handleLogout() {
     try {
       await fetch(
@@ -291,6 +313,24 @@ export default function OptometryDashboard() {
             Refresh Queue
           </button>
         </div>
+
+        <form onSubmit={handleAddVisitingPatient} className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label htmlFor="visiting-patient-code" className="block text-xs font-extrabold text-slate-700">Add visiting patient</label>
+            <p className="mt-1 text-[11px] text-slate-500">Reception must register the patient first. Enter their patient code to add them to this queue.</p>
+            <input
+              id="visiting-patient-code"
+              value={visitingPatientCode}
+              onChange={(event) => setVisitingPatientCode(event.target.value)}
+              placeholder="Patient code"
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 sm:max-w-sm"
+              required
+            />
+          </div>
+          <button type="submit" disabled={isPending} className="rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-800 disabled:opacity-60">
+            {isPending ? "Adding…" : "Add to queue"}
+          </button>
+        </form>
 
         {feedback && (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
