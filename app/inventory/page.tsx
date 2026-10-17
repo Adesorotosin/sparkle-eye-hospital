@@ -84,7 +84,7 @@ export default function InventoryPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const isManager = role === "IT_ADMIN" || role === "INVENTORY_MANAGER";
+  const isManager = role === "IT_ADMIN";
   const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
