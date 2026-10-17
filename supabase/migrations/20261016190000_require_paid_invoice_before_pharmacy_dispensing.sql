@@ -9,7 +9,8 @@ WITH candidate_matches AS (
   SELECT
     p.id AS prescription_id,
     ii.id AS invoice_item_id,
-    count(*) OVER (PARTITION BY p.id) AS candidate_count
+    count(*) OVER (PARTITION BY p.id) AS prescription_candidate_count,
+    count(*) OVER (PARTITION BY ii.id) AS invoice_item_candidate_count
   FROM public.prescriptions p
   JOIN public.invoices i
     ON i.patient_id = p.patient_id
@@ -25,7 +26,8 @@ UPDATE public.prescriptions p
 SET invoice_item_id = candidate_matches.invoice_item_id
 FROM candidate_matches
 WHERE candidate_matches.prescription_id = p.id
-  AND candidate_matches.candidate_count = 1;
+  AND candidate_matches.prescription_candidate_count = 1
+  AND candidate_matches.invoice_item_candidate_count = 1;
 
 -- Pharmacy dispensing must update the shared inventory movement ledger in the same
 -- transaction as the stock deduction and prescription status change.
