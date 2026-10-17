@@ -95,7 +95,7 @@ export async function getInventoryData() {
         .order("name", { ascending: true }),
       supabaseServer
         .from("inventory_movements")
-        .select("id, item_id, movement_type, quantity, previous_stock, new_stock, department, reference, notes, performed_by_name, created_at, item:inventory_items(name, sku, domain, unit_of_measure), supplier:inventory_suppliers(name)")
+        .select("id, item_id, movement_type, quantity, previous_stock, new_stock, sale_amount, department, reference, notes, performed_by_name, created_at, item:inventory_items(name, sku, domain, unit_of_measure), supplier:inventory_suppliers(name)")
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
