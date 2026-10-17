@@ -144,6 +144,9 @@ export async function createInventoryItem(input: {
 
     if (!sku || !name || !category) return { success: false, message: "SKU, item name and category are required." };
     if (!validDomains.includes(input.domain)) return { success: false, message: "Choose a valid inventory category." };
+    if (input.domain === "pharmacy" && staff.role !== "IT_ADMIN") {
+      return { success: false, message: "Only an IT administrator can create pharmacy inventory items." };
+    }
     if (!Number.isInteger(input.reorderLevel) || input.reorderLevel < 0) return { success: false, message: "Reorder level must be zero or greater." };
     if (!Number.isFinite(input.price) || input.price < 0 || !Number.isFinite(input.unitCost) || input.unitCost < 0) return { success: false, message: "Prices and costs must be zero or greater." };
 
