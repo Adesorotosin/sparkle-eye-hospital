@@ -2906,50 +2906,6 @@ function PharmacyContent() {
               false
             )
           }
-          onAddDrug={() =>
-            setIsAddDrugStockModalOpen(
-              true
-            )
-          }
-        />
-      )}
-
-      {/* ADD STOCK MODAL */}
-
-      {isAddDrugStockModalOpen && (
-        <AddDrugStockModal
-          newDrugStock={
-            newDrugStock
-          }
-          setNewDrugStock={
-            setNewDrugStock
-          }
-          drugSuggestions={
-            drugSuggestions
-          }
-          showDrugSuggestions={
-            showDrugSuggestions
-          }
-          setShowDrugSuggestions={
-            setShowDrugSuggestions
-          }
-          isSearchingDrugs={
-            isSearchingDrugs
-          }
-          isSubmitting={
-            isSubmittingDrugStock
-          }
-          onDrugNameChange={
-            handleDrugNameChange
-          }
-          onSubmit={
-            handleAddDrugStock
-          }
-          onClose={() =>
-            setIsAddDrugStockModalOpen(
-              false
-            )
-          }
         />
       )}
 
@@ -2967,12 +2923,10 @@ function DrugInventoryModal({
   drugInventory,
   isLoading,
   onClose,
-  onAddDrug,
 }: {
   drugInventory: DrugStockItem[];
   isLoading: boolean;
   onClose: () => void;
-  onAddDrug: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -2987,15 +2941,6 @@ function DrugInventoryModal({
           </h3>
 
           <div className="flex items-center gap-3">
-
-            <button
-              type="button"
-              onClick={onAddDrug}
-              className="px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Drug
-            </button>
 
             <button
               type="button"
