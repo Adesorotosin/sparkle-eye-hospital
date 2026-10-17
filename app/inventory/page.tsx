@@ -84,7 +84,8 @@ export default function InventoryPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const isManager = role === "IT_ADMIN" || role === "PHARMACIST" || role === "INVENTORY_MANAGER";
+  const isManager = role === "IT_ADMIN" || role === "INVENTORY_MANAGER";
+  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
@@ -186,7 +187,7 @@ export default function InventoryPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
-            <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>
+            {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
             <button onClick={() => void handleSignOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
@@ -233,7 +234,7 @@ export default function InventoryPage() {
                     <td className="px-5 py-4"><span className="font-extrabold text-slate-900">{item.stock}</span> <span className="text-xs text-slate-500">{item.unit_of_measure}</span><p className="mt-1 text-[10px] text-slate-400">Reorder at {item.reorder_level}</p></td>
                     <td className="px-5 py-4 text-slate-600">{money(item.unit_cost)}</td><td className="px-5 py-4 font-semibold text-slate-800">{money(item.price)}</td>
                     <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${low ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{low ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}{low ? "Low stock" : "In stock"}</span></td>
-                    <td className="px-5 py-4"><button disabled={item.domain === "pharmacy" && role !== "IT_ADMIN" && role !== "INVENTORY_MANAGER"} onClick={() => { const canReceive = isManager && (item.domain !== "pharmacy" || role === "IT_ADMIN"); const canIssue = item.domain !== "pharmacy" || role === "IT_ADMIN" || role === "INVENTORY_MANAGER"; if (canReceive) { setReceiveForm((v) => ({...v, itemId: item.id})); setModal("receive"); } else if (canIssue) { setIssueForm((v) => ({...v, itemId: item.id})); setModal("issue"); } }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60">{isManager && (item.domain !== "pharmacy" || role === "IT_ADMIN") ? "Receive" : item.domain === "pharmacy" && role !== "IT_ADMIN" && role !== "INVENTORY_MANAGER" ? "Dispense in Pharmacy" : "Issue"}</button></td>
+                    <td className="px-5 py-4">{isManager && (item.domain !== "pharmacy" || role === "IT_ADMIN") ? <button onClick={() => { setReceiveForm((v) => ({...v, itemId: item.id})); setModal("receive"); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">Receive</button> : item.domain === "pharmacy" ? <span className="text-xs text-slate-400">Dispense in Pharmacy</span> : canIssueStock ? <button onClick={() => { setIssueForm((v) => ({...v, itemId: item.id})); setModal("issue"); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">Issue</button> : <span className="text-xs text-slate-400">View only</span>}</td>
                   </tr>;
                 })}
               </tbody>
