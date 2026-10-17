@@ -111,10 +111,19 @@ create table prescriptions (
 create table encounters (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid not null references patients(id) on delete cascade,
+  encounter_type text not null default 'doctor',
+  visual_acuity_od text,
+  visual_acuity_os text,
+  visual_acuity_ou text,
+  with_correction boolean not null default false,
   slit_lamp_od text,
   slit_lamp_os text,
-  refraction_od jsonb,          -- { sphere, cylinder, axis }
+  refraction_od jsonb,          -- flat legacy values or { objective, subjective }
   refraction_os jsonb,
+  optometry_source text default 'in_house'
+    check (optometry_source is null or optometry_source in ('in_house','visiting')),
+  optometry_visit_type text
+    check (optometry_visit_type is null or optometry_visit_type in ('doctor_referral','external_referral','self_presenting')),
   diagnosis text,
   treatment_plan text,
   status text not null default 'draft' check (status in ('draft','completed')),
@@ -300,6 +309,7 @@ CREATE TABLE IF NOT EXISTS public.inventory_movements (
   previous_stock integer NOT NULL CHECK (previous_stock >= 0),
   new_stock integer NOT NULL CHECK (new_stock >= 0),
   unit_cost numeric(12,2),
+  sale_amount numeric(12,2) NOT NULL DEFAULT 0,
   supplier_id uuid REFERENCES public.inventory_suppliers(id) ON DELETE SET NULL,
   department text,
   reference text,
@@ -618,6 +628,80 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
+  TO service_role;
+
+-- Audited daily sales for non-prescription pharmacy transactions.
+CREATE OR REPLACE FUNCTION public.inventory_record_pharmacy_daily_sale(
+  p_item_id uuid,
+  p_quantity integer,
+  p_sale_date date,
+  p_performed_by uuid,
+  p_performed_by_name text,
+  p_notes text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO pg_catalog
+AS $$
+DECLARE
+  v_item public.inventory_items%ROWTYPE;
+  v_new_stock integer;
+  v_sale_amount numeric(12,2);
+BEGIN
+  IF p_item_id IS NULL OR p_quantity IS NULL OR p_quantity <= 0 THEN
+    RAISE EXCEPTION 'Select a pharmacy item and enter a quantity greater than zero.';
+  END IF;
+  IF p_sale_date IS NULL THEN
+    RAISE EXCEPTION 'Sale date is required.';
+  END IF;
+  IF p_performed_by IS NULL OR NULLIF(pg_catalog.btrim(p_performed_by_name), '') IS NULL THEN
+    RAISE EXCEPTION 'Staff identity is required to record a sale.';
+  END IF;
+
+  SELECT * INTO v_item
+  FROM public.inventory_items
+  WHERE id = p_item_id AND domain = 'pharmacy' AND is_active = true
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'The selected pharmacy item is unavailable.';
+  END IF;
+  IF v_item.stock < p_quantity THEN
+    RAISE EXCEPTION 'Insufficient stock for %: % available, % requested.',
+      v_item.name, v_item.stock, p_quantity;
+  END IF;
+
+  v_new_stock := v_item.stock - p_quantity;
+  v_sale_amount := round(v_item.price * p_quantity, 2);
+
+  UPDATE public.inventory_items
+  SET stock = v_new_stock, updated_at = pg_catalog.now()
+  WHERE id = v_item.id;
+
+  INSERT INTO public.inventory_movements (
+    item_id, movement_type, quantity, previous_stock, new_stock,
+    unit_cost, department, reference, notes, performed_by,
+    performed_by_name, sale_amount
+  ) VALUES (
+    v_item.id, 'SALE', p_quantity, v_item.stock, v_new_stock,
+    v_item.unit_cost, 'Pharmacy',
+    'DAILY-SALE-' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD'),
+    'Daily pharmacy sale recorded for ' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD') ||
+      CASE WHEN NULLIF(pg_catalog.btrim(p_notes), '') IS NULL THEN '' ELSE ': ' || pg_catalog.btrim(p_notes) END,
+    p_performed_by, pg_catalog.btrim(p_performed_by_name), v_sale_amount
+  );
+
+  RETURN pg_catalog.jsonb_build_object(
+    'item_id', v_item.id, 'quantity', p_quantity,
+    'sale_amount', v_sale_amount, 'new_stock', v_new_stock
+  );
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.inventory_record_pharmacy_daily_sale(uuid, integer, date, uuid, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.inventory_record_pharmacy_daily_sale(uuid, integer, date, uuid, text, text)
   TO service_role;
 
 -- ============================================================

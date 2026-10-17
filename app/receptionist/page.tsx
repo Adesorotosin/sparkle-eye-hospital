@@ -671,19 +671,6 @@ export default function ReceptionistPage() {
                 <span className="mt-1 block text-xs font-medium text-slate-500">Schedule a patient visit.</span>
               </span>
             </button>
-
-            <button
-              onClick={() => router.push("/nurse")}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                <CheckCircle2 className="h-5 w-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-extrabold text-slate-900">Open triage queue</span>
-                <span className="mt-1 block text-xs font-medium text-slate-500">View patients awaiting initial assessment.</span>
-              </span>
-            </button>
           </div>
         </section>
 

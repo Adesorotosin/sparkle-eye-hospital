@@ -34,7 +34,8 @@ export interface PharmacyPrescription {
     | "pending_payment"
     | "ready_for_dispensing"
     | "dispensed"
-    | "reviewed";
+    | "reviewed"
+    | "deferred_due_to_cost";
 }
 
 export interface PharmacyPatient {
@@ -164,7 +165,9 @@ export async function getPharmacyPatient(
                   ? "reviewed"
                   : rx.status === "pending_payment"
                     ? "pending_payment"
-                    : "ready_for_dispensing",
+                    : rx.status === "deferred_due_to_cost"
+                      ? "deferred_due_to_cost"
+                      : "ready_for_dispensing",
         })
       ),
     };
@@ -735,6 +738,180 @@ export async function dispensePatientPrescriptions(patientCode: string) {
       success: false,
       message: "Failed to dispense patient prescriptions.",
     };
+  }
+}
+
+/**
+ * Defer unpaid medication lines when a patient cannot afford the full prescription.
+ * The prescription remains in the record, but is removed from the current unpaid bill
+ * and excluded from dispensing until it is restored to billing and paid.
+ */
+export async function deferPrescriptionsDueToCost(
+  patientCode: string,
+  prescriptionIds: string[],
+) {
+  try {
+    const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    const code = patientCode?.trim();
+    const ids = [...new Set((prescriptionIds ?? []).map((id) => id.trim()).filter(Boolean))];
+    if (!code || ids.length === 0) {
+      return { success: false, message: "Select at least one unpaid medication to defer." };
+    }
+
+    const { data: patient, error: patientError } = await supabaseServer
+      .from("patients")
+      .select("id, patient_code, full_name")
+      .eq("patient_code", code)
+      .maybeSingle();
+    if (patientError || !patient) {
+      return { success: false, message: "Unable to find the patient record." };
+    }
+
+    const { data: prescriptions, error: prescriptionError } = await supabaseServer
+      .from("prescriptions")
+      .select("id, patient_id, drug_name, dosage, quantity, price_per_unit, total_price, invoice_item_id, status")
+      .eq("patient_id", patient.id)
+      .eq("status", "pending_payment")
+      .in("id", ids);
+    if (prescriptionError) throw prescriptionError;
+    if ((prescriptions ?? []).length !== ids.length) {
+      return { success: false, message: "Only unpaid prescriptions can be deferred. Refresh the patient record and try again." };
+    }
+
+    const invoiceItemIds = (prescriptions ?? []).map((rx) => rx.invoice_item_id).filter(Boolean) as string[];
+    const { data: invoiceItems, error: itemError } = invoiceItemIds.length
+      ? await supabaseServer.from("invoice_items")
+          .select("id, invoice_id, category, name, quantity, unit_price, total_price")
+          .in("id", invoiceItemIds)
+      : { data: [], error: null };
+    if (itemError) throw itemError;
+    if ((invoiceItems ?? []).some((item) => item.category !== "pharmacy")) {
+      return { success: false, message: "A selected medication is not linked to a pharmacy bill item." };
+    }
+
+    const invoiceIds = [...new Set((invoiceItems ?? []).map((item) => item.invoice_id))];
+    const { data: invoices, error: invoiceError } = invoiceIds.length
+      ? await supabaseServer.from("invoices").select("id, status").in("id", invoiceIds)
+      : { data: [], error: null };
+    if (invoiceError) throw invoiceError;
+    if ((invoices ?? []).some((invoice) => invoice.status === "paid" || invoice.status === "cancelled")) {
+      return { success: false, message: "A selected medication belongs to a finalised bill and cannot be deferred." };
+    }
+
+    if (invoiceItemIds.length) {
+      const { error: deleteError } = await supabaseServer.from("invoice_items").delete().in("id", invoiceItemIds);
+      if (deleteError) throw deleteError;
+    }
+
+    const { data: updated, error: updateError } = await supabaseServer
+      .from("prescriptions")
+      .update({ status: "deferred_due_to_cost", invoice_item_id: null })
+      .eq("patient_id", patient.id)
+      .eq("status", "pending_payment")
+      .in("id", ids)
+      .select("id");
+    if (updateError || (updated ?? []).length !== ids.length) {
+      // Restore deleted bill lines if the prescription status change fails.
+      for (const item of invoiceItems ?? []) {
+        const { data: restoredItem } = await supabaseServer
+          .from("invoice_items")
+          .insert({
+            invoice_id: item.invoice_id,
+            category: item.category,
+            name: item.name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+          })
+          .select("id")
+          .single();
+        const rx = (prescriptions ?? []).find((prescription) => prescription.invoice_item_id === item.id);
+        if (restoredItem && rx) {
+          await supabaseServer.from("prescriptions").update({ invoice_item_id: restoredItem.id }).eq("id", rx.id);
+        }
+      }
+      throw updateError ?? new Error("The selected prescriptions could not be deferred.");
+    }
+
+    for (const invoiceId of invoiceIds) await recalcInvoice(invoiceId);
+    await logActivity({
+      patientId: patient.id,
+      module: "Pharmacy",
+      category: "CLINICAL",
+      action: "Medication deferred because patient could not afford full prescription",
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ prescriptionIds: ids, medications: prescriptions?.map((rx) => rx.drug_name) ?? [] }),
+    });
+    revalidatePath("/pharmacy");
+    revalidatePath("/billing");
+    revalidatePath("/cashier");
+    return { success: true, message: "Selected medication(s) deferred. Only the remaining bill items can be paid and dispensed." };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Unable to defer the selected medication." };
+  }
+}
+
+/** Restore a deferred prescription to an unpaid invoice when the patient returns. */
+export async function restoreDeferredPrescriptionToBill(prescriptionId: string) {
+  try {
+    const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    const id = prescriptionId?.trim();
+    if (!id) return { success: false, message: "Prescription ID is required." };
+
+    const { data: prescription, error: prescriptionError } = await supabaseServer
+      .from("prescriptions")
+      .select("id, patient_id, drug_name, dosage, quantity, price_per_unit, total_price, status")
+      .eq("id", id)
+      .eq("status", "deferred_due_to_cost")
+      .maybeSingle();
+    if (prescriptionError) throw prescriptionError;
+    if (!prescription) return { success: false, message: "This prescription is no longer deferred." };
+
+    const invoice = await getOrCreateDraftInvoice(prescription.patient_id);
+    const { data: invoiceItem, error: itemError } = await supabaseServer
+      .from("invoice_items")
+      .insert({
+        invoice_id: invoice.id,
+        category: "pharmacy",
+        name: prescription.drug_name,
+        quantity: Number(prescription.quantity),
+        unit_price: Number(prescription.price_per_unit),
+        total_price: Number(prescription.total_price),
+      })
+      .select("id")
+      .single();
+    if (itemError || !invoiceItem) throw itemError ?? new Error("Unable to restore the medication to billing.");
+
+    const { data: updated, error: updateError } = await supabaseServer
+      .from("prescriptions")
+      .update({ status: "pending_payment", invoice_item_id: invoiceItem.id })
+      .eq("id", id)
+      .eq("status", "deferred_due_to_cost")
+      .select("id")
+      .maybeSingle();
+    if (updateError || !updated) {
+      await supabaseServer.from("invoice_items").delete().eq("id", invoiceItem.id);
+      throw updateError ?? new Error("This prescription was updated by another user. Refresh and try again.");
+    }
+
+    await recalcInvoice(invoice.id);
+    await logActivity({
+      patientId: prescription.patient_id,
+      module: "Pharmacy",
+      category: "CLINICAL",
+      action: "Deferred medication restored to billing",
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ prescriptionId: id, drugName: prescription.drug_name }),
+      financialAmount: Number(prescription.total_price ?? 0),
+    });
+    revalidatePath("/pharmacy");
+    revalidatePath("/billing");
+    revalidatePath("/cashier");
+    return { success: true, message: "Medication restored to the bill. Complete payment before dispensing." };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Unable to restore deferred medication." };
   }
 }
 

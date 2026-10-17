@@ -28,11 +28,16 @@ interface OpticianPatientPageProps {
   }>;
 }
 
-interface Refraction {
+interface RefractionValues {
   sphere?: string | number | null;
   cylinder?: string | number | null;
   axis?: string | number | null;
   add?: string | number | null;
+}
+
+interface Refraction extends RefractionValues {
+  objective?: RefractionValues | null;
+  subjective?: RefractionValues | null;
 }
 
 interface OptometryAssessment {
@@ -94,30 +99,33 @@ function formatDate(value: string | null | undefined) {
 function formatRefraction(refraction?: Refraction | null) {
   if (!refraction) return "No prescription recorded";
 
+  // Newer Optometry records store objective and subjective results together.
+  // Use the final subjective prescription first, falling back to objective
+  // values and then to legacy flat records.
+  const hasValues = (values?: RefractionValues | null) =>
+    Boolean(values && [values.sphere, values.cylinder, values.axis, values.add]
+      .some((value) => value !== null && value !== undefined && String(value).trim() !== ""));
+  const values = hasValues(refraction.subjective)
+    ? refraction.subjective!
+    : hasValues(refraction.objective)
+      ? refraction.objective!
+      : refraction;
   const parts: string[] = [];
 
-  if (refraction.sphere !== null && refraction.sphere !== undefined) {
-    parts.push(`SPH ${refraction.sphere}`);
+  if (values.sphere !== null && values.sphere !== undefined && values.sphere !== "") {
+    parts.push(`SPH ${values.sphere}`);
+  }
+  if (values.cylinder !== null && values.cylinder !== undefined && values.cylinder !== "") {
+    parts.push(`CYL ${values.cylinder}`);
+  }
+  if (values.axis !== null && values.axis !== undefined && values.axis !== "") {
+    parts.push(`AXIS ${values.axis}`);
+  }
+  if (values.add !== null && values.add !== undefined && values.add !== "") {
+    parts.push(`ADD ${values.add}`);
   }
 
-  if (
-    refraction.cylinder !== null &&
-    refraction.cylinder !== undefined
-  ) {
-    parts.push(`CYL ${refraction.cylinder}`);
-  }
-
-  if (refraction.axis !== null && refraction.axis !== undefined) {
-    parts.push(`AXIS ${refraction.axis}`);
-  }
-
-  if (refraction.add !== null && refraction.add !== undefined) {
-    parts.push(`ADD ${refraction.add}`);
-  }
-
-  return parts.length > 0
-    ? parts.join(" • ")
-    : "No prescription recorded";
+  return parts.length > 0 ? parts.join(" • ") : "No prescription recorded";
 }
 
 function statusLabel(status?: OpticalOrder["status"] | null) {

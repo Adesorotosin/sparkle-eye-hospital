@@ -15,6 +15,7 @@ import PatientBanner, {
 import {
   Search,
   ChevronRight,
+  ChevronLeft,
   Info,
   Printer,
   CheckCircle,
@@ -34,6 +35,8 @@ import {
   createPharmacyPrescription,
   dispensePatientPrescriptions,
   markPrescriptionRequestReviewed,
+  deferPrescriptionsDueToCost,
+  restoreDeferredPrescriptionToBill,
   type PharmacyPatient,
   type PharmacyQueueItem,
 } from "@/app/actions/pharmacy";
@@ -98,6 +101,9 @@ function PharmacyContent() {
 
   const [actionError, setActionError] =
     useState<string | null>(null);
+  const [affordabilityNotice, setAffordabilityNotice] = useState<string | null>(null);
+  const [selectedForDeferral, setSelectedForDeferral] = useState<Record<string, boolean>>({});
+  const [isDeferring, setIsDeferring] = useState(false);
 
   const [administeredDrugs, setAdministeredDrugs] =
     useState<Record<string, boolean>>({});
@@ -298,6 +304,8 @@ function PharmacyContent() {
   useEffect(() => {
     setDispenseSuccess(false);
     setActionError(null);
+    setAffordabilityNotice(null);
+    setSelectedForDeferral({});
     setAdministeredDrugs({});
   }, [patientId]);
 
@@ -448,13 +456,21 @@ function PharmacyContent() {
       })
     ) ?? [];
 
+  const deferredPrescriptions = activePrescriptions.filter(
+    (item) => item.status === "deferred_due_to_cost"
+  );
+
+  const selectedDeferralIds = activePrescriptions
+    .filter((item) => item.status === "pending_payment" && selectedForDeferral[item.id])
+    .map((item) => item.id);
+
   const totalPrescriptionPrice =
-    activePrescriptions.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.totalPrice || 0),
-      0
-    );
+    activePrescriptions
+      .filter((item) => item.status !== "deferred_due_to_cost")
+      .reduce(
+        (sum, item) => sum + Number(item.totalPrice || 0),
+        0
+      );
 
   const isHMO =
     patient?.coveragePlan
@@ -629,6 +645,42 @@ function PharmacyContent() {
       await loadQueue();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not update the prescription request.");
+    }
+  };
+
+  const handleDeferUnaffordable = async () => {
+    if (!patientId || selectedDeferralIds.length === 0) {
+      setActionError("Select the unpaid medication(s) the patient cannot afford.");
+      return;
+    }
+    setIsDeferring(true);
+    setActionError(null);
+    setAffordabilityNotice(null);
+    try {
+      const result = await deferPrescriptionsDueToCost(patientId, selectedDeferralIds);
+      if (!result.success) throw new Error(result.message);
+      setAffordabilityNotice(result.message);
+      setSelectedForDeferral({});
+      await loadPatient(patientId);
+      await loadQueue();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to defer the selected medication.");
+    } finally {
+      setIsDeferring(false);
+    }
+  };
+
+  const handleRestoreDeferred = async (prescriptionId: string) => {
+    setActionError(null);
+    setAffordabilityNotice(null);
+    try {
+      const result = await restoreDeferredPrescriptionToBill(prescriptionId);
+      if (!result.success) throw new Error(result.message);
+      setAffordabilityNotice(result.message);
+      await loadPatient(patientId);
+      await loadQueue();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to restore the medication.");
     }
   };
 
@@ -1938,15 +1990,22 @@ function PharmacyContent() {
 
         <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between print:hidden">
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <span>
-              Dispensing Queue
-            </span>
-
+          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+            {patientId && (
+              <button
+                type="button"
+                onClick={() => router.push("/pharmacy")}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700"
+                aria-label="Back to pharmacy queue"
+                title="Back to pharmacy queue"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+            <span>Dispensing Queue</span>
             <span>›</span>
-
             <span className="text-slate-900 font-bold">
-              Order Detail
+              {patientId ? "Order Detail" : "Queue"}
             </span>
           </div>
 
@@ -1980,6 +2039,11 @@ function PharmacyContent() {
           {actionError && (
             <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-800 font-medium">
               {actionError}
+            </div>
+          )}
+          {affordabilityNotice && (
+            <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800">
+              {affordabilityNotice}
             </div>
           )}
 
@@ -2159,6 +2223,9 @@ function PharmacyContent() {
                     <th className="pb-3">
                       STATUS
                     </th>
+                    <th className="pb-3">
+                      AFFORDABILITY
+                    </th>
 
                   </tr>
 
@@ -2222,7 +2289,7 @@ function PharmacyContent() {
 
                               <button
                                 type="button"
-                                disabled={rx.status === "awaiting_pharmacy_review" || rx.status === "reviewed"}
+                                disabled={rx.status !== "ready_for_dispensing"}
                                 onClick={() => toggleAdminister(rx.id)}
                                 className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                   isAdministered
@@ -2253,12 +2320,34 @@ function PharmacyContent() {
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : rx.status === "ready_for_dispensing"
                                       ? "bg-blue-50 text-blue-700 border-blue-200"
-                                      : "bg-amber-50 text-amber-700 border-amber-200"
+                                      : rx.status === "deferred_due_to_cost"
+                                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                                        : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}>
                                   {isDispensed ? "dispensed" : rx.status.replace(/_/g, " ")}
                                 </span>
                               )}
 
+                            </td>
+
+                            <td className="py-3.5">
+                              {rx.status === "pending_payment" ? (
+                                <label className="inline-flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(selectedForDeferral[rx.id])}
+                                    onChange={(event) => setSelectedForDeferral((current) => ({ ...current, [rx.id]: event.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                  />
+                                  Defer
+                                </label>
+                              ) : rx.status === "deferred_due_to_cost" ? (
+                                <button type="button" onClick={() => void handleRestoreDeferred(rx.id)} className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1.5 text-[10px] font-bold text-purple-700 hover:bg-purple-100">
+                                  Restore to bill
+                                </button>
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
                             </td>
 
                           </tr>
@@ -2270,7 +2359,7 @@ function PharmacyContent() {
 
                       <td
                         colSpan={
-                          6
+                          7
                         }
                         className="py-6 text-center text-slate-400"
                       >
@@ -2284,8 +2373,33 @@ function PharmacyContent() {
                 </tbody>
 
               </table>
-
             </div>
+
+            {selectedDeferralIds.length > 0 && (
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
+                <div>
+                  <p className="text-xs font-extrabold text-amber-900">Patient cannot afford all prescribed medicines?</p>
+                  <p className="mt-1 text-[11px] text-amber-800">Defer selected unpaid items. They will not be billed or dispensed until restored and paid.</p>
+                </div>
+                <button type="button" disabled={isDeferring} onClick={() => void handleDeferUnaffordable()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-amber-800 disabled:opacity-60">
+                  {isDeferring ? "Updating bill…" : `Defer ${selectedDeferralIds.length} item(s)`}
+                </button>
+              </div>
+            )}
+            {deferredPrescriptions.length > 0 && (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+                <p className="text-xs font-extrabold text-rose-900">Deferred due to cost ({deferredPrescriptions.length})</p>
+                <p className="mt-1 text-[11px] text-rose-800">These medicines remain in the prescription record and are not included in the current bill or dispensing queue.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {deferredPrescriptions.map((rx) => (
+                    <span key={rx.id} className="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">
+                      {rx.drugName}
+                      <button type="button" onClick={() => void handleRestoreDeferred(rx.id)} className="font-extrabold text-purple-700 hover:text-purple-900">Restore to bill</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-sky-50/80 border border-sky-200/80 rounded-xl p-4 flex items-start gap-3 text-xs text-sky-900 print:hidden">
 

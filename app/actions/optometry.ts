@@ -188,6 +188,56 @@ export async function getOptometryQueue(): Promise<{
 }
 
 /**
+ * Adds an already-registered visiting patient to the Optometry queue.
+ * Reception must register the patient first; the assessment form records
+ * external-referral versus self-presenting details.
+ */
+export async function addVisitingPatientToQueue(
+  patientCode: string
+): Promise<OptometryActionResponse> {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const normalizedCode = patientCode?.trim();
+    if (!normalizedCode) return { success: false, message: "Enter the registered patient's code." };
+
+    const { data: patient, error: patientError } = await supabaseServer
+      .from("patients")
+      .select("id, patient_code, full_name, optometry_status")
+      .eq("patient_code", normalizedCode)
+      .maybeSingle();
+    if (patientError) throw patientError;
+    if (!patient) return { success: false, message: `Patient ${normalizedCode} was not found. Register the patient at Reception first.` };
+    if (patient.optometry_status === "completed") {
+      return { success: false, message: "This patient already has a completed Optometry assessment and cannot be re-added to the same visit." };
+    }
+    if (patient.optometry_status === "referred" || patient.optometry_status === "in_examination") {
+      return { success: true, message: `${patient.full_name} is already in the Optometry queue.` };
+    }
+
+    const { error: updateError } = await supabaseServer
+      .from("patients")
+      .update({ optometry_status: "referred" })
+      .eq("id", patient.id);
+    if (updateError) throw updateError;
+
+    await logActivity({
+      patientId: patient.id,
+      module: "Optometry",
+      category: "CLINICAL",
+      action: "Visiting patient added to Optometry queue",
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ patientCode: normalizedCode, source: "visiting" }),
+    });
+    revalidatePath("/optometry");
+    revalidatePath(`/optometry/${encodeURIComponent(normalizedCode)}`);
+    return { success: true, message: `${patient.full_name} added to the Optometry queue. Choose Visiting optometrist and the correct visit type when opening the assessment.` };
+  } catch (error) {
+    return handleError(error, "Unable to add the visiting patient to Optometry.");
+  }
+}
+
+/**
  * Starts an Optometry examination.
  */
 export async function startOptometryExam(
@@ -373,6 +423,8 @@ export async function getOptometryPatient(
   slit_lamp_os,
   refraction_od,
   refraction_os,
+  optometry_source,
+  optometry_visit_type,
   diagnosis,
   status,
   created_at,
@@ -540,6 +592,12 @@ export async function getOptometryPatient(
         refractionOS:
           optometryEncounter.refraction_os ??
           null,
+
+        optometrySource:
+          optometryEncounter.optometry_source ?? "in_house",
+
+        optometryVisitType:
+          optometryEncounter.optometry_visit_type ?? "doctor_referral",
 
         diagnosis:
           optometryEncounter.diagnosis ??

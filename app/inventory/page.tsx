@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   createInventoryItem,
+  recordPharmacyDailySale,
   createInventorySupplier,
   getInventoryData,
   issueInventoryStock,
@@ -21,7 +22,7 @@ import {
 } from "@/app/actions/inventory";
 
 type TabKey = "all" | "optical" | "hospital" | "pharmacy";
-type ModalKey = "item" | "receive" | "issue" | "supplier" | null;
+type ModalKey = "item" | "receive" | "issue" | "supplier" | "sale" | null;
 
 const money = (value: number) => new Intl.NumberFormat("en-NG", {
   style: "currency", currency: "NGN", maximumFractionDigits: 2,
@@ -66,6 +67,12 @@ export default function InventoryPage() {
     itemId: "", quantity: "1", department: "Optician", reference: "", notes: "",
   });
   const [supplierForm, setSupplierForm] = useState({ name: "", contactPerson: "", phone: "", email: "" });
+  const [saleForm, setSaleForm] = useState({
+    itemId: "",
+    quantity: "1",
+    saleDate: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
+    notes: "",
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -84,7 +91,8 @@ export default function InventoryPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const isManager = role === "IT_ADMIN" || role === "INVENTORY_MANAGER";
+  const isManager = role === "IT_ADMIN";
+  const canRecordSales = role === "IT_ADMIN" || role === "PHARMACIST";
   const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
@@ -158,6 +166,27 @@ export default function InventoryPage() {
     setSaving(false);
   };
 
+  const submitDailySale = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true); setError(""); setNotice("");
+    const result = await recordPharmacyDailySale({
+      itemId: saleForm.itemId,
+      quantity: Number(saleForm.quantity),
+      saleDate: saleForm.saleDate,
+      notes: saleForm.notes,
+    });
+    if (result.success) {
+      setSaleForm({
+        itemId: "",
+        quantity: "1",
+        saleDate: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
+        notes: "",
+      });
+      await refreshAfterSuccess(result.message);
+    } else setError(result.message);
+    setSaving(false);
+  };
+
   const submitSupplier = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true); setError(""); setNotice("");
@@ -188,6 +217,7 @@ export default function InventoryPage() {
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
             {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
+            {canRecordSales && <button onClick={() => { setSaleForm((v) => ({ ...v, itemId: v.itemId || items.find((item) => item.domain === "pharmacy" && item.is_active && item.stock > 0)?.id || "" })); setModal("sale"); }} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><Activity className="h-4 w-4" /> Record daily sale</button>}
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
             <button onClick={() => void handleSignOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
@@ -243,9 +273,9 @@ export default function InventoryPage() {
         </section>
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="rounded-xl bg-sky-50 p-2 text-sky-700"><ClipboardList className="h-4 w-4" /></span><div><h2 className="font-extrabold text-slate-950">Stock movement history</h2><p className="mt-1 text-xs text-slate-500">Latest 100 recorded receipts and department issues.</p></div></div><select aria-label="Filter stock movements" value={movementFilter} onChange={(event) => setMovementFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"><option value="all">All movements</option><option value="RECEIVE">Stock received</option><option value="ISSUE">Department issues</option><option value="RETURN">Returns</option><option value="DAMAGE">Damaged</option><option value="EXPIRED">Expired</option><option value="SALE">Patient sales</option></select></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left"><thead><tr className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500"><th className="px-5 py-3 font-extrabold">Date</th><th className="px-5 py-3 font-extrabold">Item</th><th className="px-5 py-3 font-extrabold">Movement</th><th className="px-5 py-3 font-extrabold">Quantity</th><th className="px-5 py-3 font-extrabold">Stock after</th><th className="px-5 py-3 font-extrabold">Department / Supplier</th><th className="px-5 py-3 font-extrabold">Recorded by</th></tr></thead><tbody className="divide-y divide-slate-100 text-xs">
-            {loading ? <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-500">Loading movement history…</td></tr> : recentMovements.length === 0 ? <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-500">No movements recorded yet.</td></tr> : recentMovements.map((movement) => <tr key={movement.id}><td className="whitespace-nowrap px-5 py-3 text-slate-500">{new Date(movement.created_at).toLocaleString()}</td><td className="px-5 py-3"><p className="font-bold text-slate-800">{movement.item?.name ?? "Inventory item"}</p><p className="mt-0.5 text-[10px] text-slate-400">{movement.item?.sku ?? movement.item_id}</p></td><td className="px-5 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${movement.movement_type === "RECEIVE" ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-sky-700"}`}>{movement.movement_type.replace(/_/g, " ")}</span>{movement.reference && <p className="mt-1 text-[10px] text-slate-400">Ref: {movement.reference}</p>}</td><td className="px-5 py-3 font-extrabold">{movement.movement_type === "RECEIVE" || movement.movement_type === "RETURN" ? "+" : "−"}{movement.quantity}</td><td className="px-5 py-3 font-semibold">{movement.new_stock} {movement.item?.unit_of_measure ?? ""}</td><td className="px-5 py-3 text-slate-600">{movement.department ?? movement.supplier?.name ?? "—"}</td><td className="px-5 py-3 text-slate-600">{movement.performed_by_name}</td></tr>)}
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><span className="rounded-xl bg-sky-50 p-2 text-sky-700"><ClipboardList className="h-4 w-4" /></span><div><h2 className="font-extrabold text-slate-950">Stock movement history</h2><p className="mt-1 text-xs text-slate-500">Latest 100 stock receipts, department issues and sales.</p></div></div><select aria-label="Filter stock movements" value={movementFilter} onChange={(event) => setMovementFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"><option value="all">All movements</option><option value="RECEIVE">Stock received</option><option value="ISSUE">Department issues</option><option value="RETURN">Returns</option><option value="DAMAGE">Damaged</option><option value="EXPIRED">Expired</option><option value="SALE">Patient sales</option></select></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[800px] text-left"><thead><tr className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500"><th className="px-5 py-3 font-extrabold">Date</th><th className="px-5 py-3 font-extrabold">Item</th><th className="px-5 py-3 font-extrabold">Movement</th><th className="px-5 py-3 font-extrabold">Quantity</th><th className="px-5 py-3 font-extrabold">Stock after</th><th className="px-5 py-3 font-extrabold">Sale total</th><th className="px-5 py-3 font-extrabold">Department / Supplier</th><th className="px-5 py-3 font-extrabold">Recorded by</th></tr></thead><tbody className="divide-y divide-slate-100 text-xs">
+            {loading ? <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">Loading movement history…</td></tr> : recentMovements.length === 0 ? <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-500">No movements recorded yet.</td></tr> : recentMovements.map((movement) => <tr key={movement.id}><td className="whitespace-nowrap px-5 py-3 text-slate-500">{new Date(movement.created_at).toLocaleString()}</td><td className="px-5 py-3"><p className="font-bold text-slate-800">{movement.item?.name ?? "Inventory item"}</p><p className="mt-0.5 text-[10px] text-slate-400">{movement.item?.sku ?? movement.item_id}</p></td><td className="px-5 py-3"><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${movement.movement_type === "RECEIVE" ? "bg-emerald-50 text-emerald-700" : "bg-sky-50 text-sky-700"}`}>{movement.movement_type.replace(/_/g, " ")}</span>{movement.reference && <p className="mt-1 text-[10px] text-slate-400">Ref: {movement.reference}</p>}</td><td className="px-5 py-3 font-extrabold">{movement.movement_type === "RECEIVE" || movement.movement_type === "RETURN" ? "+" : "−"}{movement.quantity}</td><td className="px-5 py-3 font-semibold">{movement.new_stock} {movement.item?.unit_of_measure ?? ""}</td><td className="px-5 py-3 font-semibold">{movement.movement_type === "SALE" ? (movement.reference?.startsWith("DAILY-SALE-") ? money(Number(movement.sale_amount ?? 0)) : "Prescription sale") : "—"}</td><td className="px-5 py-3 text-slate-600">{movement.department ?? movement.supplier?.name ?? "—"}</td><td className="px-5 py-3 text-slate-600">{movement.performed_by_name}</td></tr>)}
           </tbody></table></div>
         </section>
 
@@ -254,7 +284,7 @@ export default function InventoryPage() {
 
       {modal && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
         <div role="dialog" aria-modal="true" className="my-6 w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="font-extrabold text-slate-950">{modal === "item" ? "Add inventory item" : modal === "receive" ? "Receive stock" : modal === "issue" ? "Issue stock to department" : "Add supplier"}</h3><p className="mt-1 text-xs text-slate-500">{modal === "item" ? "New items start at zero stock; record a receipt to add quantity." : modal === "receive" ? "Stock and its movement audit entry are saved together." : modal === "issue" ? "The system prevents issues that exceed available stock." : "Supplier details can be linked to future receipts."}</p></div><button onClick={closeModal} aria-label="Close dialog" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4"><div><h3 className="font-extrabold text-slate-950">{modal === "item" ? "Add inventory item" : modal === "receive" ? "Receive stock" : modal === "issue" ? "Issue stock to department" : modal === "sale" ? "Record daily pharmacy sale" : "Add supplier"}</h3><p className="mt-1 text-xs text-slate-500">{modal === "item" ? "New items start at zero stock; record a receipt to add quantity." : modal === "receive" ? "Stock and its movement audit entry are saved together." : modal === "issue" ? "The system prevents issues that exceed available stock." : modal === "sale" ? "Record non-prescription pharmacy sales. The sale is totalled at the item's current selling price and stock is reduced atomically." : "Supplier details can be linked to future receipts."}</p></div><button onClick={closeModal} aria-label="Close dialog" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button></div>
           {modal === "item" && <form onSubmit={submitItem} className="grid gap-4 p-5 sm:grid-cols-2">
             <label className={labelClass}>SKU / item code<input required maxLength={40} value={itemForm.sku} onChange={(e) => setItemForm({...itemForm, sku: e.target.value})} placeholder="e.g. OPT-FRM-001" className={inputClass} /></label>
             <label className={labelClass}>Item name<input required value={itemForm.name} onChange={(e) => setItemForm({...itemForm, name: e.target.value})} placeholder="e.g. Black optical frame" className={inputClass} /></label>
@@ -275,6 +305,14 @@ export default function InventoryPage() {
             <label className={`${labelClass} sm:col-span-2`}>Notes<textarea value={receiveForm.notes} onChange={(e) => setReceiveForm({...receiveForm, notes: e.target.value})} rows={2} className={inputClass} placeholder="Optional receipt notes" /></label>
             {selectedItem(receiveForm.itemId) && <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 sm:col-span-2">Current stock: <strong>{selectedItem(receiveForm.itemId)?.stock} {selectedItem(receiveForm.itemId)?.unit_of_measure}</strong></p>}
             <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Confirm receipt"}</button></div>
+          </form>}
+          {modal === "sale" && <form onSubmit={submitDailySale} className="grid gap-4 p-5 sm:grid-cols-2">
+            <label className={`${labelClass} sm:col-span-2`}>Pharmacy item<select required value={saleForm.itemId} onChange={(e) => setSaleForm({ ...saleForm, itemId: e.target.value })} className={inputClass}><option value="">Select pharmacy item…</option>{items.filter((item) => item.is_active && item.domain === "pharmacy" && item.stock > 0).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure} available)</option>)}</select></label>
+            <label className={labelClass}>Quantity sold<input required type="number" min="1" step="1" value={saleForm.quantity} onChange={(e) => setSaleForm({ ...saleForm, quantity: e.target.value })} className={inputClass} /></label>
+            <label className={labelClass}>Sale date<input required type="date" value={saleForm.saleDate} onChange={(e) => setSaleForm({ ...saleForm, saleDate: e.target.value })} className={inputClass} /></label>
+            <label className={`${labelClass} sm:col-span-2`}>Notes / reference<input value={saleForm.notes} onChange={(e) => setSaleForm({ ...saleForm, notes: e.target.value })} className={inputClass} placeholder="Optional daily sales reference" /></label>
+            {selectedItem(saleForm.itemId) && <p className="rounded-xl bg-emerald-50 p-3 text-xs text-emerald-800 sm:col-span-2">Estimated sale total: <strong>{money(Number(selectedItem(saleForm.itemId)?.price ?? 0) * Math.max(0, Number(saleForm.quantity) || 0))}</strong>. Available stock: <strong>{selectedItem(saleForm.itemId)?.stock}</strong>.</p>}
+            <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Record sale"}</button></div>
           </form>}
           {modal === "issue" && <form onSubmit={submitIssue} className="grid gap-4 p-5 sm:grid-cols-2">
             <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={issueForm.itemId} onChange={(e) => setIssueForm({...issueForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active && item.stock > 0 && (item.domain !== "pharmacy" || role === "IT_ADMIN")).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>

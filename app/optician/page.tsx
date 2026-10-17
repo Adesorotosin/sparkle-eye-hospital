@@ -583,26 +583,30 @@ function getPrescriptionLabel(
 }
 
 function formatRefraction(
-  refraction:
-    | {
-        sphere?: string | null;
-        cylinder?: string | null;
-        axis?: string | null;
-        add?: string | null;
-      }
-    | null
-    | undefined
+  refraction: Record<string, unknown> | null | undefined
 ) {
-  if (!refraction) {
-    return "";
-  }
+  if (!refraction) return "";
 
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  const subjective = isRecord(refraction.subjective) ? refraction.subjective : null;
+  const objective = isRecord(refraction.objective) ? refraction.objective : null;
+  const hasPrescriptionValues = (value: Record<string, unknown> | null) =>
+    Boolean(value && ["sphere", "cylinder", "axis", "add"].some((key) => {
+      const field = value[key];
+      return field !== null && field !== undefined && String(field).trim() !== "";
+    }));
+  // Prefer populated subjective results, then populated objective results, then legacy flat data.
+  const values = hasPrescriptionValues(subjective)
+    ? subjective!
+    : hasPrescriptionValues(objective)
+      ? objective!
+      : refraction;
   const parts = [
-    refraction.sphere,
-    refraction.cylinder,
-    refraction.axis
-      ? `×${refraction.axis}`
-      : null,
+    typeof values.sphere === "string" || typeof values.sphere === "number" ? String(values.sphere) : "",
+    typeof values.cylinder === "string" || typeof values.cylinder === "number" ? String(values.cylinder) : "",
+    values.axis !== undefined && values.axis !== null && values.axis !== "" ? `×${String(values.axis)}` : "",
+    values.add !== undefined && values.add !== null && values.add !== "" ? `ADD ${String(values.add)}` : "",
   ].filter(Boolean);
 
   return parts.join(" ");
