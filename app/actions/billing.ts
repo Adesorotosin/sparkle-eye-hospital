@@ -879,6 +879,18 @@ export async function processBillingPayment(input: {
           labLookupError
         );
 
+        if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
         return {
           success: false,
           message:
@@ -928,6 +940,18 @@ export async function processBillingPayment(input: {
           }
         );
 
+        if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
         return {
           success: false,
           message:
@@ -969,6 +993,18 @@ export async function processBillingPayment(input: {
           "Diagnostic order lookup failed:",
           diagnosticLookupError
         );
+
+        if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
 
         return {
           success: false,
@@ -1055,6 +1091,18 @@ export async function processBillingPayment(input: {
               diagnosticIdsToUnlock,
           }
         );
+
+        if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
 
         return {
           success: false,

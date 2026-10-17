@@ -84,7 +84,8 @@ export default function InventoryPage() {
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  const isManager = role === "IT_ADMIN" || role === "PHARMACIST" || role === "INVENTORY_MANAGER";
+  const isManager = role === "IT_ADMIN" || role === "INVENTORY_MANAGER";
+  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
@@ -186,7 +187,7 @@ export default function InventoryPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
-            <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>
+            {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
             <button onClick={() => void handleSignOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
@@ -233,7 +234,7 @@ export default function InventoryPage() {
                     <td className="px-5 py-4"><span className="font-extrabold text-slate-900">{item.stock}</span> <span className="text-xs text-slate-500">{item.unit_of_measure}</span><p className="mt-1 text-[10px] text-slate-400">Reorder at {item.reorder_level}</p></td>
                     <td className="px-5 py-4 text-slate-600">{money(item.unit_cost)}</td><td className="px-5 py-4 font-semibold text-slate-800">{money(item.price)}</td>
                     <td className="px-5 py-4"><span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${low ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{low ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}{low ? "Low stock" : "In stock"}</span></td>
-                    <td className="px-5 py-4"><button onClick={() => { setReceiveForm((v) => ({...v, itemId: item.id})); setModal(isManager ? "receive" : "issue"); if (!isManager) setIssueForm((v) => ({...v, itemId: item.id})); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">{isManager ? "Receive" : "Issue"}</button></td>
+                    <td className="px-5 py-4">{isManager && (item.domain !== "pharmacy" || role === "IT_ADMIN") ? <button onClick={() => { setReceiveForm((v) => ({...v, itemId: item.id})); setModal("receive"); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">Receive</button> : item.domain === "pharmacy" ? <span className="text-xs text-slate-400">Dispense in Pharmacy</span> : canIssueStock ? <button onClick={() => { setIssueForm((v) => ({...v, itemId: item.id})); setModal("issue"); }} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold hover:border-violet-300 hover:text-violet-700">Issue</button> : <span className="text-xs text-slate-400">View only</span>}</td>
                   </tr>;
                 })}
               </tbody>
@@ -266,7 +267,7 @@ export default function InventoryPage() {
             <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Create item"}</button></div>
           </form>}
           {modal === "receive" && <form onSubmit={submitReceive} className="grid gap-4 p-5 sm:grid-cols-2">
-            <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={receiveForm.itemId} onChange={(e) => setReceiveForm({...receiveForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>
+            <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={receiveForm.itemId} onChange={(e) => setReceiveForm({...receiveForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active && (item.domain !== "pharmacy" || role === "IT_ADMIN")).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>
             <label className={labelClass}>Quantity received<input required type="number" min="1" step="1" value={receiveForm.quantity} onChange={(e) => setReceiveForm({...receiveForm, quantity: e.target.value})} className={inputClass} /></label>
             <label className={labelClass}>Unit cost (₦), optional<input type="number" min="0" step="0.01" value={receiveForm.unitCost} onChange={(e) => setReceiveForm({...receiveForm, unitCost: e.target.value})} className={inputClass} placeholder="Use existing cost" /></label>
             <label className={labelClass}>Supplier<select value={receiveForm.supplierId} onChange={(e) => setReceiveForm({...receiveForm, supplierId: e.target.value})} className={inputClass}><option value="">Not specified</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
@@ -276,7 +277,7 @@ export default function InventoryPage() {
             <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={closeModal} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={saving} className="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60">{saving ? "Saving…" : "Confirm receipt"}</button></div>
           </form>}
           {modal === "issue" && <form onSubmit={submitIssue} className="grid gap-4 p-5 sm:grid-cols-2">
-            <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={issueForm.itemId} onChange={(e) => setIssueForm({...issueForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active && item.stock > 0).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>
+            <label className={`${labelClass} sm:col-span-2`}>Inventory item<select required value={issueForm.itemId} onChange={(e) => setIssueForm({...issueForm, itemId: e.target.value})} className={inputClass}><option value="">Select item…</option>{items.filter((item) => item.is_active && item.stock > 0 && (item.domain !== "pharmacy" || role === "IT_ADMIN")).map((item) => <option key={item.id} value={item.id}>{item.sku} — {item.name} ({item.stock} {item.unit_of_measure})</option>)}</select></label>
             <label className={labelClass}>Quantity to issue<input required type="number" min="1" step="1" value={issueForm.quantity} onChange={(e) => setIssueForm({...issueForm, quantity: e.target.value})} className={inputClass} /></label>
             <label className={labelClass}>Receiving department<select required value={issueForm.department} onChange={(e) => setIssueForm({...issueForm, department: e.target.value})} className={inputClass}>{departments.map((department) => <option key={department}>{department}</option>)}</select></label>
             <label className={labelClass}>Issue reference<input value={issueForm.reference} onChange={(e) => setIssueForm({...issueForm, reference: e.target.value})} className={inputClass} placeholder="Optional requisition number" /></label>
