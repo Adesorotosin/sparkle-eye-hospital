@@ -7,16 +7,6 @@ ALTER TABLE public.encounters
 ALTER TABLE public.encounters
   ADD COLUMN IF NOT EXISTS optometry_visit_type text;
 
-UPDATE public.encounters
-SET optometry_source = 'in_house'
-WHERE encounter_type = 'optometry'
-  AND optometry_source IS NULL;
-
-UPDATE public.encounters
-SET optometry_visit_type = 'doctor_referral'
-WHERE encounter_type = 'optometry'
-  AND optometry_visit_type IS NULL;
-
 ALTER TABLE public.encounters
   ALTER COLUMN optometry_source SET DEFAULT 'in_house';
 
