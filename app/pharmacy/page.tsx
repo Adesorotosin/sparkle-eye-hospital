@@ -304,6 +304,8 @@ function PharmacyContent() {
   useEffect(() => {
     setDispenseSuccess(false);
     setActionError(null);
+    setAffordabilityNotice(null);
+    setSelectedForDeferral({});
     setAdministeredDrugs({});
   }, [patientId]);
 
@@ -2357,7 +2359,7 @@ function PharmacyContent() {
 
                       <td
                         colSpan={
-                          6
+                          7
                         }
                         className="py-6 text-center text-slate-400"
                       >
