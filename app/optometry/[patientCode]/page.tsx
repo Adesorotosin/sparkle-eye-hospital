@@ -118,6 +118,8 @@ type PatientData = {
     refractionOS: RefractionSet | Refraction | null;
 
     diagnosis: string;
+    optometrySource: "in_house" | "visiting";
+    optometryVisitType: "doctor_referral" | "external_referral" | "self_presenting";
     status: "draft" | "completed";
     createdAt: string;
   } | null;
@@ -144,6 +146,8 @@ export default function OptometryExaminationPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [optometrySource, setOptometrySource] = useState<"in_house" | "visiting">("in_house");
+  const [optometryVisitType, setOptometryVisitType] = useState<"doctor_referral" | "external_referral" | "self_presenting">("doctor_referral");
 
   const [isPending, startTransition] =
     useTransition();
@@ -208,6 +212,8 @@ export default function OptometryExaminationPage() {
         data.previousOptometryEncounter;
 
       if (previous) {
+        setOptometrySource(previous.optometrySource ?? "in_house");
+        setOptometryVisitType(previous.optometryVisitType ?? "doctor_referral");
         setVisualAcuityOD(
           previous.visualAcuityOD ||
             data.vitals?.visualAcuityOD ||
@@ -248,6 +254,8 @@ export default function OptometryExaminationPage() {
           normalizeRefractionSet(previous.refractionOS)
         );
       } else if (data.vitals) {
+        setOptometrySource("in_house");
+        setOptometryVisitType("doctor_referral");
         /*
          * First-time Optometry examination:
          * start with measurements captured during
@@ -282,6 +290,8 @@ export default function OptometryExaminationPage() {
         setSlitLampOD("");
         setSlitLampOS("");
       } else {
+        setOptometrySource("in_house");
+        setOptometryVisitType("doctor_referral");
         /*
          * No previous Optometry encounter and
          * no triage vitals.
@@ -354,6 +364,8 @@ export default function OptometryExaminationPage() {
         const result =
           await saveOptometryEncounter({
             patientCode,
+            optometrySource,
+            optometryVisitType,
 
             visualAcuityOD,
             visualAcuityOS,
@@ -567,6 +579,47 @@ export default function OptometryExaminationPage() {
 
 
 
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-sm font-extrabold text-slate-900">Visit Details</h2>
+            <p className="mt-1 text-xs text-slate-500">Record whether this assessment is in-house or handled by a visiting optometrist.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-600">Optometry source</span>
+              <select
+                value={optometrySource}
+                onChange={(event) => {
+                  const value = event.target.value as "in_house" | "visiting";
+                  setOptometrySource(value);
+                  setOptometryVisitType(value === "in_house" ? "doctor_referral" : "external_referral");
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-purple-500 focus:outline-none"
+              >
+                <option value="in_house">In-house optometry</option>
+                <option value="visiting">Visiting optometrist</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-600">Visit type</span>
+              <select
+                value={optometryVisitType}
+                onChange={(event) => setOptometryVisitType(event.target.value as "doctor_referral" | "external_referral" | "self_presenting")}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 focus:border-purple-500 focus:outline-none"
+              >
+                {optometrySource === "in_house" ? (
+                  <option value="doctor_referral">Doctor referral</option>
+                ) : (
+                  <>
+                    <option value="external_referral">External referral</option>
+                    <option value="self_presenting">Self-presenting</option>
+                  </>
+                )}
+              </select>
+            </label>
+          </div>
+        </section>
 
         <section className="rounded-2xl border border-purple-200 bg-purple-50/40 shadow-sm">
           <SectionHeader
