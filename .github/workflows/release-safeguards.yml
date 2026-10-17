@@ -107,7 +107,9 @@ jobs:
             supabase/migrations/20261017075132_secure_hospital_data_api_access.sql \
             supabase/migrations/20261017075745_add_inventory_manager_role.sql \
             supabase/migrations/20261017075749_lock_down_inventory_table_access.sql \
-            supabase/migrations/20261017075941_fix_lab_updated_at_function_search_path.sql
+            supabase/migrations/20261017075941_fix_lab_updated_at_function_search_path.sql \
+            supabase/migrations/20261017100000_add_optometry_visit_source.sql \
+            supabase/migrations/20261017100500_record_pharmacy_daily_sales.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
