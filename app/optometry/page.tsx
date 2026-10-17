@@ -51,7 +51,7 @@ export default function OptometryDashboard() {
   const [feedback, setFeedback] =
     useState("");
   const [visitingPatientCode, setVisitingPatientCode] = useState("");
-  const [newPatient, setNewPatient] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "" });
+  const [newPatient, setNewPatient] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "external_referral" | "self_presenting" });
 
   const [isPending, startTransition] =
     useTransition();
@@ -242,6 +242,7 @@ export default function OptometryDashboard() {
         gender: newPatient.gender || undefined,
         phone: newPatient.phone || undefined,
         address: newPatient.address || undefined,
+        visitType: newPatient.visitType,
       });
       if (!registered.success || !registered.patientCode) {
         setFeedback(registered.message);
@@ -376,6 +377,13 @@ export default function OptometryDashboard() {
               <span className="mb-1.5 block text-xs font-bold text-slate-700">Gender</span>
               <select value={newPatient.gender} onChange={(event) => setNewPatient((current) => ({ ...current, gender: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500">
                 <option value="">Select gender</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Visit type *</span>
+              <select value={newPatient.visitType} onChange={(event) => setNewPatient((current) => ({ ...current, visitType: event.target.value as "external_referral" | "self_presenting" }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500">
+                <option value="self_presenting">Self-presenting</option>
+                <option value="external_referral">External referral</option>
               </select>
             </label>
             <label className="block">
