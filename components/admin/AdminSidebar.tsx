@@ -12,6 +12,7 @@ import {
   Bell,
   Settings,
   Tags,
+  Boxes,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -34,6 +35,7 @@ export default function AdminSidebar({
     { name: "Audit Logs", href: "/admin/audit", icon: ShieldAlert },
     { name: "Reports & Analytics", href: "/admin/reports", icon: BarChart3 },
     { name: "Notifications & Alerts", href: "/admin/notifications", icon: Bell },
+    { name: "Inventory Overview", href: "/admin#inventory-overview", icon: Boxes },
     { name: "Settings", href: "/admin/settings", icon: Settings },
     { name: "Procedure Prices", href: "/admin/procedure-prices", icon: Tags },
   ];

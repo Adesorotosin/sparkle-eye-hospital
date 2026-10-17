@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Calendar, Download, ArrowUpRight, Settings2 } from "lucide-react";
+import InventoryOverview from "@/components/admin/InventoryOverview";
 
 interface AdminStats {
   totalRevenue: number;
@@ -171,6 +172,8 @@ export default function ExecutiveOverviewDashboard() {
           <p className="mt-2 text-[11px] text-slate-500">Requires theatre scheduling data</p>
         </div>
       </section>
+
+      <InventoryOverview />
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-8">
