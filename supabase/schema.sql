@@ -335,7 +335,7 @@ CREATE OR REPLACE FUNCTION public.inventory_receive_stock(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_item public.inventory_items%ROWTYPE;
   v_new_stock integer;
@@ -377,7 +377,7 @@ BEGIN
 
   RETURN jsonb_build_object('item_id', p_item_id, 'previous_stock', v_item.stock, 'new_stock', v_new_stock);
 END;
-$;
+$$;
 
 -- Department issues are atomic and cannot drive stock below zero.
 CREATE OR REPLACE FUNCTION public.inventory_issue_stock(
@@ -392,7 +392,7 @@ CREATE OR REPLACE FUNCTION public.inventory_issue_stock(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 DECLARE
   v_item public.inventory_items%ROWTYPE;
   v_new_stock integer;
@@ -436,7 +436,7 @@ BEGIN
 
   RETURN jsonb_build_object('item_id', p_item_id, 'previous_stock', v_item.stock, 'new_stock', v_new_stock);
 END;
-$;
+$$;
 
 REVOKE EXECUTE ON FUNCTION public.inventory_receive_stock(uuid, integer, uuid, text, numeric, uuid, text, text)
   FROM PUBLIC, anon, authenticated;
@@ -609,11 +609,11 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $
+AS $$
 BEGIN
   RAISE EXCEPTION 'Pharmacy dispensing requires the updated application. Please retry after the hospital system has been updated.';
 END;
-$;
+$$;
 
 REVOKE EXECUTE ON FUNCTION public.dispense_patient_prescriptions(uuid)
   FROM PUBLIC, anon, authenticated;
