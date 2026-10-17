@@ -23,6 +23,7 @@ import {
   getOptometryQueue,
   startOptometryExam,
   addVisitingPatientToQueue,
+  registerVisitingOptometryPatient,
   type OptometryPatient,
 } from "@/app/actions/optometry";
 
@@ -50,6 +51,7 @@ export default function OptometryDashboard() {
   const [feedback, setFeedback] =
     useState("");
   const [visitingPatientCode, setVisitingPatientCode] = useState("");
+  const [newPatient, setNewPatient] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "external_referral" | "self_presenting" });
 
   const [isPending, startTransition] =
     useTransition();
@@ -223,6 +225,41 @@ export default function OptometryDashboard() {
     });
   }
 
+  function handleRegisterVisitingPatient(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFeedback("");
+    const age = newPatient.age.trim() ? Number(newPatient.age) : undefined;
+    if (age !== undefined && (!Number.isInteger(age) || age < 0 || age > 150)) {
+      setFeedback("Age must be a valid number between 0 and 150.");
+      return;
+    }
+
+    startTransition(async () => {
+      const registered = await registerVisitingOptometryPatient({
+        fullName: newPatient.fullName,
+        age,
+        dateOfBirth: newPatient.dateOfBirth || undefined,
+        gender: newPatient.gender || undefined,
+        phone: newPatient.phone || undefined,
+        address: newPatient.address || undefined,
+        visitType: newPatient.visitType,
+      });
+      if (!registered.success || !registered.patientCode) {
+        setFeedback(registered.message);
+        return;
+      }
+
+      const started = await startOptometryExam(registered.patientCode);
+      if (!started.success) {
+        setFeedback(`${registered.message} Patient code: ${registered.patientCode}. Open the queue to continue the assessment.`);
+        await loadQueue();
+        return;
+      }
+
+      router.push(`/optometry/${encodeURIComponent(registered.patientCode)}`);
+    });
+  }
+
   async function handleLogout() {
     try {
       await fetch(
@@ -313,6 +350,58 @@ export default function OptometryDashboard() {
             Refresh Queue
           </button>
         </div>
+
+        <form onSubmit={handleRegisterVisitingPatient} className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+          <div className="mb-4">
+            <h3 className="text-sm font-black text-slate-900">Register outside / visiting patient</h3>
+            <p className="mt-1 text-xs text-slate-600">For patients who come directly to the visiting optometrist. This creates a patient record and opens the refraction assessment without requiring the usual Reception, Triage or Doctor referral route.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block sm:col-span-2 lg:col-span-1">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Full name *</span>
+              <input value={newPatient.fullName} onChange={(event) => setNewPatient((current) => ({ ...current, fullName: event.target.value }))} placeholder="Patient full name" required className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Date of birth</span>
+              <input type="date" value={newPatient.dateOfBirth} onChange={(event) => {
+                const dateOfBirth = event.target.value;
+                const calculatedAge = dateOfBirth ? Math.max(0, new Date().getFullYear() - new Date(dateOfBirth).getFullYear()) : "";
+                setNewPatient((current) => ({ ...current, dateOfBirth, age: dateOfBirth ? String(calculatedAge) : current.age }));
+              }} max={new Date().toISOString().slice(0, 10)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Age</span>
+              <input type="number" min="0" max="150" value={newPatient.age} onChange={(event) => setNewPatient((current) => ({ ...current, age: event.target.value }))} placeholder="Age in years" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Gender</span>
+              <select value={newPatient.gender} onChange={(event) => setNewPatient((current) => ({ ...current, gender: event.target.value }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500">
+                <option value="">Select gender</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Visit type *</span>
+              <select value={newPatient.visitType} onChange={(event) => setNewPatient((current) => ({ ...current, visitType: event.target.value as "external_referral" | "self_presenting" }))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500">
+                <option value="self_presenting">Self-presenting</option>
+                <option value="external_referral">External referral</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Phone</span>
+              <input type="tel" value={newPatient.phone} onChange={(event) => setNewPatient((current) => ({ ...current, phone: event.target.value }))} placeholder="Phone number" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-700">Address (optional)</span>
+              <input value={newPatient.address} onChange={(event) => setNewPatient((current) => ({ ...current, address: event.target.value }))} placeholder="Address" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500" />
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={isPending} className="rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-800 disabled:opacity-60">
+              {isPending ? "Registering…" : "Register & Start Refraction"}
+            </button>
+            <span className="text-[11px] text-slate-500">A patient code and year-based registration number will be generated automatically.</span>
+          </div>
+        </form>
 
         <form onSubmit={handleAddVisitingPatient} className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 sm:flex-row sm:items-end">
           <div className="flex-1">
