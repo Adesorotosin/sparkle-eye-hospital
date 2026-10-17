@@ -2289,7 +2289,7 @@ function PharmacyContent() {
 
                               <button
                                 type="button"
-                                disabled={rx.status === "awaiting_pharmacy_review" || rx.status === "reviewed"}
+                                disabled={rx.status !== "ready_for_dispensing"}
                                 onClick={() => toggleAdminister(rx.id)}
                                 className={`px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition disabled:cursor-not-allowed disabled:opacity-40 ${
                                   isAdministered
