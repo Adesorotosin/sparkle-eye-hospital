@@ -879,7 +879,19 @@ export async function processBillingPayment(input: {
           labLookupError
         );
 
-        return {
+if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
+                return {
           success: false,
           message:
             "Payment could not be completed because laboratory orders could not be verified.",
@@ -928,7 +940,19 @@ export async function processBillingPayment(input: {
           }
         );
 
-        return {
+if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
+                return {
           success: false,
           message:
             "Payment could not be completed because one or more laboratory items could not be matched to a laboratory order.",
@@ -970,7 +994,19 @@ export async function processBillingPayment(input: {
           diagnosticLookupError
         );
 
-        return {
+if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
+                return {
           success: false,
           message:
             "Payment could not be completed because diagnostic orders could not be verified.",
@@ -1056,7 +1092,19 @@ export async function processBillingPayment(input: {
           }
         );
 
-        return {
+if (prescriptionIdsToUnlock.length > 0) {
+          const { error: rollbackError } = await supabaseServer
+            .from("prescriptions")
+            .update({ status: "pending_payment" })
+            .in("id", prescriptionIdsToUnlock)
+            .eq("patient_id", patient.id)
+            .eq("status", "ready_for_dispensing");
+          if (rollbackError) {
+            console.error("Prescription status rollback failed after payment validation error:", rollbackError);
+          }
+        }
+
+                return {
           success: false,
           message:
             "Payment could not be completed because one or more diagnostic items could not be matched to a diagnostic order.",
