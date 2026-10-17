@@ -56,6 +56,7 @@ export interface InventoryMovementRecord {
   quantity: number;
   previous_stock: number;
   new_stock: number;
+  sale_amount?: number;
   department: string | null;
   reference: string | null;
   notes: string | null;
@@ -288,6 +289,51 @@ export async function issueInventoryStock(input: {
     return { success: true, message: `Stock issued to ${department}. Remaining stock: ${data?.new_stock ?? "updated"}.` };
   } catch (error) {
     return { success: false, message: failureMessage(error, "Unable to issue stock.") };
+  }
+}
+
+export async function recordPharmacyDailySale(input: {
+  itemId: string;
+  quantity: number;
+  saleDate: string;
+  notes?: string;
+}) {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "PHARMACIST"]);
+    if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
+      return { success: false, message: "Select a pharmacy item and enter a whole-number quantity greater than zero." };
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.saleDate)) {
+      return { success: false, message: "Choose a valid sale date." };
+    }
+
+    const { data, error } = await supabaseServer.rpc("inventory_record_pharmacy_daily_sale", {
+      p_item_id: input.itemId,
+      p_quantity: input.quantity,
+      p_sale_date: input.saleDate,
+      p_performed_by: staff.id,
+      p_performed_by_name: staff.name,
+      p_notes: input.notes?.trim() || null,
+    });
+    if (error) throw error;
+
+    const saleAmount = Number(data?.sale_amount ?? 0);
+    await logActivity({
+      module: "Inventory",
+      category: "FINANCIAL",
+      action: "Pharmacy daily sale recorded",
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ itemId: input.itemId, quantity: input.quantity, saleDate: input.saleDate, saleAmount }),
+      financialAmount: saleAmount,
+    });
+    refreshInventoryPaths();
+    return {
+      success: true,
+      message: `Daily sale recorded: ₦${saleAmount.toLocaleString("en-NG", { maximumFractionDigits: 2 })}. Remaining stock: ${Number(data?.new_stock ?? 0)}.`,
+    };
+  } catch (error) {
+    return { success: false, message: failureMessage(error, "Unable to record daily pharmacy sale.") };
   }
 }
 
