@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
+import { registerPatient } from "@/lib/patient-flow";
 
 export type OptometryActionResponse = {
   success: boolean;
@@ -184,6 +185,75 @@ export async function getOptometryQueue(): Promise<{
       patients: [],
       message: result.message,
     };
+  }
+}
+
+/**
+ * Registers an outside/walk-in patient directly from Optometry, without
+ * requiring the normal Reception -> Triage -> Doctor route.
+ */
+export async function registerVisitingOptometryPatient(input: {
+  fullName: string;
+  age?: number | null;
+  dateOfBirth?: string;
+  gender?: string;
+  phone?: string;
+  address?: string;
+}): Promise<OptometryActionResponse & { patientCode?: string }> {
+  try {
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const fullName = input.fullName?.trim();
+    if (!fullName) return { success: false, message: "Patient full name is required." };
+
+    const age = input.age;
+    if (age !== undefined && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
+      return { success: false, message: "Age must be a valid number between 0 and 150." };
+    }
+
+    let dateOfBirth: string | undefined;
+    if (input.dateOfBirth?.trim()) {
+      const parsed = new Date(`${input.dateOfBirth}T00:00:00`);
+      if (Number.isNaN(parsed.getTime()) || parsed > new Date()) {
+        return { success: false, message: "Enter a valid date of birth that is not in the future." };
+      }
+      dateOfBirth = input.dateOfBirth;
+    }
+
+    const patient = await registerPatient({
+      fullName,
+      age: age ?? undefined,
+      dateOfBirth,
+      gender: input.gender?.trim() || undefined,
+      phone: input.phone?.trim() || undefined,
+      address: input.address?.trim() || undefined,
+      status: "in_consultation",
+      isWalkIn: true,
+      optometryStatus: "referred",
+    });
+
+    await logActivity({
+      patientId: patient.id,
+      module: "Optometry",
+      category: "CLINICAL",
+      action: "Outside patient registered directly by Optometry",
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({
+        patientCode: patient.patient_code,
+        patientName: patient.full_name,
+        source: "visiting",
+        visitType: "self_presenting",
+      }),
+    });
+
+    revalidatePath("/optometry");
+    return {
+      success: true,
+      message: "Outside patient registered and added to the Optometry queue.",
+      patientCode: patient.patient_code,
+    };
+  } catch (error) {
+    return handleError(error, "Unable to register the outside Optometry patient.");
   }
 }
 
