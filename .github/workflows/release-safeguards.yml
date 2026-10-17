@@ -50,6 +50,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;"
       - name: Apply fresh-project schema to isolated database
         run: psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
+      - name: Run pharmacy daily sales safeguards tests
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/inventory_daily_sales_safeguards.sql
       - name: Run transactional pharmacy safeguards tests
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_dispensing_safeguards.sql
 
@@ -114,5 +116,7 @@ jobs:
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Run pharmacy daily sales safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/inventory_daily_sales_safeguards.sql
       - name: Run transactional pharmacy safeguards tests after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_dispensing_safeguards.sql
