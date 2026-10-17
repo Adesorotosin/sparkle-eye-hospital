@@ -146,6 +146,7 @@ export default function OptometryExaminationPage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+  const [clinicalImpression, setClinicalImpression] = useState("");
   const [optometrySource, setOptometrySource] = useState<"in_house" | "visiting">("in_house");
   const [optometryVisitType, setOptometryVisitType] = useState<"doctor_referral" | "external_referral" | "self_presenting">("doctor_referral");
 
@@ -214,6 +215,7 @@ export default function OptometryExaminationPage() {
       if (previous) {
         setOptometrySource(previous.optometrySource ?? "in_house");
         setOptometryVisitType(previous.optometryVisitType ?? "doctor_referral");
+        setClinicalImpression(previous.diagnosis || "");
         setVisualAcuityOD(
           previous.visualAcuityOD ||
             data.vitals?.visualAcuityOD ||
@@ -256,6 +258,7 @@ export default function OptometryExaminationPage() {
       } else if (data.vitals) {
         setOptometrySource("in_house");
         setOptometryVisitType("doctor_referral");
+        setClinicalImpression("");
         /*
          * First-time Optometry examination:
          * start with measurements captured during
@@ -292,6 +295,7 @@ export default function OptometryExaminationPage() {
       } else {
         setOptometrySource("in_house");
         setOptometryVisitType("doctor_referral");
+        setClinicalImpression("");
         /*
          * No previous Optometry encounter and
          * no triage vitals.
@@ -379,7 +383,7 @@ export default function OptometryExaminationPage() {
             slitLampOD,
             slitLampOS,
 
-            clinicalImpression: "",
+            clinicalImpression,
 
             status,
           });
@@ -754,6 +758,27 @@ export default function OptometryExaminationPage() {
 
 
 
+
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <SectionHeader
+            icon={FileText}
+            title="Optometry Result"
+            description="Record the assessment result and recommendations for the clinical handoff."
+          />
+          <div className="p-5">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-700">Result / clinical impression</span>
+              <textarea
+                value={clinicalImpression}
+                onChange={(event) => setClinicalImpression(event.target.value)}
+                disabled={assessmentCompleted}
+                rows={4}
+                placeholder="Summarise the refraction result, findings, and recommendations..."
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </label>
+          </div>
+        </section>
 
         <div className="sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-[#F4F6FB]/95 px-4 py-4 backdrop-blur md:-mx-8 md:px-8">
           <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:justify-end">
