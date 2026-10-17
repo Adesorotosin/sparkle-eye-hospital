@@ -252,11 +252,11 @@ export async function issueInventoryStock(input: {
       return { success: false, message: "The selected inventory item is unavailable. Refresh inventory and try again." };
     }
     if (itemForIssue.domain === "pharmacy") {
-      if (staff.role !== "IT_ADMIN" && staff.role !== "INVENTORY_MANAGER") {
-        return { success: false, message: "Pharmacy medicines must be dispensed through the Pharmacy workflow. Contact an administrator for an authorized stock adjustment." };
+      if (staff.role !== "IT_ADMIN") {
+        return { success: false, message: "Only an IT administrator can make pharmacy stock adjustments. Normal medication deductions must happen through paid prescription dispensing." };
       }
       if (!input.reference?.trim() || !input.notes?.trim()) {
-        return { success: false, message: "A reference and reason are required when issuing pharmacy stock outside the dispensing workflow." };
+        return { success: false, message: "A reference and reason are required when an administrator adjusts pharmacy stock outside the dispensing workflow." };
       }
     }
 
