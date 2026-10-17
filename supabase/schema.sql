@@ -643,7 +643,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path TO pg_catalog
-AS $
+AS $$
 DECLARE
   v_item public.inventory_items%ROWTYPE;
   v_new_stock integer;
@@ -697,7 +697,7 @@ BEGIN
     'sale_amount', v_sale_amount, 'new_stock', v_new_stock
   );
 END;
-$;
+$$;
 
 REVOKE EXECUTE ON FUNCTION public.inventory_record_pharmacy_daily_sale(uuid, integer, date, uuid, text, text)
   FROM PUBLIC, anon, authenticated;
