@@ -62,7 +62,7 @@ BEGIN
     v_item.unit_cost, 'Pharmacy',
     'DAILY-SALE-' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD'),
     'Daily pharmacy sale recorded for ' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD') ||
-      CASE WHEN NULLIF(pg_catalog.btrim(p_notes), '') IS NULL THEN '' ELSE ': ' || pg_catalog.trim(p_notes) END,
+      CASE WHEN NULLIF(pg_catalog.btrim(p_notes), '') IS NULL THEN '' ELSE ': ' || pg_catalog.btrim(p_notes) END,
     p_performed_by, pg_catalog.btrim(p_performed_by_name), v_sale_amount
   );
 
