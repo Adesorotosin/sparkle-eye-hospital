@@ -86,6 +86,10 @@ jobs:
         run: |
           git fetch origin main
           git show origin/main:supabase/schema.sql > /tmp/base-schema.sql
+          # The current main schema has legacy PL/pgSQL bodies closed with a single
+          # dollar sign. Repair only the disposable CI copy so upgrade tests can
+          # exercise the release migrations; the PR's fresh schema is fixed separately.
+          sed -i -E 's/^([[:space:]]*AS) \$[[:space:]]*$/\1 $/; s/^[[:space:]]*\$;[[:space:]]*$/$;/' /tmp/base-schema.sql
           psql -v ON_ERROR_STOP=1 -f /tmp/base-schema.sql
       - name: Apply release migrations in order
         run: |
