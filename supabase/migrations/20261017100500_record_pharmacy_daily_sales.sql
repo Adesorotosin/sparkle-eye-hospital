@@ -26,7 +26,7 @@ BEGIN
   IF p_sale_date IS NULL THEN
     RAISE EXCEPTION 'Sale date is required.';
   END IF;
-  IF p_performed_by IS NULL OR NULLIF(trim(p_performed_by_name), '') IS NULL THEN
+  IF p_performed_by IS NULL OR NULLIF(pg_catalog.btrim(p_performed_by_name), '') IS NULL THEN
     RAISE EXCEPTION 'Staff identity is required to record a sale.';
   END IF;
 
@@ -62,8 +62,8 @@ BEGIN
     v_item.unit_cost, 'Pharmacy',
     'DAILY-SALE-' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD'),
     'Daily pharmacy sale recorded for ' || pg_catalog.to_char(p_sale_date, 'YYYY-MM-DD') ||
-      CASE WHEN NULLIF(pg_catalog.trim(p_notes), '') IS NULL THEN '' ELSE ': ' || pg_catalog.trim(p_notes) END,
-    p_performed_by, pg_catalog.trim(p_performed_by_name), v_sale_amount
+      CASE WHEN NULLIF(pg_catalog.btrim(p_notes), '') IS NULL THEN '' ELSE ': ' || pg_catalog.trim(p_notes) END,
+    p_performed_by, pg_catalog.btrim(p_performed_by_name), v_sale_amount
   );
 
   RETURN pg_catalog.jsonb_build_object(
