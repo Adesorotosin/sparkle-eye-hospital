@@ -199,11 +199,16 @@ export async function registerVisitingOptometryPatient(input: {
   gender?: string;
   phone?: string;
   address?: string;
+  visitType: "external_referral" | "self_presenting";
 }): Promise<OptometryActionResponse & { patientCode?: string }> {
   try {
     const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
     const fullName = input.fullName?.trim();
     if (!fullName) return { success: false, message: "Patient full name is required." };
+
+    if (input.visitType !== "external_referral" && input.visitType !== "self_presenting") {
+      return { success: false, message: "Choose whether the patient was externally referred or self-presenting." };
+    }
 
     const age = input.age;
     if (age !== undefined && age !== null && (!Number.isInteger(age) || age < 0 || age > 150)) {
@@ -231,6 +236,19 @@ export async function registerVisitingOptometryPatient(input: {
       optometryStatus: "referred",
     });
 
+    const { error: encounterError } = await supabaseServer
+      .from("encounters")
+      .insert({
+        patient_id: patient.id,
+        encounter_type: "optometry",
+        optometry_source: "visiting",
+        optometry_visit_type: input.visitType,
+        status: "draft",
+        recorded_by: staff.id,
+        updated_at: new Date().toISOString(),
+      });
+    if (encounterError) throw encounterError;
+
     await logActivity({
       patientId: patient.id,
       module: "Optometry",
@@ -242,7 +260,7 @@ export async function registerVisitingOptometryPatient(input: {
         patientCode: patient.patient_code,
         patientName: patient.full_name,
         source: "visiting",
-        visitType: "self_presenting",
+        visitType: input.visitType,
       }),
     });
 
