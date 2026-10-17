@@ -591,8 +591,17 @@ function formatRefraction(
     Boolean(value) && typeof value === "object" && !Array.isArray(value);
   const subjective = isRecord(refraction.subjective) ? refraction.subjective : null;
   const objective = isRecord(refraction.objective) ? refraction.objective : null;
-  // Prefer the final subjective result, with objective and legacy flat data as fallbacks.
-  const values = subjective ?? objective ?? refraction;
+  const hasPrescriptionValues = (value: Record<string, unknown> | null) =>
+    Boolean(value && ["sphere", "cylinder", "axis", "add"].some((key) => {
+      const field = value[key];
+      return field !== null && field !== undefined && String(field).trim() !== "";
+    }));
+  // Prefer populated subjective results, then populated objective results, then legacy flat data.
+  const values = hasPrescriptionValues(subjective)
+    ? subjective!
+    : hasPrescriptionValues(objective)
+      ? objective!
+      : refraction;
   const parts = [
     typeof values.sphere === "string" || typeof values.sphere === "number" ? String(values.sphere) : "",
     typeof values.cylinder === "string" || typeof values.cylinder === "number" ? String(values.cylinder) : "",
