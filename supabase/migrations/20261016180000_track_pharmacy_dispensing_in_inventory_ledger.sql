@@ -19,6 +19,7 @@ DECLARE
   total_quantity integer := 0;
   prescription_ids uuid[] := '{}';
   v_new_stock integer;
+  inventory_match_count integer := 0;
 BEGIN
   IF p_patient_id IS NULL THEN
     RAISE EXCEPTION 'Patient ID is required.';
@@ -45,6 +46,21 @@ BEGIN
     ORDER BY created_at ASC, id ASC
     FOR UPDATE
   LOOP
+    -- Do not silently choose the oldest row if duplicate active stock names exist.
+    SELECT count(*) INTO inventory_match_count
+    FROM public.inventory_items
+    WHERE domain = 'pharmacy'
+      AND is_active = true
+      AND lower(trim(name)) = lower(trim(prescription_record.drug_name));
+
+    IF inventory_match_count = 0 THEN
+      RAISE EXCEPTION 'Active pharmacy stock item not found for medication: %',
+        prescription_record.drug_name;
+    ELSIF inventory_match_count > 1 THEN
+      RAISE EXCEPTION 'Multiple active pharmacy stock items match medication: %. Resolve duplicate inventory names before dispensing.',
+        prescription_record.drug_name;
+    END IF;
+
     -- Lock the matching active stock row to serialize competing stock deductions.
     SELECT id, name, stock, unit_cost, unit_of_measure
     INTO inventory_record
