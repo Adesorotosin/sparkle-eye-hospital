@@ -101,11 +101,12 @@ jobs:
             supabase/migrations/20261016120000_fix_triage_doctor_queue_handoff.sql \
             supabase/migrations/20261016130000_allow_waiting_doctor_patient_status.sql \
             supabase/migrations/20261016140000_add_consultation_proforma_fields.sql \
-            supabase/migrations/20261016150000_shared_inventory_module.sql \
-            supabase/migrations/20261016160000_add_inventory_manager_role.sql \
-            supabase/migrations/20261016170000_lock_down_inventory_table_access.sql \
-            supabase/migrations/20261016180000_track_pharmacy_dispensing_in_inventory_ledger.sql \
-            supabase/migrations/20261016190000_require_paid_invoice_before_pharmacy_dispensing.sql
+            supabase/migrations/20261017075024_shared_inventory_module.sql \
+            supabase/migrations/20261017075033_track_pharmacy_dispensing_in_inventory_ledger.sql \
+            supabase/migrations/20261017075044_require_paid_invoice_before_pharmacy_dispensing.sql \
+            supabase/migrations/20261017075132_secure_hospital_data_api_access.sql \
+            supabase/migrations/20261017075745_add_inventory_manager_role.sql \
+            supabase/migrations/20261017075749_lock_down_inventory_table_access.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
