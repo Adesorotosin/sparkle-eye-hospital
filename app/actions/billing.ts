@@ -1157,6 +1157,7 @@ export async function processBillingPayment(input: {
               .from("prescriptions")
               .update({
                 status: "pending_payment",
+                invoice_item_id: null,
               })
               .in(
                 "id",
@@ -1259,6 +1260,7 @@ export async function processBillingPayment(input: {
           .from("prescriptions")
           .update({
             status: "pending_payment",
+            invoice_item_id: null,
           })
           .in(
             "id",
