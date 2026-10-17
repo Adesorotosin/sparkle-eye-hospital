@@ -13,7 +13,17 @@ create table staff (
   name text not null,
   email text unique not null,
   role text not null check (role in (
-    'IT_ADMIN','OPHTHALMOLOGIST','DOCTOR','PHARMACIST','NURSE','CASHIER','RECEPTIONIST'
+    'IT_ADMIN',
+    'OPHTHALMOLOGIST',
+    'DOCTOR',
+    'OPTOMETRIST',
+    'OPTICIAN',
+    'LAB_SCIENTIST',
+    'NURSE',
+    'PHARMACIST',
+    'CASHIER',
+    'RECEPTIONIST',
+    'INVENTORY_MANAGER'
   )),
   title text,                                 -- human-readable job title, e.g. "Senior Ophthalmologist"
                                                -- (separate from `role`, which drives login/route access)
