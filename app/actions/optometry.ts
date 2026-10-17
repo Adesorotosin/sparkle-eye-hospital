@@ -373,6 +373,8 @@ export async function getOptometryPatient(
   slit_lamp_os,
   refraction_od,
   refraction_os,
+  optometry_source,
+  optometry_visit_type,
   diagnosis,
   status,
   created_at,
@@ -540,6 +542,12 @@ export async function getOptometryPatient(
         refractionOS:
           optometryEncounter.refraction_os ??
           null,
+
+        optometrySource:
+          optometryEncounter.optometry_source ?? "in_house",
+
+        optometryVisitType:
+          optometryEncounter.optometry_visit_type ?? "doctor_referral",
 
         diagnosis:
           optometryEncounter.diagnosis ??
