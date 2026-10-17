@@ -320,7 +320,7 @@ export async function recordPharmacyDailySale(input: {
     const saleAmount = Number(data?.sale_amount ?? 0);
     await logActivity({
       module: "Inventory",
-      category: "FINANCIAL",
+      category: "BILLING",
       action: "Pharmacy daily sale recorded",
       performedBy: staff.name,
       staffId: staff.id,
