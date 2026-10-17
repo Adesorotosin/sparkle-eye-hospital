@@ -73,7 +73,7 @@ export default function InventoryOverview() {
   ] : [];
 
   return (
-    <section className="space-y-5">
+    <section id="inventory-overview" className="scroll-mt-6 space-y-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-700">Operations</p>
