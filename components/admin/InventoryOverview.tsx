@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Boxes, Clock3, Package, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Boxes,
+  Clock3,
+  Package,
+  RefreshCw,
+} from "lucide-react";
+import { getInventoryData } from "@/app/actions/inventory";
 
 type Overview = {
   summary: {
@@ -35,13 +44,18 @@ type Overview = {
   updatedAt: string;
 };
 
-const money = (value: number) => new Intl.NumberFormat("en-NG", {
-  style: "currency", currency: "NGN", maximumFractionDigits: 0,
-}).format(value);
+const money = (value: number) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(value);
 
-const dateTime = (value: string) => new Intl.DateTimeFormat("en-NG", {
-  dateStyle: "medium", timeStyle: "short",
-}).format(new Date(value));
+const dateTime = (value: string) =>
+  new Intl.DateTimeFormat("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 
 export default function InventoryOverview() {
   const [data, setData] = useState<Overview | null>(null);
@@ -51,10 +65,47 @@ export default function InventoryOverview() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/inventory-overview", { cache: "no-store" });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Unable to load inventory overview.");
-      setData(result);
+      // Reuse the authenticated inventory server action instead of parsing an
+      // API response that may be an HTML login/error page rather than JSON.
+      const result = await getInventoryData();
+      if (!result.success) {
+        throw new Error(result.message || "Unable to load inventory overview.");
+      }
+
+      const activeItems = result.items.filter((item) => item.is_active);
+      const lowStockItems = activeItems
+        .filter((item) => Number(item.stock) <= Number(item.reorder_level))
+        .sort((a, b) => Number(a.stock) - Number(b.stock))
+        .slice(0, 6);
+
+      setData({
+        summary: {
+          activeItemTypes: activeItems.length,
+          unitsInStock: activeItems.reduce((sum, item) => sum + Number(item.stock || 0), 0),
+          lowStockCount: activeItems.filter((item) => Number(item.stock) <= Number(item.reorder_level)).length,
+          outOfStockCount: activeItems.filter((item) => Number(item.stock) <= 0).length,
+          stockValue: activeItems.reduce((sum, item) => sum + Number(item.stock || 0) * Number(item.unit_cost || 0), 0),
+        },
+        lowStockItems,
+        recentMovements: result.movements.slice(0, 6).map((movement) => ({
+          id: movement.id,
+          movement_type: movement.movement_type,
+          quantity: Number(movement.quantity),
+          previous_stock: Number(movement.previous_stock),
+          new_stock: Number(movement.new_stock),
+          created_at: movement.created_at,
+          performed_by_name: movement.performed_by_name,
+          department: movement.department,
+          item: movement.item
+            ? {
+                name: movement.item.name,
+                domain: movement.item.domain,
+                unit_of_measure: movement.item.unit_of_measure,
+              }
+            : null,
+        })),
+        updatedAt: new Date().toISOString(),
+      });
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load inventory overview.");
@@ -63,14 +114,18 @@ export default function InventoryOverview() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const cards = data ? [
-    { label: "Active item types", value: data.summary.activeItemTypes.toLocaleString(), icon: Package, tone: "bg-violet-50 text-violet-700" },
-    { label: "Units in stock", value: data.summary.unitsInStock.toLocaleString(), icon: Boxes, tone: "bg-sky-50 text-sky-700" },
-    { label: "Low-stock items", value: data.summary.lowStockCount.toLocaleString(), icon: AlertTriangle, tone: data.summary.lowStockCount ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700" },
-    { label: "Out of stock", value: data.summary.outOfStockCount.toLocaleString(), icon: AlertTriangle, tone: data.summary.outOfStockCount ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700" },
-  ] : [];
+  const cards = data
+    ? [
+        { label: "Active item types", value: data.summary.activeItemTypes.toLocaleString(), icon: Package, tone: "bg-violet-50 text-violet-700" },
+        { label: "Units in stock", value: data.summary.unitsInStock.toLocaleString(), icon: Boxes, tone: "bg-sky-50 text-sky-700" },
+        { label: "Low-stock items", value: data.summary.lowStockCount.toLocaleString(), icon: AlertTriangle, tone: data.summary.lowStockCount ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700" },
+        { label: "Out of stock", value: data.summary.outOfStockCount.toLocaleString(), icon: AlertTriangle, tone: data.summary.outOfStockCount ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700" },
+      ]
+    : [];
 
   return (
     <section id="inventory-overview" className="scroll-mt-6 space-y-5">
@@ -96,10 +151,12 @@ export default function InventoryOverview() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
-          return <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-slate-500">{card.label}</p><span className={`rounded-xl p-2 ${card.tone}`}><Icon className="h-4 w-4" /></span></div>
-            <p className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900">{loading && !data ? "…" : card.value}</p>
-          </div>;
+          return (
+            <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-bold text-slate-500">{card.label}</p><span className={`rounded-xl p-2 ${card.tone}`}><Icon className="h-4 w-4" /></span></div>
+              <p className="mt-3 text-2xl font-extrabold tracking-tight text-slate-900">{loading && !data ? "…" : card.value}</p>
+            </div>
+          );
         })}
       </div>
 
