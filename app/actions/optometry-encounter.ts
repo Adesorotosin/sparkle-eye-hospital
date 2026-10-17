@@ -10,6 +10,8 @@ type EncounterStatus = "draft" | "completed";
 
 export type SaveOptometryEncounterInput = {
   patientCode: string;
+  optometrySource: "in_house" | "visiting";
+  optometryVisitType: "doctor_referral" | "external_referral" | "self_presenting";
 
   visualAcuityOD: string;
   visualAcuityOS: string;
@@ -176,10 +178,26 @@ export async function saveOptometryEncounter(
       throw existingError;
     }
 
+    if (
+      !["in_house", "visiting"].includes(input.optometrySource) ||
+      !["doctor_referral", "external_referral", "self_presenting"].includes(input.optometryVisitType)
+    ) {
+      return { success: false, message: "Select a valid Optometry source and visit type." };
+    }
+
+    if (
+      (input.optometrySource === "in_house" && input.optometryVisitType !== "doctor_referral") ||
+      (input.optometrySource === "visiting" && input.optometryVisitType === "doctor_referral")
+    ) {
+      return { success: false, message: "In-house visits use Doctor referral; visiting visits use External referral or Self-presenting." };
+    }
+
     const encounterPayload = {
       patient_id: patient.id,
 
       encounter_type: "optometry",
+      optometry_source: input.optometrySource,
+      optometry_visit_type: input.optometryVisitType,
 
       /*
        * Optometry visual acuity is stored on the encounter itself.
