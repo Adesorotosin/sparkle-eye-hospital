@@ -1711,51 +1711,10 @@ function PharmacyContent() {
               setIsDrugInventoryOpen(
                 false
               )
-            }
-            onAddDrug={() =>
-              setIsAddDrugStockModalOpen(
-                true
-              )
-            }
+            } 
           />
         )}
 
-        {isAddDrugStockModalOpen && (
-          <AddDrugStockModal
-            newDrugStock={
-              newDrugStock
-            }
-            setNewDrugStock={
-              setNewDrugStock
-            }
-            drugSuggestions={
-              drugSuggestions
-            }
-            showDrugSuggestions={
-              showDrugSuggestions
-            }
-            setShowDrugSuggestions={
-              setShowDrugSuggestions
-            }
-            isSearchingDrugs={
-              isSearchingDrugs
-            }
-            isSubmitting={
-              isSubmittingDrugStock
-            }
-            onDrugNameChange={
-              handleDrugNameChange
-            }
-            onSubmit={
-              handleAddDrugStock
-            }
-            onClose={() =>
-              setIsAddDrugStockModalOpen(
-                false
-              )
-            }
-          />
-        )}
       </div>
     );
   }
