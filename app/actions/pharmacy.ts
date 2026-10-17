@@ -34,7 +34,8 @@ export interface PharmacyPrescription {
     | "pending_payment"
     | "ready_for_dispensing"
     | "dispensed"
-    | "reviewed";
+    | "reviewed"
+    | "deferred_due_to_cost";
 }
 
 export interface PharmacyPatient {
@@ -164,7 +165,9 @@ export async function getPharmacyPatient(
                   ? "reviewed"
                   : rx.status === "pending_payment"
                     ? "pending_payment"
-                    : "ready_for_dispensing",
+                    : rx.status === "deferred_due_to_cost"
+                      ? "deferred_due_to_cost"
+                      : "ready_for_dispensing",
         })
       ),
     };
