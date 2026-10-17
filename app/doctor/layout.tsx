@@ -7,7 +7,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
-  Kanban,
   Stethoscope,
   Package,
   Calendar,
@@ -89,7 +88,6 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const navItems = [
     { name: "Overview", href: "/doctor", icon: LayoutDashboard },
     { name: "Patient Records", href: "/doctor/patients", icon: Users },
-    { name: "Workflow Queue", href: "/doctor/kanban", icon: Kanban },
     { name: "Investigation Room", href: "/diagnostics", icon: TestTube2 },
     { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope },
     { name: "Appointments", href: "/appointments", icon: Calendar },
