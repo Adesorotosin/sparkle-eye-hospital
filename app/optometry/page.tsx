@@ -22,7 +22,6 @@ import {
 import {
   getOptometryQueue,
   startOptometryExam,
-  addVisitingPatientToQueue,
   registerVisitingOptometryPatient,
   type OptometryPatient,
 } from "@/app/actions/optometry";
@@ -50,7 +49,6 @@ export default function OptometryDashboard() {
 
   const [feedback, setFeedback] =
     useState("");
-  const [visitingPatientCode, setVisitingPatientCode] = useState("");
   const [newPatient, setNewPatient] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "external_referral" | "self_presenting" });
 
   const [isPending, startTransition] =
@@ -202,26 +200,6 @@ export default function OptometryDashboard() {
           "Unable to start the Optometry examination."
         );
       }
-    });
-  }
-
-  function handleAddVisitingPatient(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const patientCode = visitingPatientCode.trim();
-    if (!patientCode) {
-      setFeedback("Enter the registered patient's code.");
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await addVisitingPatientToQueue(patientCode);
-      if (!result.success) {
-        setFeedback(result.message);
-        return;
-      }
-      await loadQueue();
-      setVisitingPatientCode("");
-      setFeedback(result.message);
     });
   }
 
@@ -401,24 +379,6 @@ export default function OptometryDashboard() {
             </button>
             <span className="text-[11px] text-slate-500">A patient code and year-based registration number will be generated automatically.</span>
           </div>
-        </form>
-
-        <form onSubmit={handleAddVisitingPatient} className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label htmlFor="visiting-patient-code" className="block text-xs font-extrabold text-slate-700">Add visiting patient</label>
-            <p className="mt-1 text-[11px] text-slate-500">Reception must register the patient first. Enter their patient code to add them to this queue.</p>
-            <input
-              id="visiting-patient-code"
-              value={visitingPatientCode}
-              onChange={(event) => setVisitingPatientCode(event.target.value)}
-              placeholder="Patient code"
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 sm:max-w-sm"
-              required
-            />
-          </div>
-          <button type="submit" disabled={isPending} className="rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-blue-800 disabled:opacity-60">
-            {isPending ? "Adding…" : "Add to queue"}
-          </button>
         </form>
 
         {feedback && (
