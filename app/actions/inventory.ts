@@ -80,6 +80,58 @@ function refreshInventoryPaths() {
   revalidatePath("/laboratory");
 }
 
+export async function getDoctorOpticalInventory() {
+  try {
+    await requireRole(["DOCTOR", "OPHTHALMOLOGIST"]);
+
+    const { data, error } = await supabaseServer
+      .from("inventory_items")
+      .select("id, sku, name, category, stock, reorder_level, unit_of_measure, updated_at")
+      .eq("domain", "optical")
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Doctor optical inventory load failed:", error);
+      return {
+        success: false as const,
+        message: "Unable to load optical stock right now.",
+        items: [] as Array<{
+          id: string;
+          sku: string;
+          name: string;
+          category: string;
+          stock: number;
+          reorder_level: number;
+          unit_of_measure: string;
+          updated_at: string;
+        }>,
+      };
+    }
+
+    return {
+      success: true as const,
+      message: "Optical stock loaded.",
+      items: data ?? [],
+    };
+  } catch (error) {
+    return {
+      success: false as const,
+      message: failureMessage(error, "Unable to load optical stock."),
+      items: [] as Array<{
+        id: string;
+        sku: string;
+        name: string;
+        category: string;
+        stock: number;
+        reorder_level: number;
+        unit_of_measure: string;
+        updated_at: string;
+      }>,
+    };
+  }
+}
+
 export async function getInventoryData() {
   try {
     const staff = await requireRole([...INVENTORY_READ_ROLES]);
