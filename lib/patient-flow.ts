@@ -922,6 +922,7 @@ export async function registerPatient(input: {
     | "in_consultation"
     | "completed_today";
   isWalkIn?: boolean;
+  optometryStatus?: "referred";
 }) {
   const fullName =
     input.fullName?.trim();
@@ -991,6 +992,10 @@ export async function registerPatient(input: {
         is_walk_in:
           input.isWalkIn ??
           false,
+
+        optometry_status:
+          input.optometryStatus ??
+          null,
 
         last_visit_at:
           new Date().toISOString(),
