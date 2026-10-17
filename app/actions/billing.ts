@@ -690,6 +690,10 @@ export async function processBillingPayment(input: {
      */
     let prescriptionsUnlocked = 0;
     const prescriptionIdsToUnlock: string[] = [];
+    const prescriptionInvoiceItemPairs: {
+      prescriptionId: string;
+      invoiceItemId: string;
+    }[] = [];
 
     if (pharmacyItems.length > 0) {
       const {
@@ -775,6 +779,10 @@ export async function processBillingPayment(input: {
           prescriptionIdsToUnlock.push(
             matched.id
           );
+          prescriptionInvoiceItemPairs.push({
+            prescriptionId: matched.id,
+            invoiceItemId: invoiceItem.id,
+          });
 
           unmatchedPrescriptions.splice(
             matchIndex,
@@ -810,43 +818,45 @@ export async function processBillingPayment(input: {
         };
       }
 
-      if (prescriptionIdsToUnlock.length > 0) {
-        const {
-          error: prescriptionUpdateError,
-        } = await supabaseServer
-          .from("prescriptions")
-          .update({
-            status: "ready_for_dispensing",
-          })
-          .in(
-            "id",
-            prescriptionIdsToUnlock
-          )
-          .eq(
-            "patient_id",
-            patient.id
-          )
-          .eq(
-            "status",
-            "pending_payment"
-          );
+      if (prescriptionInvoiceItemPairs.length > 0) {
+        for (const match of prescriptionInvoiceItemPairs) {
+          const { error: prescriptionUpdateError } = await supabaseServer
+            .from("prescriptions")
+            .update({
+              status: "ready_for_dispensing",
+              invoice_item_id: match.invoiceItemId,
+            })
+            .eq("id", match.prescriptionId)
+            .eq("patient_id", patient.id)
+            .eq("status", "pending_payment");
 
-        if (prescriptionUpdateError) {
-          console.error(
-            "Prescription status update failed:",
-            prescriptionUpdateError
-          );
+          if (prescriptionUpdateError) {
+            console.error(
+              "Prescription status/link update failed:",
+              prescriptionUpdateError
+            );
 
-          return {
-            success: false,
-            message:
-              "Payment could not be completed because the prescription status could not be updated.",
-            grandTotal,
-          };
+            await supabaseServer
+              .from("prescriptions")
+              .update({
+                status: "pending_payment",
+                invoice_item_id: null,
+              })
+              .in("id", prescriptionIdsToUnlock)
+              .eq("patient_id", patient.id)
+              .eq("status", "ready_for_dispensing");
+
+            return {
+              success: false,
+              message:
+                "Payment could not be completed because the prescription could not be linked to its exact invoice item.",
+              grandTotal,
+            };
+          }
         }
 
         prescriptionsUnlocked =
-          prescriptionIdsToUnlock.length;
+          prescriptionInvoiceItemPairs.length;
       }
     }
 
@@ -882,7 +892,7 @@ export async function processBillingPayment(input: {
         if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
-            .update({ status: "pending_payment" })
+            .update({ status: "pending_payment", invoice_item_id: null })
             .in("id", prescriptionIdsToUnlock)
             .eq("patient_id", patient.id)
             .eq("status", "ready_for_dispensing");
@@ -943,7 +953,7 @@ export async function processBillingPayment(input: {
         if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
-            .update({ status: "pending_payment" })
+            .update({ status: "pending_payment", invoice_item_id: null })
             .in("id", prescriptionIdsToUnlock)
             .eq("patient_id", patient.id)
             .eq("status", "ready_for_dispensing");
@@ -997,7 +1007,7 @@ export async function processBillingPayment(input: {
         if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
-            .update({ status: "pending_payment" })
+            .update({ status: "pending_payment", invoice_item_id: null })
             .in("id", prescriptionIdsToUnlock)
             .eq("patient_id", patient.id)
             .eq("status", "ready_for_dispensing");
@@ -1095,7 +1105,7 @@ export async function processBillingPayment(input: {
         if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
-            .update({ status: "pending_payment" })
+            .update({ status: "pending_payment", invoice_item_id: null })
             .in("id", prescriptionIdsToUnlock)
             .eq("patient_id", patient.id)
             .eq("status", "ready_for_dispensing");
@@ -1194,7 +1204,7 @@ export async function processBillingPayment(input: {
             if (prescriptionIdsToUnlock.length > 0) {
               await supabaseServer
                 .from("prescriptions")
-                .update({ status: "pending_payment" })
+                .update({ status: "pending_payment", invoice_item_id: null })
                 .in("id", prescriptionIdsToUnlock)
                 .eq("status", "ready_for_dispensing");
             }
