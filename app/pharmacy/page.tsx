@@ -15,6 +15,7 @@ import PatientBanner, {
 import {
   Search,
   ChevronRight,
+  ChevronLeft,
   Info,
   Printer,
   CheckCircle,
@@ -1938,15 +1939,22 @@ function PharmacyContent() {
 
         <header className="bg-white border-b border-slate-200/80 px-8 py-3.5 flex items-center justify-between print:hidden">
 
-          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-            <span>
-              Dispensing Queue
-            </span>
-
+          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+            {patientId && (
+              <button
+                type="button"
+                onClick={() => router.push("/pharmacy")}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-purple-200 hover:bg-purple-50 hover:text-purple-700"
+                aria-label="Back to pharmacy queue"
+                title="Back to pharmacy queue"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+            <span>Dispensing Queue</span>
             <span>›</span>
-
             <span className="text-slate-900 font-bold">
-              Order Detail
+              {patientId ? "Order Detail" : "Queue"}
             </span>
           </div>
 
