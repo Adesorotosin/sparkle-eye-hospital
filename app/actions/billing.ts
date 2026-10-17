@@ -879,7 +879,7 @@ export async function processBillingPayment(input: {
           labLookupError
         );
 
-if (prescriptionIdsToUnlock.length > 0) {
+        if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
             .update({ status: "pending_payment" })
@@ -891,7 +891,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         }
 
-                return {
+        return {
           success: false,
           message:
             "Payment could not be completed because laboratory orders could not be verified.",
@@ -940,7 +940,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         );
 
-if (prescriptionIdsToUnlock.length > 0) {
+        if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
             .update({ status: "pending_payment" })
@@ -952,7 +952,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         }
 
-                return {
+        return {
           success: false,
           message:
             "Payment could not be completed because one or more laboratory items could not be matched to a laboratory order.",
@@ -994,7 +994,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           diagnosticLookupError
         );
 
-if (prescriptionIdsToUnlock.length > 0) {
+        if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
             .update({ status: "pending_payment" })
@@ -1006,7 +1006,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         }
 
-                return {
+        return {
           success: false,
           message:
             "Payment could not be completed because diagnostic orders could not be verified.",
@@ -1092,7 +1092,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         );
 
-if (prescriptionIdsToUnlock.length > 0) {
+        if (prescriptionIdsToUnlock.length > 0) {
           const { error: rollbackError } = await supabaseServer
             .from("prescriptions")
             .update({ status: "pending_payment" })
@@ -1104,7 +1104,7 @@ if (prescriptionIdsToUnlock.length > 0) {
           }
         }
 
-                return {
+        return {
           success: false,
           message:
             "Payment could not be completed because one or more diagnostic items could not be matched to a diagnostic order.",
