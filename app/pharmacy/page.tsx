@@ -1412,7 +1412,7 @@ function PharmacyContent() {
                       ) : filteredPharmacyOrders.length === 0 ? (
                         <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500">{queueSearch.trim() ? "No queue entries match your search." : "No active prescriptions in the queue right now."}</td></tr>
                       ) : filteredPharmacyOrders.map((item) => (
-                        <tr key={item.id} className="transition hover:bg-violet-50/40">
+                        <tr key={`${item.id}-${item.status}`} className="transition hover:bg-violet-50/40">
                           <td className="px-5 py-4"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">Prescription record</p></td>
                           <td className="px-5 py-4 font-mono text-xs text-slate-600">{item.id}</td>
                           <td className="px-5 py-4 text-slate-600">{item.time}</td>
