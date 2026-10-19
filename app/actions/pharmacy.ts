@@ -848,7 +848,16 @@ export async function deferPrescriptionsDueToCost(
     revalidatePath("/cashier");
     return { success: true, message: "Selected medication(s) deferred. Only the remaining bill items can be paid and dispensed." };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : "Unable to defer the selected medication." };
+    // Keep the full diagnostic in server logs; surface the database/action message
+    // when available so the pharmacy UI does not hide the actual failure.
+    console.error("Failed to defer pharmacy prescription(s):", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === "object" && "message" in error && typeof error.message === "string"
+          ? error.message
+          : "Unable to defer the selected medication.";
+    return { success: false, message };
   }
 }
 
