@@ -78,6 +78,8 @@ function PharmacyContent() {
   const [pharmacyQueue, setPharmacyQueue] =
     useState<PharmacyQueueItem[]>([]);
 
+  const [queueSearch, setQueueSearch] = useState("");
+
   const [isLoadingPatient, setIsLoadingPatient] =
     useState(false);
 
@@ -392,6 +394,13 @@ function PharmacyContent() {
       status: item.status,
     })
   );
+
+  const filteredPharmacyOrders = pharmacyOrders.filter((item) => {
+    const query = queueSearch.trim().toLowerCase();
+    return !query || [item.name, item.id, item.status].some((value) =>
+      value.toLowerCase().includes(query)
+    );
+  });
 
   const readyOrders =
     pharmacyOrders.filter(
@@ -1302,187 +1311,37 @@ function PharmacyContent() {
   if (!patient) {
     return (
       <div className="min-h-screen bg-[#F4F6FB] flex text-slate-800 font-sans antialiased">
-        <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+        <aside className="w-64 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
           <div className="p-5 border-b border-slate-800/80">
             <div className="flex items-center gap-3">
               <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
-                <Image
-                  src="/Logo.png"
-                  alt="Sparkle Eye Specialist Hospital Logo"
-                  width={36}
-                  height={36}
-                  className="object-contain"
-                  priority
-                />
+                <Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital Logo" width={36} height={36} className="object-contain" priority />
               </div>
-
               <div>
-                <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">
-                  Sparkle Eye
-                </h1>
-
-                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                  Dispensing Console
-                </p>
+                <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">Sparkle Eye</h1>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">Pharmacy workspace</p>
               </div>
-            </div>
-
-            <div className="mt-4 relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
-              <input
-                type="text"
-                placeholder="Search prescriptions..."
-                className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
-              />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setIsRegisterModalOpen(
-                    true
-                  )
-                }
-                className="px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                Register Patient
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  handleOpenDrugInventory
-                }
-                className="px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-              >
-                <Boxes className="w-3.5 h-3.5" />
-                Drug Stock
-              </button>
             </div>
           </div>
-
-          <div className="flex-1 overflow-y-auto p-3">
-            <div className="flex items-center gap-2 px-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-violet-500" />
-              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                DOCTOR REQUESTS TO REVIEW ({isLoadingQueue ? "..." : pharmacyReviewOrders.length})
-              </h2>
-            </div>
-            {pharmacyReviewOrders.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-slate-500">No doctor prescription requests need review.</p>
-            ) : (
-              <div className="space-y-1 mb-5">
-                {pharmacyReviewOrders.map((item) => (
-                  <button key={item.id} type="button" onClick={() => handlePatientSelect(item.id, item.name)} className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between">
-                    <div>
-                      <strong className="text-xs font-bold block">{item.name}</strong>
-                      <span className="text-[10px] text-violet-300 font-medium block mt-0.5">Prescription needs medication and price confirmation • {item.time}</span>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-500" />
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2 px-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-
-              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                AWAITING PAYMENT (
-                {isLoadingQueue
-                  ? "..."
-                  : awaitingPaymentOrders.length}
-                )
-              </h2>
-            </div>
-
-            {awaitingPaymentOrders.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-slate-500">
-                No prescriptions are awaiting payment.
-              </p>
-            ) : (
-              <div className="space-y-1 mb-5">
-                {awaitingPaymentOrders.map(
-                  (item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        handlePatientSelect(
-                          item.id,
-                          item.name
-                        )
-                      }
-                      className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between"
-                    >
-                      <div>
-                        <strong className="text-xs font-bold block">
-                          {item.name}
-                        </strong>
-
-                        <span className="text-[10px] text-amber-400 font-medium block mt-0.5">
-                          Awaiting Cashier payment •{" "}
-                          {item.time}
-                        </span>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </button>
-                  )
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 px-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-
-              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                READY FOR PICKUP (
-                {isLoadingQueue
-                  ? "..."
-                  : readyOrders.length}
-                )
-              </h2>
-            </div>
-
-            {readyOrders.length === 0 ? (
-              <p className="px-2 py-3 text-xs text-slate-500">
-                No prescriptions are ready for pickup.
-              </p>
-            ) : (
-              <div className="space-y-1">
-                {readyOrders.map(
-                  (item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        handlePatientSelect(
-                          item.id,
-                          item.name
-                        )
-                      }
-                      className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between"
-                    >
-                      <div>
-                        <strong className="text-xs font-bold block">
-                          {item.name}
-                        </strong>
-
-                        <span className="text-[10px] text-emerald-400 font-medium block mt-0.5">
-                          Ready for dispensing •{" "}
-                          {item.time}
-                        </span>
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </button>
-                  )
-                )}
-              </div>
-            )}
+          <nav aria-label="Pharmacy navigation" className="flex-1 p-3 space-y-2">
+            <button type="button" onClick={() => router.push("/pharmacy")} className="w-full flex items-center gap-3 rounded-xl bg-slate-800 px-3 py-3 text-sm font-bold text-white">
+              <Pill className="h-4 w-4 text-violet-300" />
+              Dashboard & queue
+            </button>
+            <button type="button" onClick={handleOpenDrugInventory} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
+              <Boxes className="h-4 w-4" />
+              Drug inventory
+            </button>
+            <button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
+              <UserPlus className="h-4 w-4" />
+              Register patient
+            </button>
+          </nav>
+          <div className="border-t border-slate-800 p-3">
+            <button type="button" onClick={() => void handleLogout()} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-rose-300" aria-label="Log out of the pharmacy module">
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
           </div>
         </aside>
 
@@ -1517,21 +1376,54 @@ function PharmacyContent() {
             </div>
           </header>
 
-          <main className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center max-w-md">
-              <div className="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto mb-5">
-                <Pill className="w-7 h-7" />
+          <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+            <div className="mx-auto max-w-7xl space-y-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Pharmacy overview</p>
+                  <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-900">Prescription queue</h2>
+                  <p className="mt-1 text-sm text-slate-500">Find a patient and open their prescription to review or dispense.</p>
+                </div>
+                <button type="button" onClick={() => void loadQueue()} disabled={isLoadingQueue} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                  <Search className="h-4 w-4" />
+                  {isLoadingQueue ? "Refreshing…" : "Refresh queue"}
+                </button>
               </div>
-
-              <h2 className="text-xl font-extrabold text-slate-900">
-                Select a patient
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-2">
-                Select a patient from the pharmacy
-                queue or register a new patient to
-                begin dispensing.
-              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-medium text-slate-500">Needs pharmacy review</p><p className="mt-2 text-3xl font-extrabold text-slate-900">{isLoadingQueue ? "—" : pharmacyReviewOrders.length}</p></div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-medium text-slate-500">Awaiting payment</p><p className="mt-2 text-3xl font-extrabold text-slate-900">{isLoadingQueue ? "—" : awaitingPaymentOrders.length}</p></div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-medium text-slate-500">Ready for dispensing</p><p className="mt-2 text-3xl font-extrabold text-slate-900">{isLoadingQueue ? "—" : readyOrders.length}</p></div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-sm font-medium text-slate-500">Active queue</p><p className="mt-2 text-3xl font-extrabold text-slate-900">{isLoadingQueue ? "—" : pharmacyOrders.length}</p></div>
+              </div>
+              <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-100 p-4 sm:p-5">
+                  <label htmlFor="pharmacy-queue-search" className="mb-2 block text-sm font-bold text-slate-700">Search queue</label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input id="pharmacy-queue-search" type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)} placeholder="Search patient name, patient code or status…" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:bg-white focus:ring-2 focus:ring-violet-100" />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3 font-bold">Patient</th><th className="px-5 py-3 font-bold">Patient code</th><th className="px-5 py-3 font-bold">Received</th><th className="px-5 py-3 font-bold">Status</th><th className="px-5 py-3 text-right font-bold">Action</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {isLoadingQueue ? (
+                        <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500">Loading pharmacy queue…</td></tr>
+                      ) : filteredPharmacyOrders.length === 0 ? (
+                        <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500">{queueSearch.trim() ? "No queue entries match your search." : "No active prescriptions in the queue right now."}</td></tr>
+                      ) : filteredPharmacyOrders.map((item) => (
+                        <tr key={`${item.id}-${item.status}`} className="transition hover:bg-violet-50/40">
+                          <td className="px-5 py-4"><p className="font-bold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">Prescription record</p></td>
+                          <td className="px-5 py-4 font-mono text-xs text-slate-600">{item.id}</td>
+                          <td className="px-5 py-4 text-slate-600">{item.time}</td>
+                          <td className="px-5 py-4"><span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${item.status === "ready_for_dispensing" ? "bg-emerald-50 text-emerald-700" : item.status === "pending_payment" ? "bg-amber-50 text-amber-700" : "bg-violet-50 text-violet-700"}`}>{item.status.replaceAll("_", " ")}</span></td>
+                          <td className="px-5 py-4 text-right"><button type="button" onClick={() => handlePatientSelect(item.id, item.name)} className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-violet-700">Open <ChevronRight className="h-3.5 w-3.5" /></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           </main>
         </div>
@@ -1782,207 +1674,39 @@ function PharmacyContent() {
 
       {/* SIDEBAR */}
 
-      <aside className="w-80 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
-
-        <div className="p-5 border-b border-slate-800/80">
-
-          <div className="flex items-center gap-3">
-
-            <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
-              <Image
-                src="/Logo.png"
-                alt="Sparkle Eye Specialist Hospital Logo"
-                width={36}
-                height={36}
-                className="object-contain"
-                priority
-              />
+        <aside className="w-64 bg-[#0B132B] text-white flex flex-col shrink-0 border-r border-slate-800 print:hidden">
+          <div className="p-5 border-b border-slate-800/80">
+            <div className="flex items-center gap-3">
+              <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
+                <Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital Logo" width={36} height={36} className="object-contain" priority />
+              </div>
+              <div>
+                <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">Sparkle Eye</h1>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">Pharmacy workspace</p>
+              </div>
             </div>
-
-            <div>
-              <h1 className="font-extrabold text-sm tracking-tight text-white leading-tight">
-                Sparkle Eye
-              </h1>
-
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                Dispensing Console
-              </p>
-            </div>
-
           </div>
-
-          <div className="mt-4 relative">
-
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-
-            <input
-              type="text"
-              placeholder="Search prescriptions..."
-              className="w-full bg-slate-800/80 border border-slate-700/80 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-purple-500 transition"
-            />
-
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-
-            <button
-              type="button"
-              onClick={() =>
-                setIsRegisterModalOpen(
-                  true
-                )
-              }
-              className="px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Register Patient
+          <nav aria-label="Pharmacy navigation" className="flex-1 p-3 space-y-2">
+            <button type="button" onClick={() => router.push("/pharmacy")} className="w-full flex items-center gap-3 rounded-xl bg-slate-800 px-3 py-3 text-sm font-bold text-white">
+              <Pill className="h-4 w-4 text-violet-300" />
+              Dashboard & queue
             </button>
-
-            <button
-              type="button"
-              onClick={
-                handleOpenDrugInventory
-              }
-              className="px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white rounded-lg text-[11px] font-bold flex items-center justify-center gap-1.5 transition"
-            >
-              <Boxes className="w-3.5 h-3.5" />
-              Drug Stock
+            <button type="button" onClick={handleOpenDrugInventory} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
+              <Boxes className="h-4 w-4" />
+              Drug inventory
             </button>
-
+            <button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
+              <UserPlus className="h-4 w-4" />
+              Register patient
+            </button>
+          </nav>
+          <div className="border-t border-slate-800 p-3">
+            <button type="button" onClick={() => void handleLogout()} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-rose-300" aria-label="Log out of the pharmacy module">
+              <LogOut className="h-4 w-4" />
+              Log out
+            </button>
           </div>
-
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-5">
-
-          <div>
-
-            <div className="flex items-center gap-2 px-2 mb-2">
-
-              <span className="w-2 h-2 rounded-full bg-rose-500" />
-
-              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                UNFULFILLED (
-                {unfulfilledOrders.length}
-                )
-              </h2>
-
-            </div>
-
-            <div className="space-y-1">
-
-              {unfulfilledOrders.map(
-                (item) => {
-
-                  const isSelected =
-                    selectedPrescription ===
-                    item.name;
-
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        handlePatientSelect(
-                          item.id,
-                          item.name
-                        )
-                      }
-                      className={`w-full text-left p-3 rounded-xl transition flex items-center justify-between group ${
-                        isSelected
-                          ? "bg-slate-800 text-white border border-slate-700"
-                          : "text-slate-300 hover:bg-slate-800/50"
-                      }`}
-                    >
-                      <div>
-
-                        <strong className="text-xs font-bold block">
-                          {item.name}
-                        </strong>
-
-                        <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                          Received:{" "}
-                          {item.time}
-                        </span>
-
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-
-                    </button>
-                  );
-                }
-              )}
-
-            </div>
-
-          </div>
-
-          <div>
-
-            <div className="flex items-center gap-2 px-2 mb-2">
-
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-
-              <h2 className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
-                READY FOR PICKUP (
-                {isLoadingQueue
-                  ? "..."
-                  : readyOrders.length}
-                )
-              </h2>
-
-            </div>
-
-            <div className="space-y-1">
-
-              {readyOrders.length === 0 ? (
-                <p className="px-2 py-3 text-[10px] text-slate-500">
-                  No prescriptions ready
-                  for pickup.
-                </p>
-              ) : (
-                readyOrders.map(
-                  (item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        handlePatientSelect(
-                          item.id,
-                          item.name
-                        )
-                      }
-                      className="w-full text-left p-3 rounded-xl text-slate-300 hover:bg-slate-800/50 transition flex items-center justify-between"
-                    >
-
-                      <div>
-
-                        <strong className="text-xs font-bold block">
-                          {item.name}
-                        </strong>
-
-                        <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                          Received:{" "}
-                          {item.time}
-                        </span>
-
-                      </div>
-
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-
-                    </button>
-                  )
-                )
-              )}
-
-            </div>
-
-          </div>
-
-        </div>
-
-      </aside>
+        </aside>
 
       {/* MAIN */}
 
