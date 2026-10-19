@@ -12,6 +12,11 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "Sparkle Eye Specialist Hospital",
   description: "Hospital Security & Audit Portal",
+  icons: {
+    icon: "/Logo.png",
+    shortcut: "/Logo.png",
+    apple: "/Logo.png",
+  },
 };
 
 export default function RootLayout({
