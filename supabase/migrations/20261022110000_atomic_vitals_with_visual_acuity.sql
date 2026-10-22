@@ -45,13 +45,20 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_vitals_id uuid;
+  v_patient_status text;
+  v_rows integer;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.patients
-    WHERE id = p_patient_id
-  ) THEN
+  SELECT status INTO v_patient_status
+  FROM public.patients
+  WHERE id = p_patient_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'Patient not found';
+  END IF;
+
+  IF v_patient_status <> 'waiting_triage' THEN
+    RAISE EXCEPTION 'Patient is not waiting for triage';
   END IF;
 
   INSERT INTO public.vitals (
@@ -116,6 +123,11 @@ BEGIN
   SET status = 'waiting_doctor'
   WHERE id = p_patient_id
     AND status = 'waiting_triage';
+  GET DIAGNOSTICS v_rows = ROW_COUNT;
+
+  IF v_rows <> 1 THEN
+    RAISE EXCEPTION 'Patient queue status changed during triage';
+  END IF;
 
   RETURN v_vitals_id;
 END;
