@@ -152,30 +152,6 @@ function isValidResultFlag(
   return ["LOW", "NORMAL", "HIGH", "CRITICAL"].includes(value);
 }
 
-async function createLabEvent(input: {
-  labOrderId: string;
-  sampleId?: string | null;
-  eventType: string;
-  description: string;
-  performedBy?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  const { error } = await supabaseServer
-    .from("lab_events")
-    .insert({
-      lab_order_id: input.labOrderId,
-      sample_id: input.sampleId ?? null,
-      event_type: input.eventType,
-      description: input.description,
-      performed_by: input.performedBy ?? null,
-      metadata: input.metadata ?? {},
-    });
-
-  if (error) {
-    throw error;
-  }
-}
-
 async function getLabOrder(id: string) {
   const { data, error } = await supabaseServer
     .from("lab_orders")
