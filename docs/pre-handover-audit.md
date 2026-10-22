@@ -23,6 +23,8 @@
 10. Supabase's advisor reports 29 tables with RLS enabled and no policies. A separate grants query returned no direct grants to `anon`/`authenticated`/PUBLIC for the checked public tables, and the app uses a server secret key. Treat this as a server-only access-model review, not as proof of an exploitable vulnerability; verify the full grants/role model before changing policies.
 11. Supabase's performance advisor reports 31 foreign keys without covering indexes. Review query patterns and migration impact before adding indexes.
 12. Open PRs include draft work for shared inventory recovery and triage-to-doctor handoff. Review these against `main` and the live schema before considering them; do not merge diverged branches wholesale.
+13. The login route originally interpolated user input into a PostgREST `.or()` filter. The audit branch now uses exact username and staff-ID lookups instead. Login rate limiting is not implemented and remains a security follow-up.
+14. The general patient-creation API previously allowed doctor, nurse, and pharmacy roles as well as reception/admin. The audit branch now restricts that endpoint to reception and admin; the dedicated visiting-optometry registration path remains separately role-guarded.
 
 ## Remediation tracks
 
@@ -75,6 +77,7 @@ For each workflow, record: role used, preconditions, steps, expected result, act
 ## Current status
 
 - Repository and schema review: in progress.
+- The application login route has no explicit rate limiting; this remains a pre-handover security task.
 - Initial fixes are committed to `audit/pre-handover-remediation`; CI/preview results are pending.
 - Live database: read-only inspection only; no test patient or clinical write performed.
 - The new migration has not been applied to Supabase.
