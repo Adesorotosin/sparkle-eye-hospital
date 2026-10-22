@@ -25,6 +25,10 @@
 12. Open PRs include draft work for shared inventory recovery and triage-to-doctor handoff. Review these against `main` and the live schema before considering them; do not merge diverged branches wholesale.
 13. The login route originally interpolated user input into a PostgREST `.or()` filter. The audit branch now uses exact username and staff-ID lookups instead. Login rate limiting is not implemented and remains a security follow-up.
 14. The general patient-creation API previously allowed doctor, nurse, and pharmacy roles as well as reception/admin. The audit branch now restricts that endpoint to reception and admin; the dedicated visiting-optometry registration path remains separately role-guarded.
+15. Laboratory sample collection, sample acceptance/rejection, result entry, and result verification perform multiple sequential database writes. A failure between writes can leave a sample, order, or result in a partially transitioned state; these transitions need transaction-backed RPCs and failure-injection tests.
+16. Procedure registration inserts a procedure order and invoice line separately. If invoice-line creation fails, the procedure remains without a corresponding bill line. This needs an atomic database operation.
+17. Pharmacy prescription creation/defer/restore and billing payment use multiple writes with compensating cleanup. These paths need concurrency and injected-failure tests; compensation alone is not equivalent to a database transaction.
+18. Login currently has no explicit rate limiting/lockout policy. Exact lookup filtering is fixed in this branch, but rate limiting still needs a reviewed policy that avoids locking out shared workstations or exposing account existence.
 
 ## Remediation tracks
 
@@ -62,6 +66,14 @@
 - Fix Lagos-local date handling, loading/empty/error states, duplicate-click prevention, keyboard/mobile usability, and console errors.
 - Review database indexes against actual query filters/orderings.
 
+## Additional high-priority remediation still required
+
+- Convert laboratory sample/result state transitions to transactional database functions, with concurrency and failure-injection coverage.
+- Make procedure order + invoice-line creation atomic.
+- Make prescription creation/defer/restore and cashier payment transitions transactional or provide verifiable compensating recovery for every write.
+- Implement a rate-limiting policy for login attempts and test it without exposing account existence.
+- Review remaining lint errors and warnings across the full codebase.
+
 ## Test evidence required before handoff
 
 For each workflow, record: role used, preconditions, steps, expected result, actual result, persistence verified, authorization verified, failure/retry result, and evidence. Keep production read-only until an isolated test database or explicitly safe test setup is confirmed.
@@ -72,7 +84,7 @@ For each workflow, record: role used, preconditions, steps, expected result, act
 - Added an additive RPC and migration to save all triage measurements and queue handoff in one database transaction; added a rollback-only PostgreSQL integration test.
 - Reception's date default now uses the `Africa/Lagos` calendar date.
 - Patient-code generation retries on a patient-code unique-constraint collision without masking unrelated database errors.
-- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus atomic triage and visiting-optometry database tests. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
+- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus atomic triage, visiting-optometry, and draft-invoice database tests. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
 
 ## Current status
 
