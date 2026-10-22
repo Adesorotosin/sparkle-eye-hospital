@@ -100,6 +100,7 @@ jobs:
       - name: Apply release migrations in order
         run: |
           for migration in \
+            supabase/migrations/20261001_create_laboratory_workflow.sql \
             supabase/migrations/20261011_add_year_based_patient_registration_numbers.sql \
             supabase/migrations/202610110001_fix_ambiguous_registration_year.sql \
             supabase/migrations/202610110002_create_procedure_orders.sql \
@@ -125,7 +126,8 @@ jobs:
             supabase/migrations/20261022120000_unpadded_patient_registration_numbers.sql \
             supabase/migrations/20261022130000_atomic_visiting_optometry_registration.sql \
             supabase/migrations/20261022140000_atomic_draft_invoice_creation.sql \
-            supabase/migrations/20261022150000_atomic_procedure_billing.sql
+            supabase/migrations/20261022150000_atomic_procedure_billing.sql \
+            supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -142,3 +144,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/draft_invoice_atomicity.sql
       - name: Run atomic procedure billing safeguards after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/procedure_billing_atomicity.sql
+      - name: Run laboratory lifecycle safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/laboratory_lifecycle_atomicity.sql
