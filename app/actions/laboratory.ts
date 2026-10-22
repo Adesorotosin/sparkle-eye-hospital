@@ -1292,70 +1292,17 @@ export async function verifyLabResult(input: {
       };
     }
 
-    const now =
-      new Date().toISOString();
-
-    const { error: updateResultError } =
-      await supabaseServer
-        .from("lab_results")
-        .update({
-          verified_by: staff.id,
-          verified_at: now,
-          verification_notes:
-            clean(input.verificationNotes) ||
-            null,
-        })
-        .eq("id", resultId)
-        .is("verified_at", null);
-
-    if (updateResultError) {
-      throw updateResultError;
-    }
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "COMPLETED",
-        })
-        .eq("id", labOrderId)
-        .eq(
-          "status",
-          "AWAITING_VERIFICATION"
-        );
-
-    if (orderError) {
-      throw orderError;
-    }
-
-    if (result.sample_id) {
-      const { error: sampleError } =
-        await supabaseServer
-          .from("lab_samples")
-          .update({
-            status: "COMPLETED",
-          })
-          .eq("id", result.sample_id);
-
-      if (sampleError) {
-        throw sampleError;
+    const { error: verificationError } = await supabaseServer.rpc(
+      "verify_lab_result_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_result_id: resultId,
+        p_verification_notes: clean(input.verificationNotes) || null,
+        p_performed_by: staff.id,
       }
-    }
+    );
 
-    await createLabEvent({
-      labOrderId,
-      sampleId:
-        result.sample_id,
-      eventType: "RESULT_VERIFIED",
-      description: `Laboratory result verified for ${order.test_name}.`,
-      performedBy: staff.id,
-      metadata: {
-        resultId,
-        verificationNotes:
-          clean(input.verificationNotes) ||
-          null,
-      },
-    });
+    if (verificationError) throw verificationError;
 
     await logActivity({
       module: "Laboratory",
