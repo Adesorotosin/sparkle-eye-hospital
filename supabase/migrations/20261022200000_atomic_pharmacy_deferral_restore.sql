@@ -43,7 +43,7 @@ BEGIN
   END IF;
   IF v_billing IS NOT NULL THEN
     v_rate_text := regexp_replace(COALESCE(v_billing->>'vatRate', '0'), '%', '', 'g');
-    IF v_rate_text ~ '^[0-9]+([.][0-9]+)?$' THEN
+    IF v_rate_text ~ '^[0-9]' AND v_rate_text !~ '[^0-9.]' AND length(v_rate_text) - length(replace(v_rate_text, '.', '')) <= 1 THEN
       v_vat_rate := LEAST(GREATEST(v_rate_text::numeric, 0), 100);
     ELSE
       v_vat_rate := 0;
