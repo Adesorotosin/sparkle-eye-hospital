@@ -100,124 +100,63 @@ export async function POST(
       );
     }
 
-    const { data: vitalsId, error: vitalsError } =
-      await supabaseServer.rpc("record_patient_vitals", {
+    const { error: vitalsError } = await supabaseServer.rpc(
+      "record_patient_vitals_complete",
+      {
         p_patient_id: patient.id,
-
         p_visual_acuity_od: visualAcuityOD,
-
         p_visual_acuity_os: visualAcuityOS,
-
         p_visual_acuity_ou: visualAcuityOU,
-
-        p_with_correction:
-          withCorrection ?? false,
-
+        p_with_correction: withCorrection ?? false,
         p_visual_acuity_od_note:
-          typeof visualAcuityODNote === "string"
-            ? visualAcuityODNote.trim() || null
-            : null,
-
+          typeof visualAcuityODNote === "string" ? visualAcuityODNote.trim() || null : null,
         p_visual_acuity_os_note:
-          typeof visualAcuityOSNote === "string"
-            ? visualAcuityOSNote.trim() || null
-            : null,
-
+          typeof visualAcuityOSNote === "string" ? visualAcuityOSNote.trim() || null : null,
         p_visual_acuity_ou_note:
-          typeof visualAcuityOUNote === "string"
-            ? visualAcuityOUNote.trim() || null
-            : null,
-
+          typeof visualAcuityOUNote === "string" ? visualAcuityOUNote.trim() || null : null,
         p_gonioscopy_od:
-          typeof gonioscopyOD === "string"
-            ? gonioscopyOD.trim() || null
-            : null,
-
+          typeof gonioscopyOD === "string" ? gonioscopyOD.trim() || null : null,
         p_gonioscopy_os:
-          typeof gonioscopyOS === "string"
-            ? gonioscopyOS.trim() || null
-            : null,
-
+          typeof gonioscopyOS === "string" ? gonioscopyOS.trim() || null : null,
         p_bp_systolic:
-          bpSystolic !== "" && bpSystolic != null
-            ? Number(bpSystolic)
-            : null,
-
+          bpSystolic !== "" && bpSystolic != null ? Number(bpSystolic) : null,
         p_bp_diastolic:
-          bpDiastolic !== "" && bpDiastolic != null
-            ? Number(bpDiastolic)
-            : null,
-
-        p_pulse:
-          pulse !== "" && pulse != null
-            ? Number(pulse)
-            : null,
-
+          bpDiastolic !== "" && bpDiastolic != null ? Number(bpDiastolic) : null,
+        p_pulse: pulse !== "" && pulse != null ? Number(pulse) : null,
         p_temperature:
-          temperature !== "" && temperature != null
-            ? Number(temperature)
-            : null,
-
-        p_spo2:
-          spo2 !== "" && spo2 != null
-            ? Number(spo2)
-            : null,
-
-        p_rbs:
-          rbs !== "" && rbs != null
-            ? Number(rbs)
-            : null,
-
+          temperature !== "" && temperature != null ? Number(temperature) : null,
+        p_spo2: spo2 !== "" && spo2 != null ? Number(spo2) : null,
+        p_rbs: rbs !== "" && rbs != null ? Number(rbs) : null,
         p_recorded_by: staff.id,
-      });
+        p_visual_acuity_od_pinhole:
+          typeof visualAcuityODPinhole === "string" ? visualAcuityODPinhole.trim() || null : null,
+        p_visual_acuity_os_pinhole:
+          typeof visualAcuityOSPinhole === "string" ? visualAcuityOSPinhole.trim() || null : null,
+        p_visual_acuity_od_glasses:
+          typeof visualAcuityODGlasses === "string" ? visualAcuityODGlasses.trim() || null : null,
+        p_visual_acuity_os_glasses:
+          typeof visualAcuityOSGlasses === "string" ? visualAcuityOSGlasses.trim() || null : null,
+        p_visual_acuity_ou_glasses:
+          typeof visualAcuityOUGlasses === "string" ? visualAcuityOUGlasses.trim() || null : null,
+        p_visual_acuity_od_near:
+          typeof visualAcuityODNear === "string" ? visualAcuityODNear.trim() || null : null,
+        p_visual_acuity_os_near:
+          typeof visualAcuityOSNear === "string" ? visualAcuityOSNear.trim() || null : null,
+        p_visual_acuity_ou_near:
+          typeof visualAcuityOUNear === "string" ? visualAcuityOUNear.trim() || null : null,
+      }
+    );
 
     if (vitalsError) {
-      console.error(
-        "Atomic vitals recording failed:",
-        vitalsError
-      );
-
+      console.error("Atomic vitals recording failed:", vitalsError);
       return NextResponse.json(
-        {
-          error: "Failed to record patient vitals.",
-        },
-        {
-          status: 500,
-        }
+        { error: "Failed to record patient vitals." },
+        { status: 500 }
       );
     }
 
-    // Save the additional visual-acuity methods on the same vitals record.
-    // The migration adds these columns without changing the existing RPC.
-    if (vitalsId) {
-      const { error: visualAcuityError } = await supabaseServer
-        .from("vitals")
-        .update({
-          visual_acuity_od_pinhole: typeof visualAcuityODPinhole === "string" ? visualAcuityODPinhole.trim() || null : null,
-          visual_acuity_os_pinhole: typeof visualAcuityOSPinhole === "string" ? visualAcuityOSPinhole.trim() || null : null,
-          visual_acuity_od_glasses: typeof visualAcuityODGlasses === "string" ? visualAcuityODGlasses.trim() || null : null,
-          visual_acuity_os_glasses: typeof visualAcuityOSGlasses === "string" ? visualAcuityOSGlasses.trim() || null : null,
-          visual_acuity_ou_glasses: typeof visualAcuityOUGlasses === "string" ? visualAcuityOUGlasses.trim() || null : null,
-          visual_acuity_od_near: typeof visualAcuityODNear === "string" ? visualAcuityODNear.trim() || null : null,
-          visual_acuity_os_near: typeof visualAcuityOSNear === "string" ? visualAcuityOSNear.trim() || null : null,
-          visual_acuity_ou_near: typeof visualAcuityOUNear === "string" ? visualAcuityOUNear.trim() || null : null,
-        })
-        .eq("id", vitalsId);
-
-      if (visualAcuityError) {
-        console.error("Failed to save additional visual acuity:", visualAcuityError);
-        return NextResponse.json(
-          { error: "Vitals were recorded, but additional visual-acuity results could not be saved. Please contact an administrator." },
-          { status: 500 }
-        );
-      }
-    }
-
-    /*
-     * The database function already moves the patient to
-     * "in_consultation". We intentionally do not update the
-     * status again here.
-     */
+    // The database function atomically saves all measurements and advances
+    // patients still waiting for triage to the doctor queue.
 
     await addActivityLog(
       patient.id,
