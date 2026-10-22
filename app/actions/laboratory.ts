@@ -977,47 +977,17 @@ export async function startLabProcessing(input: {
       };
     }
 
-    const now = new Date().toISOString();
+    const { error: processingError } = await supabaseServer.rpc(
+      "start_lab_processing_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_processing_notes: clean(input.processingNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    const { error: updateSampleError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "PROCESSING",
-          processing_started_by: staff.id,
-          processing_started_at: now,
-        })
-        .eq("id", sampleId)
-        .eq("status", "RECEIVED");
-
-    if (updateSampleError) {
-      throw updateSampleError;
-    }
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "PROCESSING",
-        })
-        .eq("id", labOrderId)
-        .eq("status", "COLLECTED");
-
-    if (orderError) {
-      throw orderError;
-    }
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "PROCESSING_STARTED",
-      description: `Processing started for sample ${sample.sample_number}.`,
-      performedBy: staff.id,
-      metadata: {
-        processingNotes:
-          clean(input.processingNotes) || null,
-      },
-    });
+    if (processingError) throw processingError;
 
     revalidatePath("/laboratory");
 
