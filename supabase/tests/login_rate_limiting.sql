@@ -43,8 +43,11 @@ BEGIN
   END IF;
 
   PERFORM public.clear_login_rate_limit(v_identity_hash, v_ip_hash);
-  IF EXISTS (SELECT 1 FROM public.auth_login_rate_limits WHERE rate_key IN (v_identity_hash, v_ip_hash)) THEN
-    RAISE EXCEPTION 'Successful login cleanup did not clear rate-limit entries';
+  IF EXISTS (SELECT 1 FROM public.auth_login_rate_limits WHERE rate_key = v_identity_hash) THEN
+    RAISE EXCEPTION 'Successful login cleanup did not clear the account/IP rate-limit entry';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.auth_login_rate_limits WHERE rate_key = v_ip_hash) THEN
+    RAISE EXCEPTION 'Successful login must not clear the IP-wide password-spraying counter';
   END IF;
 
   FOR i IN 1..20 LOOP
