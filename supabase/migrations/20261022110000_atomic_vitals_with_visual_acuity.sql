@@ -1,3 +1,14 @@
+-- Keep this migration compatible with fresh schema installs and upgraded projects.
+ALTER TABLE public.vitals
+  ADD COLUMN IF NOT EXISTS visual_acuity_od_pinhole text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_os_pinhole text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_od_glasses text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_os_glasses text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_ou_glasses text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_od_near text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_os_near text,
+  ADD COLUMN IF NOT EXISTS visual_acuity_ou_near text;
+
 -- Save all triage measurements and the queue transition in one transaction.
 -- This is additive: the legacy RPC remains available for existing callers.
 CREATE OR REPLACE FUNCTION public.record_patient_vitals_complete(
