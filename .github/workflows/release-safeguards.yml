@@ -120,7 +120,8 @@ jobs:
             supabase/migrations/20261017091710_record_pharmacy_daily_sales.sql \
             supabase/migrations/20261019000000_allow_deferred_pharmacy_prescriptions.sql \
             supabase/migrations/20261022110000_atomic_vitals_with_visual_acuity.sql \
-            supabase/migrations/20261022120000_unpadded_patient_registration_numbers.sql
+            supabase/migrations/20261022120000_unpadded_patient_registration_numbers.sql \
+            supabase/migrations/20261022130000_atomic_visiting_optometry_registration.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -131,3 +132,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_dispensing_safeguards.sql
       - name: Run atomic triage vitals safeguards after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/triage_vitals_atomicity.sql
+      - name: Run atomic visiting optometry registration safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/optometry_registration_atomicity.sql
