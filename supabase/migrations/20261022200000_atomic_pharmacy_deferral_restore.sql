@@ -90,7 +90,7 @@ BEGIN
   END IF;
 
   SELECT array_agg(DISTINCT id ORDER BY id) INTO v_ids
-  FROM unnest(p_prescription_ids) AS id
+  FROM unnest(p_prescription_ids) AS selected(id)
   WHERE id IS NOT NULL;
   IF COALESCE(cardinality(v_ids), 0) = 0 THEN
     RAISE EXCEPTION 'Select at least one unpaid prescription to defer';
