@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import {
-  getOrCreateDraftInvoice,
-  recalcInvoice,
-} from "@/lib/patient-flow";
+import { recalcInvoice } from "@/lib/patient-flow";
 import { requireRole } from "@/lib/server-auth";
 
 const PHARMACY_READ_ROLES = [
