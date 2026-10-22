@@ -80,8 +80,10 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $$
 BEGIN
+  -- Clear only this account/IP pair. Keep the IP-wide bucket so a successful
+  -- login to another account cannot reset broader password-spraying protection.
   DELETE FROM public.auth_login_rate_limits
-  WHERE rate_key IN (p_identity_ip_hash, p_ip_hash);
+  WHERE rate_key = p_identity_ip_hash;
 END;
 $$;
 
