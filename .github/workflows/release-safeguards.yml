@@ -131,7 +131,7 @@ jobs:
             supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql \
             supabase/migrations/20261022170000_atomic_pharmacy_prescription_creation.sql \
             supabase/migrations/20261022180000_atomic_diagnostic_orders.sql \
-            supabase/migrations/20261022190000_atomic_cashier_payment.sql \\
+            supabase/migrations/20261022190000_atomic_cashier_payment.sql \
             supabase/migrations/20261022200000_atomic_pharmacy_deferral_restore.sql
           do
             echo "Applying $migration"
