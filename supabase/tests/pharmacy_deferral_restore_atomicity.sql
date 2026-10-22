@@ -74,8 +74,10 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Restored invoice line has incorrect details';
   END IF;
+  SELECT subtotal INTO v_total FROM public.invoices WHERE id = v_invoice_id;
+  IF v_total <> 250 THEN RAISE EXCEPTION 'Invoice subtotal was not recalculated after restoration'; END IF;
   SELECT grand_total INTO v_total FROM public.invoices WHERE id = v_invoice_id;
-  IF v_total <> 250 THEN RAISE EXCEPTION 'Invoice total was not recalculated after restoration'; END IF;
+  IF v_total < 250 THEN RAISE EXCEPTION 'Invoice grand total was not recalculated after restoration'; END IF;
 
   -- A second restoration must be rejected without creating a duplicate line.
   BEGIN
