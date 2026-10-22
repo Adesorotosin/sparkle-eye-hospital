@@ -52,32 +52,42 @@ export async function POST(request: Request) {
     }
 
     /*
-     * Look up the staff member in Supabase.
-     *
-     * The user can log in using either:
-     * - username
-     * - staff ID
+     * Resolve username or staff ID using exact equality filters.
+     * Do not interpolate user input into a PostgREST .or() expression.
      */
-    const { data: staff, error: staffError } =
-      await supabaseServer
+    const staffColumns = `
+      id,
+      staff_id,
+      username,
+      password_hash,
+      name,
+      email,
+      role,
+      title,
+      department,
+      is_active,
+      deleted_at
+    `;
+
+    const usernameLookup = await supabaseServer
+      .from("staff")
+      .select(staffColumns)
+      .eq("username", identifier)
+      .maybeSingle();
+
+    let staff = usernameLookup.data;
+    let staffError = usernameLookup.error;
+
+    if (!staff && !staffError) {
+      const staffIdLookup = await supabaseServer
         .from("staff")
-        .select(`
-          id,
-          staff_id,
-          username,
-          password_hash,
-          name,
-          email,
-          role,
-          title,
-          department,
-          is_active,
-          deleted_at
-        `)
-        .or(
-          `username.eq.${identifier},staff_id.eq.${identifier}`
-        )
+        .select(staffColumns)
+        .eq("staff_id", identifier)
         .maybeSingle();
+
+      staff = staffIdLookup.data;
+      staffError = staffIdLookup.error;
+    }
 
     if (staffError) {
       console.error(
