@@ -101,44 +101,22 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     throw new Error("Patient ID is required.");
   }
 
-  const { data: existing, error: findError } = await supabaseServer
-    .from("invoices")
-    .select("*")
-    .eq("patient_id", patientId)
-    .in("status", ["draft", "pending"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await supabaseServer.rpc(
+    "get_or_create_draft_invoice",
+    { p_patient_id: patientId }
+  );
 
-  if (findError) {
-    throw findError;
+  if (error) {
+    throw error;
   }
 
-  if (existing) {
-    return existing;
+  // PostgREST can represent a composite RPC return as an object or a one-row array.
+  const invoice = Array.isArray(data) ? data[0] : data;
+  if (!invoice) {
+    throw new Error("Unable to create or load the patient's draft invoice.");
   }
 
-  const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(
-    1000 + Math.random() * 9000
-  )}`;
-
-  const { data: created, error: createError } = await supabaseServer
-    .from("invoices")
-    .insert({
-      invoice_no: invoiceNo,
-      patient_id: patientId,
-      status: "draft",
-      vat_rate: 0,
-      vat_amount: 0,
-    })
-    .select("*")
-    .single();
-
-  if (createError) {
-    throw createError;
-  }
-
-  return created;
+  return invoice;
 }
 
 /**
