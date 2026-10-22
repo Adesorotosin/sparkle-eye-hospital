@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS public.optical_orders (
 );
 
 ALTER TABLE public.optical_orders
+  ADD COLUMN IF NOT EXISTS patient_code text,
+  ADD COLUMN IF NOT EXISTS patient_name text,
   ADD COLUMN IF NOT EXISTS invoice_item_id uuid NULL
     REFERENCES public.invoice_items(id) ON DELETE SET NULL;
 
