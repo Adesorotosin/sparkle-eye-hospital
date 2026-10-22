@@ -38,7 +38,7 @@ BEGIN
   FROM public.system_settings
   WHERE id = 'default';
 
-  v_rate_text := COALESCE(v_billing->>'vatRate', '0');
+  v_rate_text := regexp_replace(COALESCE(v_billing->>'vatRate', '0'), '%', '', 'g');
   IF v_rate_text ~ '^[0-9]+([.][0-9]+)?$' THEN
     v_vat_rate := LEAST(GREATEST(v_rate_text::numeric, 0), 100);
   END IF;
