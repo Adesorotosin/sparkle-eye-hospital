@@ -28,9 +28,9 @@ function TriageVitalsContent() {
   // VISUAL ACUITY
   // ------------------------------------------------------------
 
-  const [odVisual, setOdVisual] = useState("6/6");
-  const [osVisual, setOsVisual] = useState("6/6");
-  const [ouVisual, setOuVisual] = useState("6/6");
+  const [odVisual, setOdVisual] = useState("");
+  const [osVisual, setOsVisual] = useState("");
+  const [ouVisual, setOuVisual] = useState("");
 
   // Pinhole visual acuity is recorded separately for each eye.
   const [odPinhole, setOdPinhole] = useState("");
@@ -57,11 +57,11 @@ function TriageVitalsContent() {
   // GENERAL VITALS
   // ------------------------------------------------------------
 
-  const [bpSystolic, setBpSystolic] = useState("128");
-  const [bpDiastolic, setBpDiastolic] = useState("82");
-  const [pulse, setPulse] = useState("76");
-  const [temp, setTemp] = useState("36.8");
-  const [spo2, setSpo2] = useState("98");
+  const [bpSystolic, setBpSystolic] = useState("");
+  const [bpDiastolic, setBpDiastolic] = useState("");
+  const [pulse, setPulse] = useState("");
+  const [temp, setTemp] = useState("");
+  const [spo2, setSpo2] = useState("");
   const [rbs, setRbs] = useState("");
 
   const rbsValue = rbs.trim() === "" ? null : Number(rbs);
@@ -360,6 +360,7 @@ function TriageVitalsContent() {
                         }
                         className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                       >
+                        <option value="">Select measured result</option>
                         {VISUAL_ACUITY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
                             {option}
@@ -397,6 +398,7 @@ function TriageVitalsContent() {
                         }
                         className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                       >
+                        <option value="">Select measured result</option>
                         {VISUAL_ACUITY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
                             {option}
@@ -434,6 +436,7 @@ function TriageVitalsContent() {
                         }
                         className="w-1/2 bg-slate-50 border border-slate-200 rounded-xl py-2.5 px-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-purple-600"
                       >
+                        <option value="">Select measured result</option>
                         {VISUAL_ACUITY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
                             {option}
