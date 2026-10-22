@@ -847,149 +847,51 @@ export async function receiveLabSample(input: {
       };
     }
 
-    const isAcceptable =
-      input.condition === "ACCEPTABLE";
+    const { data: transition, error: transitionError } = await supabaseServer.rpc(
+      "receive_lab_sample_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_condition: input.condition,
+        p_reception_notes: clean(input.receptionNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (isAcceptable) {
-      const { error } =
-        await supabaseServer
-          .from("lab_samples")
-          .update({
-            status: "RECEIVED",
-            condition: "ACCEPTABLE",
-            received_by: staff.id,
-            received_at:
-              new Date().toISOString(),
-            collection_notes:
-              clean(input.receptionNotes) ||
-              null,
-          })
-          .eq("id", sampleId)
-          .eq("status", "COLLECTED");
+    if (transitionError) throw transitionError;
 
-      if (error) throw error;
-
-      const { error: orderError } =
-        await supabaseServer
-          .from("lab_orders")
-          .update({
-            status: "PROCESSING",
-          })
-          .eq("id", labOrderId)
-          .eq("status", "COLLECTED");
-
-      if (orderError) throw orderError;
-
-      await createLabEvent({
-        labOrderId,
-        sampleId,
-        eventType: "SAMPLE_RECEIVED",
-        description: `Sample ${sample.sample_number} received and accepted.`,
-        performedBy: staff.id,
-        metadata: {
-          condition: "ACCEPTABLE",
-          receptionNotes:
-            clean(input.receptionNotes) || null,
-        },
-      });
-
-      await logActivity({
-        module: "Laboratory",
-        category: "CLINICAL",
-        action: `Laboratory sample received: ${order.test_name}`,
-        performedBy: staff.name,
-        staffId: staff.id,
-        patientId: order.patient_id,
-        details: JSON.stringify({
-          labOrderId,
-          sampleId,
-          sampleNumber:
-            sample.sample_number,
-          condition: "ACCEPTABLE",
-        }),
-      });
-
-      revalidatePath("/laboratory");
-
-      return {
-        success: true,
-        message:
-          "Sample received and accepted for processing.",
-      };
-    }
-
-    const rejectionReason =
-      clean(input.receptionNotes) ||
-      `Sample rejected: ${input.condition}.`;
-
-    const { error: rejectError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "REJECTED",
-          condition: input.condition,
-          rejection_reason:
-            rejectionReason,
-          rejected_by: staff.id,
-          rejected_at:
-            new Date().toISOString(),
-          received_by: staff.id,
-          received_at:
-            new Date().toISOString(),
-        })
-        .eq("id", sampleId)
-        .eq("status", "COLLECTED");
-
-    if (rejectError) throw rejectError;
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "RECOLLECTION",
-        })
-        .eq("id", labOrderId)
-        .eq("status", "COLLECTED");
-
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "SAMPLE_REJECTED",
-      description: `Sample ${sample.sample_number} rejected. Recollection required.`,
-      performedBy: staff.id,
-      metadata: {
-        condition: input.condition,
-        rejectionReason,
-      },
-    });
-
+    const isAcceptable = transition === "ACCEPTED";
     await logActivity({
       module: "Laboratory",
       category: "CLINICAL",
-      action: `Laboratory sample rejected: ${order.test_name}`,
+      action: isAcceptable
+        ? `Laboratory sample received: ${order.test_name}`
+        : `Laboratory sample rejected: ${order.test_name}`,
       performedBy: staff.name,
       staffId: staff.id,
       patientId: order.patient_id,
       details: JSON.stringify({
         labOrderId,
         sampleId,
-        sampleNumber:
-          sample.sample_number,
+        sampleNumber: sample.sample_number,
         condition: input.condition,
-        rejectionReason,
+        receptionNotes: clean(input.receptionNotes) || null,
       }),
     });
 
     revalidatePath("/laboratory");
 
-    return {
-      success: true,
-      message:
-        "Sample rejected. Recollection is required.",
-      recollectionRequired: true,
-    };
+    return isAcceptable
+      ? {
+          success: true,
+          message: "Sample received and accepted for processing.",
+        }
+      : {
+          success: true,
+          message: "Sample rejected. Recollection is required.",
+          recollectionRequired: true,
+        };
+
   } catch (error) {
     console.error(
       "Receive lab sample error:",
