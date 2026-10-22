@@ -1676,459 +1676,77 @@ export async function markOpticalOrderReady(
   orderId: string
 ): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole([
-      "IT_ADMIN",
-      "OPTICIAN",
-    ]);
-
-    const normalizedId =
-      orderId?.trim();
-
+    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const normalizedId = orderId?.trim();
     if (!normalizedId) {
-      return {
-        success: false,
-        message:
-          "Optical order ID is required.",
-      };
+      return { success: false, message: "Optical order ID is required." };
     }
 
-    const {
-      data: order,
-      error: orderError,
-    } = await supabaseServer
+    const { data: order, error: orderError } = await supabaseServer
       .from("optical_orders")
-      .select(`
-        id,
-        patient_id,
-        status,
-        pd_binocular,
-        pd_od,
-        pd_os,
-        frame_selection,
-        lens_type,
-        lens_material,
-        lens_coating,
-        optical_charge,
-        invoice_id,
-        charge_approval_status,
-        patients (
-          patient_code,
-          full_name
-        )
-      `)
-      .eq(
-        "id",
-        normalizedId
-      )
+      .select("id, patient_id, status, charge_approval_status, patients(patient_code, full_name)")
+      .eq("id", normalizedId)
       .maybeSingle();
 
-    if (orderError) {
-      throw orderError;
-    }
+    if (orderError) throw orderError;
+    if (!order) return { success: false, message: "Optical order was not found." };
 
-    if (!order) {
-      return {
-        success: false,
-        message:
-          "Optical order was not found.",
-      };
-    }
-
-    if (
-      order.status ===
-      "collected"
-    ) {
-      return {
-        success: false,
-        message:
-          "This order has already been collected.",
-      };
-    }
-
-    if (
-      order.status ===
-      "ready_for_dispense"
-    ) {
-      return {
-        success: true,
-        message:
-          "This order is already ready for dispensing.",
-        orderId:
-          order.id,
-      };
-    }
-
-    if (
-      !order.pd_binocular &&
-      (!order.pd_od ||
-        !order.pd_os)
-    ) {
-      return {
-        success: false,
-        message:
-          "Please record the patient's PD measurement before marking the order ready.",
-      };
-    }
-
-    if (!order.frame_selection) {
-      return {
-        success: false,
-        message:
-          "Please select a frame before marking the order ready.",
-      };
-    }
-
-    if (!order.lens_type) {
-      return {
-        success: false,
-        message:
-          "Please select a lens type before marking the order ready.",
-      };
-    }
-
-    if ((order.charge_approval_status ?? "not_submitted") !== "approved") {
-      return {
-        success: false,
-        message: "The Doctor must approve this optical charge before the order can be marked ready.",
-        orderId: order.id,
-      };
-    }
-
-    const opticalCharge =
-      normalizeMoney(
-        order.optical_charge
-      );
-
-    if (opticalCharge <= 0) {
-      return {
-        success: false,
-        message:
-          "Please enter the total optical charge before marking the order ready.",
-      };
-    }
-
-    const patient = Array.isArray(
-      order.patients
-    )
-      ? order.patients[0]
-      : order.patients;
-
-    if (!patient) {
-      return {
-        success: false,
-        message:
-          "The patient attached to this optical order could not be found.",
-      };
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * BILLING
-     * ---------------------------------------------------------
-     *
-     * If the optical order is already linked to an invoice,
-     * reuse that invoice.
-     *
-     * Otherwise create/reuse the patient's active draft/pending
-     * invoice.
-     */
-    let invoiceId =
-      order.invoice_id ??
-      null;
-
-    if (invoiceId) {
-      const {
-        data: linkedInvoice,
-        error: linkedInvoiceError,
-      } = await supabaseServer
-        .from("invoices")
-        .select(`
-          id,
-          status
-        `)
-        .eq(
-          "id",
-          invoiceId
-        )
-        .maybeSingle();
-
-      if (linkedInvoiceError) {
-        throw linkedInvoiceError;
+    const { data: result, error } = await supabaseServer.rpc(
+      "finalize_optical_order_billing_atomic",
+      {
+        p_order_id: order.id,
+        p_staff_id: staff.id,
       }
+    );
 
-      if (!linkedInvoice) {
-        invoiceId = null;
-      } else if (
-        linkedInvoice.status ===
-        "paid"
-      ) {
-        return {
-          success: false,
-          message:
-            "This optical order is already linked to a paid invoice.",
-          orderId:
-            order.id,
-        };
-      } else if (
-        linkedInvoice.status ===
-        "cancelled"
-      ) {
-        invoiceId = null;
+    if (error || !result) {
+      console.error("Atomic optical billing failed:", error);
+      const reason = error?.message ?? "";
+      if (/not found|already been collected|only optical orders|PD measurement|Select a frame|Select a lens type|Doctor approval|required|greater than zero|paid invoice|legacy optical bill lines/i.test(reason)) {
+        return { success: false, message: reason };
       }
+      return {
+        success: false,
+        message: "The optical order could not be billed and marked ready. No partial billing changes were committed; refresh and retry.",
+      };
     }
 
-    if (!invoiceId) {
-      const invoice =
-        await getOrCreateDraftInvoice(
-          order.patient_id
-        );
-
-      invoiceId =
-        invoice.id;
-    }
-
-    /*
-     * Check whether this optical order already has
-     * a corresponding optical invoice item.
-     *
-     * The invoice item is identified using the order's
-     * patient + invoice + optical category + exact charge.
-     *
-     * We also avoid creating a duplicate when this action
-     * is retried after a partial failure.
-     */
-    const {
-      data: existingOpticalItems,
-      error: existingOpticalItemsError,
-    } = await supabaseServer
-      .from("invoice_items")
-      .select(`
-        id,
-        name,
-        quantity,
-        unit_price,
-        total_price
-      `)
-      .eq(
-        "invoice_id",
-        invoiceId
-      )
-      .eq(
-        "category",
-        "optical"
-      );
-
-    if (existingOpticalItemsError) {
-      throw existingOpticalItemsError;
-    }
-
-    const opticalItemName =
-      `Optical eyewear - ${patient.full_name} (${patient.patient_code})`;
-
-    const matchingOpticalItem =
-      (existingOpticalItems ?? []).find(
-        (item) =>
-          String(
-            item.name ?? ""
-          )
-            .trim()
-            .toLowerCase() ===
-            opticalItemName
-              .trim()
-              .toLowerCase()
-      );
-
-    if (!matchingOpticalItem) {
-      const {
-        error: itemInsertError,
-      } = await supabaseServer
-        .from("invoice_items")
-        .insert({
-          invoice_id:
-            invoiceId,
-
-          category:
-            "optical",
-
-          name:
-            opticalItemName,
-
-          quantity:
-            1,
-
-          unit_price:
-            opticalCharge,
-
-          total_price:
-            opticalCharge,
-        });
-
-      if (itemInsertError) {
-        throw itemInsertError;
-      }
-    } else {
-      /*
-       * If an optical item already exists but its price was
-       * changed before the order was made ready, keep billing
-       * synchronized with the current optical charge.
-       */
-      const existingPrice =
-        normalizeMoney(
-          matchingOpticalItem.unit_price
-        );
-
-      if (
-        existingPrice !==
-        opticalCharge
-      ) {
-        const {
-          error:
-            opticalItemUpdateError,
-        } = await supabaseServer
-          .from("invoice_items")
-          .update({
-            unit_price:
-              opticalCharge,
-            total_price:
-              opticalCharge,
-          })
-          .eq(
-            "id",
-            matchingOpticalItem.id
-          );
-
-        if (
-          opticalItemUpdateError
-        ) {
-          throw opticalItemUpdateError;
-        }
-      }
-    }
-
-    /*
-     * Link the optical order to the invoice.
-     */
-    const {
-      error: orderBillingLinkError,
-    } = await supabaseServer
-      .from("optical_orders")
-      .update({
-        invoice_id:
-          invoiceId,
-
-        updated_at:
-          new Date().toISOString(),
-      })
-      .eq(
-        "id",
-        order.id
-      );
-
-    if (orderBillingLinkError) {
-      throw orderBillingLinkError;
-    }
-
-    /*
-     * Recalculate the entire invoice.
-     *
-     * This preserves any consultation, diagnostic,
-     * pharmacy or consumable items already on the invoice.
-     */
-    const totals =
-      await recalcInvoice(
-        invoiceId
-      );
-
-    /*
-     * Finally mark the optical order ready.
-     */
-    const readyAt =
-      new Date().toISOString();
-
-    const {
-      error: updateError,
-    } = await supabaseServer
-      .from("optical_orders")
-      .update({
-        status:
-          "ready_for_dispense",
-
-        ready_at:
-          readyAt,
-
-        updated_at:
-          readyAt,
-
-        recorded_by:
-          staff.id,
-      })
-      .eq(
-        "id",
-        order.id
-      );
-
-    if (updateError) {
-      throw updateError;
-    }
-
+    const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
     await logActivity({
       module: "Optician",
       category: "CLINICAL",
-      action:
-        "Optical order marked ready for dispensing and billed",
-      performedBy:
-        staff.name,
-      staffId:
-        staff.id,
-      patientId:
-        order.patient_id,
-      details:
-        JSON.stringify({
-          opticalOrderId:
-            order.id,
-          patientCode:
-            patient.patient_code,
-          patientName:
-            patient.full_name,
-          invoiceId,
-          opticalCharge,
-          invoiceGrandTotal:
-            totals.grandTotal,
-          invoiceVat:
-            totals.vatAmount,
-        }),
-      financialAmount:
-        opticalCharge,
+      action: "Optical order marked ready for dispensing and billed",
+      performedBy: staff.name,
+      staffId: staff.id,
+      patientId: order.patient_id,
+      details: JSON.stringify({
+        opticalOrderId: order.id,
+        patientCode: patient?.patient_code ?? null,
+        patientName: patient?.full_name ?? null,
+        invoiceId: result.invoice_id,
+        invoiceItemId: result.invoice_item_id,
+        opticalCharge: Number(result.optical_charge ?? 0),
+        invoiceGrandTotal: Number(result.grand_total ?? 0),
+        invoiceVat: Number(result.vat_amount ?? 0),
+        alreadyReady: Boolean(result.already_ready),
+      }),
+      financialAmount: Number(result.optical_charge ?? 0),
     });
 
-    revalidatePath(
-      "/optician"
-    );
-
-    revalidatePath(
-      `/optician/${patient.patient_code}`
-    );
-
-    revalidatePath(
-      "/billing"
-    );
-
-    revalidatePath(
-      "/cashier"
-    );
+    revalidatePath("/optician");
+    if (patient?.patient_code) revalidatePath(`/optician/${patient.patient_code}`);
+    revalidatePath("/billing");
+    revalidatePath("/cashier");
 
     return {
       success: true,
-      message:
-        `Optical order is ready for dispensing. ₦${opticalCharge.toLocaleString()} has been added to the patient's invoice.`,
-      orderId:
-        order.id,
+      message: result.already_ready
+        ? "This optical order is already ready and its billing link is verified."
+        : `Optical order is ready for dispensing. ₦${Number(result.optical_charge ?? 0).toLocaleString()} has been added to the patient's invoice.`,
+      orderId: order.id,
     };
   } catch (error) {
-    return handleError(
-      error,
-      "Unable to mark the optical order ready."
-    );
+    return handleError(error, "Unable to mark the optical order ready.");
   }
 }
 
