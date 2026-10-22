@@ -8,6 +8,8 @@ DECLARE
   v_vitals_id uuid;
   v_status text;
   v_registration_number text;
+  v_vitals_count integer;
+  v_duplicate_rejected boolean := false;
   v_row public.vitals%ROWTYPE;
 BEGIN
   INSERT INTO public.patients (patient_code, full_name, status)
@@ -41,6 +43,51 @@ BEGIN
     'N8',
     'N6'
   );
+
+  -- A retry after the successful handoff must not create a second vitals row.
+  BEGIN
+    PERFORM public.record_patient_vitals_complete(
+      v_patient_id,
+      '6/9',
+      '6/12',
+      '6/9',
+      false,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      NULL,
+      120,
+      80,
+      72,
+      36.6,
+      98,
+      NULL,
+      NULL,
+      '6/6',
+      '6/9',
+      '6/6',
+      '6/9',
+      '6/6',
+      'N6',
+      'N8',
+      'N6'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_duplicate_rejected := true;
+  END;
+
+  IF NOT v_duplicate_rejected THEN
+    RAISE EXCEPTION 'Duplicate triage submission unexpectedly succeeded';
+  END IF;
+
+  SELECT count(*) INTO v_vitals_count
+  FROM public.vitals
+  WHERE patient_id = v_patient_id;
+
+  IF v_vitals_count <> 1 THEN
+    RAISE EXCEPTION 'Duplicate triage submission created an extra vitals record';
+  END IF;
 
   SELECT * INTO v_row
   FROM public.vitals
