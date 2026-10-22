@@ -127,7 +127,8 @@ jobs:
             supabase/migrations/20261022130000_atomic_visiting_optometry_registration.sql \
             supabase/migrations/20261022140000_atomic_draft_invoice_creation.sql \
             supabase/migrations/20261022150000_atomic_procedure_billing.sql \
-            supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql
+            supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql \
+            supabase/migrations/20261022170000_atomic_pharmacy_prescription_creation.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -146,3 +147,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/procedure_billing_atomicity.sql
       - name: Run laboratory lifecycle safeguards after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/laboratory_lifecycle_atomicity.sql
+      - name: Run atomic pharmacy prescription safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_prescription_atomicity.sql
