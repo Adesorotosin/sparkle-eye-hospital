@@ -818,46 +818,7 @@ export async function processBillingPayment(input: {
         };
       }
 
-      if (prescriptionInvoiceItemPairs.length > 0) {
-        for (const match of prescriptionInvoiceItemPairs) {
-          const { error: prescriptionUpdateError } = await supabaseServer
-            .from("prescriptions")
-            .update({
-              status: "ready_for_dispensing",
-              invoice_item_id: match.invoiceItemId,
-            })
-            .eq("id", match.prescriptionId)
-            .eq("patient_id", patient.id)
-            .eq("status", "pending_payment");
-
-          if (prescriptionUpdateError) {
-            console.error(
-              "Prescription status/link update failed:",
-              prescriptionUpdateError
-            );
-
-            await supabaseServer
-              .from("prescriptions")
-              .update({
-                status: "pending_payment",
-                invoice_item_id: null,
-              })
-              .in("id", prescriptionIdsToUnlock)
-              .eq("patient_id", patient.id)
-              .eq("status", "ready_for_dispensing");
-
-            return {
-              success: false,
-              message:
-                "Payment could not be completed because the prescription could not be linked to its exact invoice item.",
-              grandTotal,
-            };
-          }
-        }
-
-        prescriptionsUnlocked =
-          prescriptionInvoiceItemPairs.length;
-      }
+      prescriptionsUnlocked = prescriptionInvoiceItemPairs.length;
     }
 
     /*
@@ -868,6 +829,7 @@ export async function processBillingPayment(input: {
      * PENDING after payment so the laboratory team can
      * collect and process the specimen.
      */
+    const labOrderIdsToVerify: string[] = [];
     if (laboratoryItems.length > 0) {
       const {
         data: labOrders,
@@ -929,10 +891,9 @@ export async function processBillingPayment(input: {
           );
 
         if (matchIndex !== -1) {
-          unmatchedLabOrders.splice(
-            matchIndex,
-            1
-          );
+          const matchedLabOrder = unmatchedLabOrders[matchIndex];
+          labOrderIdsToVerify.push(matchedLabOrder.id);
+          unmatchedLabOrders.splice(matchIndex, 1);
         }
       }
 
@@ -1122,186 +1083,46 @@ export async function processBillingPayment(input: {
         };
       }
 
-      if (diagnosticIdsToUnlock.length > 0) {
-        const {
-          error: diagnosticUpdateError,
-        } = await supabaseServer
-          .from("diagnostic_orders")
-          .update({
-            status: "ready_for_test",
-          })
-          .in(
-            "id",
-            diagnosticIdsToUnlock
-          )
-          .eq(
-            "patient_id",
-            patient.id
-          )
-          .eq(
-            "status",
-            "ordered"
-          );
-
-        if (diagnosticUpdateError) {
-          console.error(
-            "Diagnostic status update failed:",
-            diagnosticUpdateError
-          );
-
-          /*
-           * Roll back any pharmacy unlock performed above.
-           */
-          if (prescriptionIdsToUnlock.length > 0) {
-            await supabaseServer
-              .from("prescriptions")
-              .update({
-                status: "pending_payment",
-                invoice_item_id: null,
-              })
-              .in(
-                "id",
-                prescriptionIdsToUnlock
-              )
-              .eq(
-                "status",
-                "ready_for_dispensing"
-              );
-          }
-
-          return {
-            success: false,
-            message:
-              "Payment could not be completed because the diagnostic status could not be updated.",
-            grandTotal,
-          };
-        }
-
-        // Persist approved prices for previously unpriced diagnostic
-        // orders so the queue, invoice, and clinical order agree.
-        for (const priceUpdate of diagnosticPriceUpdates) {
-          const { error: approvedPriceError } = await supabaseServer
-            .from("diagnostic_orders")
-            .update({ price: priceUpdate.approvedPrice })
-            .eq("id", priceUpdate.id)
-            .eq("patient_id", patient.id)
-            .eq("status", "ready_for_test");
-
-          if (approvedPriceError) {
-            console.error("Diagnostic approved-price update failed:", approvedPriceError);
-            await supabaseServer
-              .from("diagnostic_orders")
-              .update({ status: "ordered" })
-              .in("id", diagnosticIdsToUnlock)
-              .eq("patient_id", patient.id)
-              .eq("status", "ready_for_test");
-            for (const rollback of diagnosticPriceUpdates) {
-              await supabaseServer
-                .from("diagnostic_orders")
-                .update({ price: rollback.originalPrice })
-                .eq("id", rollback.id)
-                .eq("patient_id", patient.id);
-            }
-            if (prescriptionIdsToUnlock.length > 0) {
-              await supabaseServer
-                .from("prescriptions")
-                .update({ status: "pending_payment", invoice_item_id: null })
-                .in("id", prescriptionIdsToUnlock)
-                .eq("status", "ready_for_dispensing");
-            }
-            return {
-              success: false,
-              message: "Payment could not be completed because the approved diagnostic price could not be saved.",
-              grandTotal,
-            };
-          }
-        }
-
-        diagnosticsUnlocked =
-          diagnosticIdsToUnlock.length;
-      }
+      diagnosticsUnlocked = diagnosticIdsToUnlock.length;
     }
 
     /*
-     * Mark the invoice as paid only after all invoice
-     * items have been verified and processed.
+     * Finalize invoice payment and release linked pharmacy/diagnostic work
+     * inside one database transaction. Row locks and status checks in the RPC
+     * reject duplicate/concurrent payment attempts and stale invoice totals.
      */
     const paidAt = new Date().toISOString();
-
-    const {
-      data: paidInvoice,
-      error: paymentError,
-    } = await supabaseServer
-      .from("invoices")
-      .update({
-        status: "paid",
-        grand_total: grandTotal,
-        payment_method: input.paymentMethod,
-        paid_at: paidAt,
-      })
-      .eq("id", invoice.id)
-      .neq("status", "paid")
-      .select("id")
-      .maybeSingle();
-
-    if (paymentError || !paidInvoice) {
-      console.error(
-        "Invoice payment update failed or invoice was already paid:",
-        paymentError
-      );
-
-      /*
-       * Keep clinical workflow states consistent if the final
-       * invoice transition fails. Payment is only considered
-       * successful when the invoice itself becomes paid.
-       */
-      if (prescriptionIdsToUnlock.length > 0) {
-        await supabaseServer
-          .from("prescriptions")
-          .update({
-            status: "pending_payment",
-            invoice_item_id: null,
-          })
-          .in(
-            "id",
-            prescriptionIdsToUnlock
-          )
-          .eq(
-            "status",
-            "ready_for_dispensing"
-          );
+    const { data: paymentResult, error: paymentError } = await supabaseServer.rpc(
+      "process_invoice_payment_atomic",
+      {
+        p_invoice_id: invoice.id,
+        p_patient_id: patient.id,
+        p_payment_method: input.paymentMethod,
+        p_grand_total: grandTotal,
+        p_paid_at: paidAt,
+        p_prescription_links: prescriptionInvoiceItemPairs.map((item) => ({
+          prescriptionId: item.prescriptionId,
+          invoiceItemId: item.invoiceItemId,
+        })),
+        p_diagnostic_ids: diagnosticIdsToUnlock,
+        p_diagnostic_updates: diagnosticPriceUpdates.map((item) => ({
+          id: item.id,
+          originalPrice: item.originalPrice,
+          approvedPrice: item.approvedPrice,
+        })),
+        p_lab_order_ids: labOrderIdsToVerify,
       }
+    );
 
-      if (diagnosticIdsToUnlock.length > 0) {
-        await supabaseServer
-          .from("diagnostic_orders")
-          .update({
-            status: "ordered",
-          })
-          .in(
-            "id",
-            diagnosticIdsToUnlock
-          )
-          .eq(
-            "status",
-            "ready_for_test"
-          );
-      }
-
-      // If the final invoice transition fails, restore any previously
-      // unpriced diagnostic order to its original price as well as status.
-      for (const priceUpdate of diagnosticPriceUpdates) {
-        await supabaseServer
-          .from("diagnostic_orders")
-          .update({ price: priceUpdate.originalPrice })
-          .eq("id", priceUpdate.id)
-          .eq("patient_id", patient.id);
-      }
-
+    if (paymentError || !paymentResult) {
+      console.error("Atomic invoice payment failed:", paymentError);
       return {
         success: false,
         message:
-          "Payment could not be completed. The invoice was not marked as paid.",
+          paymentError?.message?.includes("already paid") ||
+          paymentError?.message?.includes("not payable")
+            ? "This invoice has already been paid or is no longer payable. Refresh the billing screen."
+            : "Payment could not be completed. No invoice or linked clinical status changes were committed.",
         grandTotal,
       };
     }
