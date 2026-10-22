@@ -17,7 +17,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx tsc --noEmit
+      - run: npm run lint
+      - run: npm run typecheck
 
   pharmacy-database-safeguards:
     name: Pharmacy database integration tests (isolated PostgreSQL)
@@ -111,7 +112,9 @@ jobs:
             supabase/migrations/20261017075749_lock_down_inventory_table_access.sql \
             supabase/migrations/20261017075941_fix_lab_updated_at_function_search_path.sql \
             supabase/migrations/20261017091655_add_optometry_visit_source.sql \
-            supabase/migrations/20261017091710_record_pharmacy_daily_sales.sql
+            supabase/migrations/20261017091710_record_pharmacy_daily_sales.sql \
+            supabase/migrations/20261019000000_allow_deferred_pharmacy_prescriptions.sql \
+            supabase/migrations/20261022110000_atomic_vitals_with_visual_acuity.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -120,3 +123,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/inventory_daily_sales_safeguards.sql
       - name: Run transactional pharmacy safeguards tests after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_dispensing_safeguards.sql
+      - name: Run atomic triage vitals safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/triage_vitals_atomicity.sql
