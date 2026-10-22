@@ -100,6 +100,8 @@ jobs:
       - name: Apply release migrations in order
         run: |
           for migration in \
+            supabase/migrations/20261011_add_year_based_patient_registration_numbers.sql \
+            supabase/migrations/202610110001_fix_ambiguous_registration_year.sql \
             supabase/migrations/20261015070000_add_pharmacy_review_statuses.sql \
             supabase/migrations/20261015080000_add_treatment_billing_requests.sql \
             supabase/migrations/20261015100000_harden_nurse_vitals_recording.sql \
@@ -117,7 +119,8 @@ jobs:
             supabase/migrations/20261017091655_add_optometry_visit_source.sql \
             supabase/migrations/20261017091710_record_pharmacy_daily_sales.sql \
             supabase/migrations/20261019000000_allow_deferred_pharmacy_prescriptions.sql \
-            supabase/migrations/20261022110000_atomic_vitals_with_visual_acuity.sql
+            supabase/migrations/20261022110000_atomic_vitals_with_visual_acuity.sql \
+            supabase/migrations/20261022120000_unpadded_patient_registration_numbers.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
