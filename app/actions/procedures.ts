@@ -130,40 +130,27 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
     }
 
     const invoice = await getOrCreateDraftInvoice(patient.id);
-    const { data: procedure, error: procedureError } = await supabaseServer
-      .from("procedure_orders")
-      .insert({
-        patient_id: patient.id,
-        procedure_name: procedureName,
-        referral_type: "doctor_order",
-        order_reference: "In-house after doctor's review",
-        scheduled_date: input.scheduledDate || null,
-        notes: input.notes?.trim() || null,
-        price,
-        status: "scheduled",
-        invoice_id: invoice.id,
-        registered_by: staff.id,
-      })
-      .select("id")
-      .single();
+    const { data: procedureId, error: procedureError } = await supabaseServer.rpc(
+      "register_procedure_with_invoice_item",
+      {
+        p_patient_id: patient.id,
+        p_invoice_id: invoice.id,
+        p_procedure_name: procedureName,
+        p_scheduled_date: input.scheduledDate || null,
+        p_notes: input.notes?.trim() || null,
+        p_price: price,
+        p_registered_by: staff.id,
+      }
+    );
 
-    if (procedureError || !procedure) {
-      console.error("Procedure registration failed:", procedureError);
-      return { success: false, message: "Could not register the procedure. Check that the procedure database migrations have been applied." };
-    }
-
-    const { error: itemError } = await supabaseServer.from("invoice_items").insert({
-      invoice_id: invoice.id,
-      category: "procedure",
-      name: procedureName,
-      quantity: 1,
-      unit_price: price,
-      total_price: price,
-    });
-
-    if (itemError) {
-      console.error("Procedure billing item creation failed:", itemError);
-      return { success: false, message: "Procedure was recorded, but its bill could not be created. Please contact the administrator before registering it again.", id: procedure.id };
+    if (procedureError || !procedureId) {
+      console.error("Atomic procedure registration failed:", procedureError);
+      return {
+        success: false,
+        message: procedureError?.message?.includes("draft or pending invoice")
+          ? "The patient's bill has already been finalised. Refresh billing and try again."
+          : "Could not register the procedure and its bill together. Please retry.",
+      };
     }
 
     await recalcInvoice(invoice.id);
@@ -175,7 +162,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
       staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
-        procedureOrderId: procedure.id,
+        procedureOrderId: procedureId,
         patientCode: patient.patient_code,
         workflow: "in_house_after_doctors_review",
         scheduledDate: input.scheduledDate || null,
