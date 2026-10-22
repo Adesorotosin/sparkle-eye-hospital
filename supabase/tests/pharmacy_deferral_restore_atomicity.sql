@@ -49,7 +49,7 @@ BEGIN
   END IF;
   SELECT count(*) INTO v_count FROM public.invoice_items WHERE id = v_original_item_id;
   IF v_count <> 0 THEN RAISE EXCEPTION 'Deferred invoice line was not removed'; END IF;
-  SELECT subtotal, grand_total INTO v_total, v_total FROM public.invoices WHERE id = v_invoice_id;
+  SELECT grand_total INTO v_total FROM public.invoices WHERE id = v_invoice_id;
   IF v_total <> 0 THEN RAISE EXCEPTION 'Invoice total was not recalculated after deferral'; END IF;
 
   v_restore_result := public.restore_deferred_pharmacy_prescription_atomic(v_prescription_id, v_staff_id);
