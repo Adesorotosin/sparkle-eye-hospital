@@ -298,36 +298,20 @@ export async function createLabOrder(input: {
       };
     }
 
-    const { data: order, error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .insert({
-          patient_id: patient.id,
-          test_code: testCode,
-          test_name: testName,
-          specimen_type: specimenType,
-          priority,
-          status: "PENDING",
-          clinical_notes: clean(input.clinicalNotes) || null,
-          ordered_by: staff.id,
-        })
-        .select("id")
-        .single();
+    const { data: orderId, error: orderError } = await supabaseServer.rpc(
+      "create_lab_order_atomic",
+      {
+        p_patient_id: patient.id,
+        p_test_code: testCode,
+        p_test_name: testName,
+        p_specimen_type: specimenType,
+        p_priority: priority,
+        p_clinical_notes: clean(input.clinicalNotes) || null,
+        p_ordered_by: staff.id,
+      }
+    );
 
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId: order.id,
-      eventType: "ORDERED",
-      description: `Laboratory investigation ordered: ${testName}`,
-      performedBy: staff.id,
-      metadata: {
-        testCode,
-        testName,
-        specimenType,
-        priority,
-      },
-    });
+    if (orderError || !orderId) throw orderError ?? new Error("Laboratory order creation returned no ID");
 
     await logActivity({
       module: "Laboratory",
@@ -337,7 +321,7 @@ export async function createLabOrder(input: {
       staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
-        labOrderId: order.id,
+        labOrderId: orderId,
         patientCode: patient.patient_code,
         testCode,
         testName,
@@ -354,7 +338,7 @@ export async function createLabOrder(input: {
     return {
       success: true,
       message: "Laboratory investigation ordered successfully.",
-      orderId: order.id,
+      orderId: orderId,
     };
   } catch (error) {
     console.error("Create lab order error:", error);
