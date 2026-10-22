@@ -101,9 +101,9 @@ jobs:
         run: |
           for migration in \
             supabase/migrations/20261011_add_year_based_patient_registration_numbers.sql \
+            supabase/migrations/202610110001_fix_ambiguous_registration_year.sql \
             supabase/migrations/202610110002_create_procedure_orders.sql \
             supabase/migrations/202610110003_create_procedure_price_catalog.sql \
-            supabase/migrations/202610110001_fix_ambiguous_registration_year.sql \
             supabase/migrations/20261015070000_add_pharmacy_review_statuses.sql \
             supabase/migrations/20261015080000_add_treatment_billing_requests.sql \
             supabase/migrations/20261015100000_harden_nurse_vitals_recording.sql \
