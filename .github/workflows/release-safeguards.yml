@@ -2,7 +2,7 @@ name: Release safeguards
 
 on:
   pull_request:
-    branches: [main, audit/doctor-module-hardening, audit/pre-handover-remediation]
+    branches: [main, audit/doctor-module-hardening, audit/pre-handover-remediation, fix/atomic-cashier-payment]
   push:
     branches: [fix/inventory-paid-prescription-guard]
 
