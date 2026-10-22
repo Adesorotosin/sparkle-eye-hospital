@@ -19,7 +19,7 @@
 6. `lib/patient-flow.ts` generates invoice numbers using a random four-digit suffix. Verify uniqueness constraints and collision recovery; this pattern can collide.
 7. `lib/patient-flow.ts` includes a `getOrCreatePatientByCode` helper that creates a minimal patient from a code. Audit every call site to ensure clinical workflows cannot accidentally create incomplete patients.
 8. The live database currently reports 19 patient rows, 16 with a null/blank registration number, and no duplicate internal patient codes. These appear to include legacy records. Do not backfill them automatically; decide the historical-data policy with the owner.
-9. The live database's registration-number trigger uses a zero-padded sequence (for example `001/26`), while the requested format is unpadded (for example `1/26`). Correct future numbering only through a reviewed migration; do not rewrite existing records automatically.
+9. The live database's registration-number trigger uses a zero-padded sequence (for example `001/26`), while the requested format is unpadded (for example `1/26`). A new migration changes future numbers only; existing values are not rewritten. The migration is awaiting isolated CI verification and must not be applied to production until approved.
 10. Supabase's advisor reports 29 tables with RLS enabled and no policies. A separate grants query returned no direct grants to `anon`/`authenticated`/PUBLIC for the checked public tables, and the app uses a server secret key. Treat this as a server-only access-model review, not as proof of an exploitable vulnerability; verify the full grants/role model before changing policies.
 11. Supabase's performance advisor reports 31 foreign keys without covering indexes. Review query patterns and migration impact before adding indexes.
 12. Open PRs include draft work for shared inventory recovery and triage-to-doctor handoff. Review these against `main` and the live schema before considering them; do not merge diverged branches wholesale.
@@ -70,7 +70,7 @@ For each workflow, record: role used, preconditions, steps, expected result, act
 - Added an additive RPC and migration to save all triage measurements and queue handoff in one database transaction; added a rollback-only PostgreSQL integration test.
 - Reception's date default now uses the `Africa/Lagos` calendar date.
 - Patient-code generation retries on a patient-code unique-constraint collision without masking unrelated database errors.
-- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus the triage atomicity test. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
+- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus atomic triage and visiting-optometry database tests. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
 
 ## Current status
 
