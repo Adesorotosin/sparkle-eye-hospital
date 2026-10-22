@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
@@ -26,8 +26,12 @@ function getRequestMeta(request: Request) {
 }
 
 function getRateLimitKeys(identifier: string, ip: string) {
+  // Pepper keys with the server-only Supabase secret so database leaks do not expose guessable identifiers or IPs.
+  const pepper = process.env.SUPABASE_SECRET_KEY;
+  if (!pepper) throw new Error("Login rate-limit secret is unavailable.");
+
   const hash = (value: string) =>
-    createHash("sha256").update(value).digest("hex");
+    createHmac("sha256", pepper).update(value).digest("hex");
 
   return {
     identityIp: hash(`identity-ip:${identifier}:${ip}`),
