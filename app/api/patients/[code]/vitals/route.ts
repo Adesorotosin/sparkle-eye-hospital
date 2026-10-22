@@ -149,9 +149,16 @@ export async function POST(
 
     if (vitalsError) {
       console.error("Atomic vitals recording failed:", vitalsError);
+      const isStaleTriage =
+        vitalsError.message?.includes("not waiting for triage") ||
+        vitalsError.message?.includes("queue status changed");
       return NextResponse.json(
-        { error: "Failed to record patient vitals." },
-        { status: 500 }
+        {
+          error: isStaleTriage
+            ? "This patient is no longer waiting for triage. Refresh the nurse queue before retrying."
+            : "Failed to record patient vitals.",
+        },
+        { status: isStaleTriage ? 409 : 500 }
       );
     }
 
