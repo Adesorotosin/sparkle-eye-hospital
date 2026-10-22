@@ -100,7 +100,7 @@ export async function POST(
       );
     }
 
-    const { error: vitalsError } = await supabaseServer.rpc(
+    const { data: vitalsId, error: vitalsError } = await supabaseServer.rpc(
       "record_patient_vitals_complete",
       {
         p_patient_id: patient.id,
