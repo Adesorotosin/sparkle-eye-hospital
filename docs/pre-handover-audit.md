@@ -64,9 +64,19 @@
 
 For each workflow, record: role used, preconditions, steps, expected result, actual result, persistence verified, authorization verified, failure/retry result, and evidence. Keep production read-only until an isolated test database or explicitly safe test setup is confirmed.
 
+## Initial remediation now in the audit branch
+
+- Triage no longer pre-populates visual acuity or general vital signs with plausible measurements; distance visual acuity now has an explicit blank prompt.
+- Added an additive RPC and migration to save all triage measurements and queue handoff in one database transaction; added a rollback-only PostgreSQL integration test.
+- Reception's date default now uses the `Africa/Lagos` calendar date.
+- Patient-code generation retries on a patient-code unique-constraint collision without masking unrelated database errors.
+- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run lint/typecheck plus the triage atomicity test.
+
 ## Current status
 
 - Repository and schema review: in progress.
+- Initial fixes are committed to `audit/pre-handover-remediation`; CI/preview results are pending.
 - Live database: read-only inspection only; no test patient or clinical write performed.
+- The new migration has not been applied to Supabase.
 - Browser-based Vercel preview journey: not yet executed.
-- No production migration, merge, or deployment authorized by this document.
+- No merge or production deployment authorized by this document.
