@@ -1,11 +1,14 @@
 -- Rate-limit failed staff logins without storing usernames or IP addresses in this table.
--- The application sends SHA-256 hashes for the account+IP pair and IP-only bucket.
+-- The application sends HMAC-SHA-256 keys for the account+IP pair and IP-only bucket.
 CREATE TABLE IF NOT EXISTS public.auth_login_rate_limits (
   rate_key text PRIMARY KEY CHECK (rate_key ~ '^[a-f0-9]{64}$'),
   failures integer NOT NULL DEFAULT 0 CHECK (failures >= 0),
   window_started_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS auth_login_rate_limits_updated_at_idx
+  ON public.auth_login_rate_limits (updated_at);
 
 ALTER TABLE public.auth_login_rate_limits ENABLE ROW LEVEL SECURITY;
 REVOKE ALL PRIVILEGES ON TABLE public.auth_login_rate_limits FROM PUBLIC, anon, authenticated;
@@ -47,6 +50,10 @@ AS $$
 DECLARE
   v_key text;
 BEGIN
+  -- Prune expired keys so arbitrary failed identifiers cannot grow this table indefinitely.
+  DELETE FROM public.auth_login_rate_limits
+  WHERE updated_at <= pg_catalog.now() - interval '1 day';
+
   IF p_identity_ip_hash IS NULL OR p_identity_ip_hash !~ '^[a-f0-9]{64}$'
      OR p_ip_hash IS NULL OR p_ip_hash !~ '^[a-f0-9]{64}$' THEN
     RAISE EXCEPTION 'Invalid login rate-limit key';
