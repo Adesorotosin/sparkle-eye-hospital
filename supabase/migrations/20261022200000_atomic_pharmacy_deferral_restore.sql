@@ -43,7 +43,17 @@ BEGIN
   END IF;
   IF v_billing IS NOT NULL THEN
     v_rate_text := regexp_replace(COALESCE(v_billing->>'vatRate', '0'), '%', '', 'g');
-    IF v_rate_text ~ '^[0-9]+([.][0-9]+)?
+    IF v_rate_text ~ '^[0-9]+([.][0-9]+)?$' THEN
+      v_vat_rate := LEAST(GREATEST(v_rate_text::numeric, 0), 100);
+    ELSE
+      v_vat_rate := 0;
+    END IF;
+    IF jsonb_typeof(v_billing->'vatEnabled') = 'boolean' THEN
+      IF (v_billing->>'vatEnabled')::boolean = false THEN v_vat_rate := 0; END IF;
+    ELSIF v_vat_rate <= 0 THEN
+      v_vat_rate := 0;
+    END IF;
+  END IF;
 
   v_vat_amount := round(v_taxable * (v_vat_rate / 100), 2);
   v_grand_total := round(v_taxable + v_vat_amount, 2);
