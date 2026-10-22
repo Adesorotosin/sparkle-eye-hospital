@@ -152,30 +152,6 @@ function isValidResultFlag(
   return ["LOW", "NORMAL", "HIGH", "CRITICAL"].includes(value);
 }
 
-async function createLabEvent(input: {
-  labOrderId: string;
-  sampleId?: string | null;
-  eventType: string;
-  description: string;
-  performedBy?: string | null;
-  metadata?: Record<string, unknown>;
-}) {
-  const { error } = await supabaseServer
-    .from("lab_events")
-    .insert({
-      lab_order_id: input.labOrderId,
-      sample_id: input.sampleId ?? null,
-      event_type: input.eventType,
-      description: input.description,
-      performed_by: input.performedBy ?? null,
-      metadata: input.metadata ?? {},
-    });
-
-  if (error) {
-    throw error;
-  }
-}
-
 async function getLabOrder(id: string) {
   const { data, error } = await supabaseServer
     .from("lab_orders")
@@ -298,36 +274,20 @@ export async function createLabOrder(input: {
       };
     }
 
-    const { data: order, error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .insert({
-          patient_id: patient.id,
-          test_code: testCode,
-          test_name: testName,
-          specimen_type: specimenType,
-          priority,
-          status: "PENDING",
-          clinical_notes: clean(input.clinicalNotes) || null,
-          ordered_by: staff.id,
-        })
-        .select("id")
-        .single();
+    const { data: orderId, error: orderError } = await supabaseServer.rpc(
+      "create_lab_order_atomic",
+      {
+        p_patient_id: patient.id,
+        p_test_code: testCode,
+        p_test_name: testName,
+        p_specimen_type: specimenType,
+        p_priority: priority,
+        p_clinical_notes: clean(input.clinicalNotes) || null,
+        p_ordered_by: staff.id,
+      }
+    );
 
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId: order.id,
-      eventType: "ORDERED",
-      description: `Laboratory investigation ordered: ${testName}`,
-      performedBy: staff.id,
-      metadata: {
-        testCode,
-        testName,
-        specimenType,
-        priority,
-      },
-    });
+    if (orderError || !orderId) throw orderError ?? new Error("Laboratory order creation returned no ID");
 
     await logActivity({
       module: "Laboratory",
@@ -337,7 +297,7 @@ export async function createLabOrder(input: {
       staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
-        labOrderId: order.id,
+        labOrderId: orderId,
         patientCode: patient.patient_code,
         testCode,
         testName,
@@ -354,7 +314,7 @@ export async function createLabOrder(input: {
     return {
       success: true,
       message: "Laboratory investigation ordered successfully.",
-      orderId: order.id,
+      orderId: orderId,
     };
   } catch (error) {
     console.error("Create lab order error:", error);
@@ -733,77 +693,22 @@ export async function collectLabSample(input: {
       };
     }
 
-    const { data: existingSamples, error: samplesError } =
-      await supabaseServer
-        .from("lab_samples")
-        .select("sample_number")
-        .eq("lab_order_id", labOrderId)
-        .order("sample_number", {
-          ascending: false,
-        })
-        .limit(1);
-
-    if (samplesError) throw samplesError;
-
-    const latestNumber =
-      existingSamples?.[0]?.sample_number ?? 0;
-
-    const sampleNumber =
-      Number(latestNumber) + 1;
-
     const sampleType =
       clean(input.sampleType) ||
       order.specimen_type;
 
-    const { data: sample, error: sampleError } =
-      await supabaseServer
-        .from("lab_samples")
-        .insert({
-          lab_order_id: labOrderId,
-          sample_number: sampleNumber,
-          sample_type: sampleType,
-          sample_id:
-            clean(input.sampleId) || null,
-          status: "COLLECTED",
-          condition: null,
-          collection_notes:
-            clean(input.collectionNotes) || null,
-          collected_by: staff.id,
-          collected_at:
-            new Date().toISOString(),
-        })
-        .select("id")
-        .single();
+    const { data: sampleId, error: sampleError } = await supabaseServer.rpc(
+      "collect_lab_sample_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_type: sampleType,
+        p_sample_id: clean(input.sampleId) || null,
+        p_collection_notes: clean(input.collectionNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (sampleError) throw sampleError;
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "COLLECTED",
-        })
-        .eq("id", labOrderId)
-        .in("status", [
-          "PENDING",
-          "RECOLLECTION",
-        ]);
-
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId,
-      sampleId: sample.id,
-      eventType: "SAMPLE_COLLECTED",
-      description: `Sample ${sampleNumber} collected.`,
-      performedBy: staff.id,
-      metadata: {
-        sampleNumber,
-        sampleType,
-        sampleId:
-          clean(input.sampleId) || null,
-      },
-    });
+    if (sampleError || !sampleId) throw sampleError ?? new Error("Sample collection returned no ID");
 
     await logActivity({
       module: "Laboratory",
@@ -814,8 +719,7 @@ export async function collectLabSample(input: {
       patientId: order.patient_id,
       details: JSON.stringify({
         labOrderId,
-        sampleId: sample.id,
-        sampleNumber,
+        sampleId,
         testName: order.test_name,
       }),
     });
@@ -825,7 +729,7 @@ export async function collectLabSample(input: {
     return {
       success: true,
       message: "Sample collected successfully.",
-      sampleId: sample.id,
+      sampleId,
     };
   } catch (error) {
     console.error(
@@ -919,149 +823,51 @@ export async function receiveLabSample(input: {
       };
     }
 
-    const isAcceptable =
-      input.condition === "ACCEPTABLE";
+    const { data: transition, error: transitionError } = await supabaseServer.rpc(
+      "receive_lab_sample_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_condition: input.condition,
+        p_reception_notes: clean(input.receptionNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (isAcceptable) {
-      const { error } =
-        await supabaseServer
-          .from("lab_samples")
-          .update({
-            status: "RECEIVED",
-            condition: "ACCEPTABLE",
-            received_by: staff.id,
-            received_at:
-              new Date().toISOString(),
-            collection_notes:
-              clean(input.receptionNotes) ||
-              null,
-          })
-          .eq("id", sampleId)
-          .eq("status", "COLLECTED");
+    if (transitionError) throw transitionError;
 
-      if (error) throw error;
-
-      const { error: orderError } =
-        await supabaseServer
-          .from("lab_orders")
-          .update({
-            status: "PROCESSING",
-          })
-          .eq("id", labOrderId)
-          .eq("status", "COLLECTED");
-
-      if (orderError) throw orderError;
-
-      await createLabEvent({
-        labOrderId,
-        sampleId,
-        eventType: "SAMPLE_RECEIVED",
-        description: `Sample ${sample.sample_number} received and accepted.`,
-        performedBy: staff.id,
-        metadata: {
-          condition: "ACCEPTABLE",
-          receptionNotes:
-            clean(input.receptionNotes) || null,
-        },
-      });
-
-      await logActivity({
-        module: "Laboratory",
-        category: "CLINICAL",
-        action: `Laboratory sample received: ${order.test_name}`,
-        performedBy: staff.name,
-        staffId: staff.id,
-        patientId: order.patient_id,
-        details: JSON.stringify({
-          labOrderId,
-          sampleId,
-          sampleNumber:
-            sample.sample_number,
-          condition: "ACCEPTABLE",
-        }),
-      });
-
-      revalidatePath("/laboratory");
-
-      return {
-        success: true,
-        message:
-          "Sample received and accepted for processing.",
-      };
-    }
-
-    const rejectionReason =
-      clean(input.receptionNotes) ||
-      `Sample rejected: ${input.condition}.`;
-
-    const { error: rejectError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "REJECTED",
-          condition: input.condition,
-          rejection_reason:
-            rejectionReason,
-          rejected_by: staff.id,
-          rejected_at:
-            new Date().toISOString(),
-          received_by: staff.id,
-          received_at:
-            new Date().toISOString(),
-        })
-        .eq("id", sampleId)
-        .eq("status", "COLLECTED");
-
-    if (rejectError) throw rejectError;
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "RECOLLECTION",
-        })
-        .eq("id", labOrderId)
-        .eq("status", "COLLECTED");
-
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "SAMPLE_REJECTED",
-      description: `Sample ${sample.sample_number} rejected. Recollection required.`,
-      performedBy: staff.id,
-      metadata: {
-        condition: input.condition,
-        rejectionReason,
-      },
-    });
-
+    const isAcceptable = transition === "ACCEPTED";
     await logActivity({
       module: "Laboratory",
       category: "CLINICAL",
-      action: `Laboratory sample rejected: ${order.test_name}`,
+      action: isAcceptable
+        ? `Laboratory sample received: ${order.test_name}`
+        : `Laboratory sample rejected: ${order.test_name}`,
       performedBy: staff.name,
       staffId: staff.id,
       patientId: order.patient_id,
       details: JSON.stringify({
         labOrderId,
         sampleId,
-        sampleNumber:
-          sample.sample_number,
+        sampleNumber: sample.sample_number,
         condition: input.condition,
-        rejectionReason,
+        receptionNotes: clean(input.receptionNotes) || null,
       }),
     });
 
     revalidatePath("/laboratory");
 
-    return {
-      success: true,
-      message:
-        "Sample rejected. Recollection is required.",
-      recollectionRequired: true,
-    };
+    return isAcceptable
+      ? {
+          success: true,
+          message: "Sample received and accepted for processing.",
+        }
+      : {
+          success: true,
+          message: "Sample rejected. Recollection is required.",
+          recollectionRequired: true,
+        };
+
   } catch (error) {
     console.error(
       "Receive lab sample error:",
@@ -1147,47 +953,17 @@ export async function startLabProcessing(input: {
       };
     }
 
-    const now = new Date().toISOString();
+    const { error: processingError } = await supabaseServer.rpc(
+      "start_lab_processing_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_processing_notes: clean(input.processingNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    const { error: updateSampleError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "PROCESSING",
-          processing_started_by: staff.id,
-          processing_started_at: now,
-        })
-        .eq("id", sampleId)
-        .eq("status", "RECEIVED");
-
-    if (updateSampleError) {
-      throw updateSampleError;
-    }
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "PROCESSING",
-        })
-        .eq("id", labOrderId)
-        .eq("status", "COLLECTED");
-
-    if (orderError) {
-      throw orderError;
-    }
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "PROCESSING_STARTED",
-      description: `Processing started for sample ${sample.sample_number}.`,
-      performedBy: staff.id,
-      metadata: {
-        processingNotes:
-          clean(input.processingNotes) || null,
-      },
-    });
+    if (processingError) throw processingError;
 
     revalidatePath("/laboratory");
 
@@ -1344,105 +1120,20 @@ export async function saveLabResult(input: {
         })
       );
 
-    const { data: existingResult, error: existingError } =
-      await supabaseServer
-        .from("lab_results")
-        .select("id")
-        .eq("lab_order_id", labOrderId)
-        .eq("sample_id", sampleId)
-        .maybeSingle();
+    const { data: resultId, error: resultSaveError } = await supabaseServer.rpc(
+      "save_lab_result_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_result_data: normalisedResults,
+        p_laboratory_comments: clean(input.laboratoryComments) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (existingError) {
-      throw existingError;
+    if (resultSaveError || !resultId) {
+      throw resultSaveError ?? new Error("Laboratory result save returned no ID");
     }
-
-    let resultId: string;
-
-    if (existingResult) {
-      const { data: updatedResult, error } =
-        await supabaseServer
-          .from("lab_results")
-          .update({
-            result_data:
-              normalisedResults,
-            laboratory_comments:
-              clean(input.laboratoryComments) ||
-              null,
-            entered_by: staff.id,
-            entered_at:
-              new Date().toISOString(),
-            verified_by: null,
-            verified_at: null,
-            verification_notes: null,
-          })
-          .eq("id", existingResult.id)
-          .select("id")
-          .single();
-
-      if (error) throw error;
-
-      resultId = updatedResult.id;
-    } else {
-      const { data: newResult, error } =
-        await supabaseServer
-          .from("lab_results")
-          .insert({
-            lab_order_id: labOrderId,
-            sample_id: sampleId,
-            result_data:
-              normalisedResults,
-            laboratory_comments:
-              clean(input.laboratoryComments) ||
-              null,
-            entered_by: staff.id,
-            entered_at:
-              new Date().toISOString(),
-          })
-          .select("id")
-          .single();
-
-      if (error) throw error;
-
-      resultId = newResult.id;
-    }
-
-    const { error: sampleUpdateError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "COMPLETED",
-        })
-        .eq("id", sampleId)
-        .eq("status", "PROCESSING");
-
-    if (sampleUpdateError) {
-      throw sampleUpdateError;
-    }
-
-    const { error: orderUpdateError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "AWAITING_VERIFICATION",
-        })
-        .eq("id", labOrderId);
-
-    if (orderUpdateError) {
-      throw orderUpdateError;
-    }
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "RESULT_ENTERED",
-      description: `Laboratory result entered for ${order.test_name}. Awaiting verification.`,
-      performedBy: staff.id,
-      metadata: {
-        resultId,
-        resultCount:
-          normalisedResults.length,
-      },
-    });
 
     await logActivity({
       module: "Laboratory",
@@ -1577,70 +1268,17 @@ export async function verifyLabResult(input: {
       };
     }
 
-    const now =
-      new Date().toISOString();
-
-    const { error: updateResultError } =
-      await supabaseServer
-        .from("lab_results")
-        .update({
-          verified_by: staff.id,
-          verified_at: now,
-          verification_notes:
-            clean(input.verificationNotes) ||
-            null,
-        })
-        .eq("id", resultId)
-        .is("verified_at", null);
-
-    if (updateResultError) {
-      throw updateResultError;
-    }
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "COMPLETED",
-        })
-        .eq("id", labOrderId)
-        .eq(
-          "status",
-          "AWAITING_VERIFICATION"
-        );
-
-    if (orderError) {
-      throw orderError;
-    }
-
-    if (result.sample_id) {
-      const { error: sampleError } =
-        await supabaseServer
-          .from("lab_samples")
-          .update({
-            status: "COMPLETED",
-          })
-          .eq("id", result.sample_id);
-
-      if (sampleError) {
-        throw sampleError;
+    const { error: verificationError } = await supabaseServer.rpc(
+      "verify_lab_result_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_result_id: resultId,
+        p_verification_notes: clean(input.verificationNotes) || null,
+        p_performed_by: staff.id,
       }
-    }
+    );
 
-    await createLabEvent({
-      labOrderId,
-      sampleId:
-        result.sample_id,
-      eventType: "RESULT_VERIFIED",
-      description: `Laboratory result verified for ${order.test_name}.`,
-      performedBy: staff.id,
-      metadata: {
-        resultId,
-        verificationNotes:
-          clean(input.verificationNotes) ||
-          null,
-      },
-    });
+    if (verificationError) throw verificationError;
 
     await logActivity({
       module: "Laboratory",

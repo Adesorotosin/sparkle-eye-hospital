@@ -435,27 +435,6 @@ export async function createPharmacyPrescription(
 
 
 
-    const { data: stockItem, error: stockError } = await supabaseServer
-      .from("inventory_items")
-      .select("sku, name, stock, price")
-      .eq("domain", "pharmacy")
-      .eq("name", drugName)
-      .maybeSingle();
-
-    if (stockError) {
-      console.error("Pharmacy stock lookup failed:", stockError);
-      return { success: false, message: "Unable to verify medication stock and price." };
-    }
-    if (!stockItem) {
-      return { success: false, message: "Select a medication from the pharmacy inventory before adding it to billing." };
-    }
-    if (Number(stockItem.stock) < quantity) {
-      return { success: false, message: "Only " + Number(stockItem.stock) + " unit(s) of this medication are in stock." };
-    }
-
-    const pricePerUnit = Number(stockItem.price);
-    const totalPrice = quantity * pricePerUnit;
-
     const {
       data: patient,
       error: patientError,
@@ -489,94 +468,45 @@ export async function createPharmacyPrescription(
       };
     }
 
-    const {
-      data: prescription,
-      error: prescriptionError,
-    } =
-      await supabaseServer
-        .from("prescriptions")
-        .insert({
-          patient_id: patient.id,
-          drug_name: drugName,
-          dosage,
-          quantity,
-          price_per_unit: pricePerUnit,
-          total_price: totalPrice,
-          status: "pending_payment",
-        })
-        .select("id")
-        .single();
+    const { data: prescriptionResult, error: prescriptionError } = await supabaseServer.rpc(
+      "create_pharmacy_prescription_atomic",
+      {
+        p_patient_id: patient.id,
+        p_drug_name: drugName,
+        p_dosage: dosage,
+        p_quantity: quantity,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (prescriptionError) {
-      console.error(
-        "Pharmacy prescription creation failed:",
-        prescriptionError
-      );
-
-      return {
-        success: false,
-        message:
-          "Failed to create the prescription.",
-      };
+    if (prescriptionError || !prescriptionResult) {
+      const reason = prescriptionError?.message ?? "";
+      console.error("Atomic pharmacy prescription creation failed:", prescriptionError);
+      if (/Only [0-9]+ unit\(s\) of this medication are in stock/i.test(reason)) {
+        return { success: false, message: reason };
+      }
+      if (reason.includes("active pharmacy inventory")) {
+        return { success: false, message: "Select a medication from the active pharmacy inventory before adding it to billing." };
+      }
+      if (reason.includes("duplicated in pharmacy inventory")) {
+        return { success: false, message: "This medication appears more than once in inventory. Ask an administrator to resolve the duplicate item." };
+      }
+      return { success: false, message: "The prescription and bill could not be created together. Please retry." };
     }
 
-    const invoice =
-      await getOrCreateDraftInvoice(
-        patient.id
-      );
-
-    const {
-      data: invoiceItem,
-      error: invoiceItemError,
-    } =
-      await supabaseServer
-        .from("invoice_items")
-        .insert({
-          invoice_id: invoice.id,
-          category: "pharmacy",
-          name: drugName,
-          quantity,
-          unit_price: pricePerUnit,
-          total_price: totalPrice,
-        })
-        .select("id")
-        .single();
-
-    if (invoiceItemError || !invoiceItem) {
-      console.error(
-        "Pharmacy invoice item creation failed:",
-        invoiceItemError
-      );
-
-      await supabaseServer
-        .from("prescriptions")
-        .delete()
-        .eq("id", prescription.id);
-
-      return {
-        success: false,
-        message:
-          "The medication could not be added to the patient's bill.",
-      };
+    const result = Array.isArray(prescriptionResult)
+      ? prescriptionResult[0]
+      : prescriptionResult;
+    if (!result?.prescription_id || !result?.invoice_id) {
+      throw new Error("Atomic pharmacy prescription creation returned incomplete identifiers.");
     }
 
-    const { error: prescriptionLinkError } = await supabaseServer
-      .from("prescriptions")
-      .update({ invoice_item_id: invoiceItem.id })
-      .eq("id", prescription.id)
-      .eq("patient_id", patient.id);
+    const prescriptionId = String(result.prescription_id);
+    const invoiceId = String(result.invoice_id);
+    const pricePerUnit = Number(result.price_per_unit);
+    const totalPrice = Number(result.total_price);
 
-    if (prescriptionLinkError) {
-      console.error("Prescription-to-invoice link failed:", prescriptionLinkError);
-      await supabaseServer.from("invoice_items").delete().eq("id", invoiceItem.id);
-      await supabaseServer.from("prescriptions").delete().eq("id", prescription.id);
-      return {
-        success: false,
-        message: "The medication could not be securely linked to the patient's bill. Please retry.",
-      };
-    }
-
-    await recalcInvoice(invoice.id);
+    await recalcInvoice(invoiceId);
 
     await logActivity({
       module: "Pharmacy",
@@ -587,8 +517,7 @@ export async function createPharmacyPrescription(
       patientId: patient.id,
       staffId: staff.id,
       details: JSON.stringify({
-        prescriptionId:
-          prescription.id,
+        prescriptionId,
         patientCode:
           patient.patient_code,
         drugName,
@@ -609,7 +538,7 @@ export async function createPharmacyPrescription(
       success: true,
       message:
         `${drugName} has been added to the patient's prescription and bill.`,
-      id: prescription.id,
+      id: prescriptionId,
       totalPrice,
     };
   } catch (error) {

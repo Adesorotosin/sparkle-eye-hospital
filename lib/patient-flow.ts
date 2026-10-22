@@ -101,44 +101,22 @@ export async function getOrCreateDraftInvoice(patientId: string) {
     throw new Error("Patient ID is required.");
   }
 
-  const { data: existing, error: findError } = await supabaseServer
-    .from("invoices")
-    .select("*")
-    .eq("patient_id", patientId)
-    .in("status", ["draft", "pending"])
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await supabaseServer.rpc(
+    "get_or_create_draft_invoice",
+    { p_patient_id: patientId }
+  );
 
-  if (findError) {
-    throw findError;
+  if (error) {
+    throw error;
   }
 
-  if (existing) {
-    return existing;
+  // PostgREST can represent a composite RPC return as an object or a one-row array.
+  const invoice = Array.isArray(data) ? data[0] : data;
+  if (!invoice) {
+    throw new Error("Unable to create or load the patient's draft invoice.");
   }
 
-  const invoiceNo = `INV-${new Date().getFullYear()}-${Math.floor(
-    1000 + Math.random() * 9000
-  )}`;
-
-  const { data: created, error: createError } = await supabaseServer
-    .from("invoices")
-    .insert({
-      invoice_no: invoiceNo,
-      patient_id: patientId,
-      status: "draft",
-      vat_rate: 0,
-      vat_amount: 0,
-    })
-    .select("*")
-    .single();
-
-  if (createError) {
-    throw createError;
-  }
-
-  return created;
+  return invoice;
 }
 
 /**
@@ -933,79 +911,56 @@ export async function registerPatient(input: {
     );
   }
 
-  const patientCode =
-    `SPK-${Math.floor(
-      10000 +
-        Math.random() * 90000
-    )}`;
+  // The patient code has a database uniqueness constraint. Retry only when
+  // that specific identifier collides; never mask unrelated database errors.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const patientCode = `SPK-${Math.floor(10000 + Math.random() * 90000)}`;
 
-  const { data, error } =
-    await supabaseServer
+    const { data, error } = await supabaseServer
       .from("patients")
       .insert({
-        patient_code:
-          patientCode,
-
-        full_name:
-          fullName,
-
-        coverage_plan:
-          input.coveragePlan ||
-          "Self-Pay",
-
-        age:
-          input.age ??
-          null,
-
-        date_of_birth:
-          input.dateOfBirth ??
-          null,
-
-        gender:
-          input.gender ??
-          null,
-
-        phone:
-          input.phone ??
-          null,
-
-        allergies:
-          input.allergies ??
-          null,
-
-        address:
-          input.address ??
-          null,
-
-        next_of_kin:
-          input.nextOfKin ??
-          null,
-
-        next_of_kin_phone:
-          input.nextOfKinPhone ??
-          null,
-
-        status:
-          input.status ??
-          "waiting_triage",
-
-        is_walk_in:
-          input.isWalkIn ??
-          false,
-
-        optometry_status:
-          input.optometryStatus ??
-          null,
-
-        last_visit_at:
-          new Date().toISOString(),
+        patient_code: patientCode,
+        full_name: fullName,
+        coverage_plan: input.coveragePlan || "Self-Pay",
+        age: input.age ?? null,
+        date_of_birth: input.dateOfBirth ?? null,
+        gender: input.gender ?? null,
+        phone: input.phone ?? null,
+        allergies: input.allergies ?? null,
+        address: input.address ?? null,
+        next_of_kin: input.nextOfKin ?? null,
+        next_of_kin_phone: input.nextOfKinPhone ?? null,
+        status: input.status ?? "waiting_triage",
+        is_walk_in: input.isWalkIn ?? false,
+        optometry_status: input.optometryStatus ?? null,
+        last_visit_at: new Date().toISOString(),
       })
       .select("*")
       .single();
 
-  if (error) {
+    if (!error) {
+      return data;
+    }
+
+    const uniqueViolation = error.code === "23505";
+    const errorContext = `${error.message} ${error.details ?? ""} ${error.hint ?? ""}`;
+    const patientCodeCollision =
+      uniqueViolation && /patient_code/i.test(errorContext);
+
+    if (patientCodeCollision && attempt < 4) {
+      continue;
+    }
+
+    if (patientCodeCollision) {
+      throw new Error(
+        "Unable to generate a unique patient code after several attempts. Please retry registration."
+      );
+    }
+
     throw error;
   }
 
-  return data;
+  throw new Error(
+    "Unable to register patient. Please retry the registration."
+  );
 }

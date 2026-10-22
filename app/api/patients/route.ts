@@ -17,10 +17,6 @@ const PATIENT_READ_ROLES = [
 const PATIENT_CREATE_ROLES = [
   "IT_ADMIN",
   "RECEPTIONIST",
-  "NURSE",
-  "OPHTHALMOLOGIST",
-  "DOCTOR",
-  "PHARMACIST",
 ] as const;
 
 export async function GET(request: NextRequest) {

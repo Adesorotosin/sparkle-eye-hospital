@@ -2,11 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
-import {
-  getOrCreateDraftInvoice,
-  recalcInvoice,
-  registerPatient,
-} from "@/lib/patient-flow";
+import { recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
 
@@ -103,151 +99,81 @@ export async function createDiagnosticOrder(
       };
     }
 
-    /*
-     * Create the clinical diagnostic order.
-     */
-    const { data: diagnostic, error: diagnosticError } =
-      await supabaseServer
-        .from("diagnostic_orders")
-        .insert({
-          patient_id: patient.id,
-          name,
-          price,
-          status: "ordered",
-          ordered_by: staff.id,
-        })
-        .select("id")
-        .single();
-
-    if (diagnosticError) {
-      console.error(
-        "Diagnostic order creation failed:",
-        diagnosticError
-      );
-
-      return {
-        success: false,
-        message: "Failed to create the diagnostic order.",
-      };
-    }
-
-    if (price === 0) {
-      const { error: pricingHandoffError } = await supabaseServer
-        .from("clinical_handoffs")
-        .insert({
-          patient_id: patient.id,
-          destination: "CASHIER",
-          handoff_type: "PRICING_REVIEW",
-          title: "Pricing review required: " + name,
-          details: "An investigation order was created for " + name + ", but no approved price is configured. Add the approved investigation charge before billing; do not treat this as a free test. Order ID: " + diagnostic.id,
-          requested_by: staff.id,
-        });
-      if (pricingHandoffError) {
-        console.error("Investigation pricing-review handoff failed:", pricingHandoffError);
-        return { success: false, message: "Investigation order was created, but its pricing-review request could not be sent to Cashier. Refresh the patient record and notify the administrator; do not retry blindly.", id: diagnostic.id };
+    const { data: diagnosticResult, error: diagnosticError } = await supabaseServer.rpc(
+      "create_diagnostic_order_atomic",
+      {
+        p_patient_id: patient.id,
+        p_name: name,
+        p_price: price,
+        p_ordered_by: staff.id,
       }
-      await logActivity({
-        module: "Diagnostics", category: "CLINICAL",
-        action: "Investigation sent for pricing review: " + name,
-        performedBy: staff.name, staffId: staff.id, patientId: patient.id,
-        details: JSON.stringify({ diagnosticOrderId: diagnostic.id, testName: name, pricePending: true }),
-      });
-      revalidatePath("/diagnostics");
-      revalidatePath("/billing");
-      revalidatePath("/cashier");
-      revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
-      return { success: true, message: name + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: diagnostic.id };
-    }
+    );
 
-    /*
-     * Get the patient's active invoice. The diagnostic row already exists,
-     * so preserve its ID if billing setup fails; the UI can refresh and
-     * show the order rather than encouraging a blind retry.
-     */
-    let invoice: Awaited<ReturnType<typeof getOrCreateDraftInvoice>>;
-    try {
-      invoice = await getOrCreateDraftInvoice(patient.id);
-    } catch (invoiceError) {
-      console.error("Diagnostic invoice lookup failed:", invoiceError);
+    if (diagnosticError || !diagnosticResult) {
+      console.error("Atomic diagnostic order creation failed:", diagnosticError);
       return {
         success: false,
-        message:
-          "Diagnostic order was created, but the patient's invoice could not be opened. Refresh the patient record before retrying.",
-        id: diagnostic.id,
+        message: "The investigation and its billing handoff could not be created together. Please retry.",
       };
     }
 
-    /*
-     * Add the diagnostic to the invoice.
-     */
-    const { error: itemError } = await supabaseServer
-      .from("invoice_items")
-      .insert({
-        invoice_id: invoice.id,
-        category: "diagnostic",
-        name,
-        quantity: 1,
-        unit_price: price,
-        total_price: price,
-      });
+    const result = Array.isArray(diagnosticResult)
+      ? diagnosticResult[0]
+      : diagnosticResult;
+    const diagnosticId = String(result.diagnostic_id);
+    const invoiceId = result.invoice_id ? String(result.invoice_id) : null;
+    const pricePending = Boolean(result.price_pending);
+    let invoiceRefreshFailed = false;
 
-    if (itemError) {
-      console.error(
-        "Diagnostic invoice item creation failed:",
-        itemError
-      );
-
-      return {
-        success: false,
-        message:
-          "Diagnostic order was created, but it could not be added to the invoice.",
-        id: diagnostic.id,
-      };
+    if (invoiceId) {
+      try {
+        await recalcInvoice(invoiceId);
+      } catch (recalcError) {
+        invoiceRefreshFailed = true;
+        console.error("Diagnostic invoice recalculation failed after atomic order save:", recalcError);
+      }
     }
 
-    try {
-      await recalcInvoice(invoice.id);
-    } catch (recalcError) {
-      console.error("Diagnostic invoice recalculation failed:", recalcError);
-      return {
-        success: false,
-        message:
-          "Diagnostic order and billing item were created, but the invoice total could not be recalculated. Refresh the patient record before retrying.",
-        id: diagnostic.id,
-      };
-    }
-
-    /*
-     * Record the clinical activity using the actual
-     * authenticated staff member.
-     */
     await logActivity({
       module: "Diagnostics",
       category: "CLINICAL",
-      action: `Diagnostic order created: ${name}`,
+      action: pricePending
+        ? "Investigation sent for pricing review: " + name
+        : `Diagnostic order created: ${name}`,
       performedBy: staff.name,
       staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
-        diagnosticOrderId: diagnostic.id,
+        diagnosticOrderId: diagnosticId,
         testName: name,
         price,
+        pricePending,
+        invoiceId,
       }),
-      financialAmount: price,
+      financialAmount: price > 0 ? price : undefined,
     });
 
-    revalidatePath(
-      `/doctor/patients/${patient.patient_code}/encounter`
-    );
-
+    revalidatePath("/diagnostics");
     revalidatePath("/billing");
     revalidatePath("/cashier");
+    revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
+
+    if (pricePending) {
+      return {
+        success: true,
+        message: name + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.",
+        id: diagnosticId,
+      };
+    }
 
     return {
       success: true,
-      message: `${name} has been ordered and added to the patient's bill.`,
-      id: diagnostic.id,
+      message: invoiceRefreshFailed
+        ? `${name} was ordered and its bill line was saved, but the displayed invoice total could not be refreshed. Do not create the order again; ask Cashier to refresh the bill before collecting payment.`
+        : `${name} has been ordered and added to the patient's bill.`,
+      id: diagnosticId,
     };
+
   } catch (error) {
     if (error instanceof Error) {
       if (error.message === "UNAUTHENTICATED") {
@@ -319,53 +245,68 @@ export async function createExternalDiagnosticOrder(input: {
       return { success: false, message: "Age must be a whole number between 0 and 150." };
     }
 
-    const patient = await registerPatient({
-      fullName,
-      age,
-      gender: input.gender?.trim() || undefined,
-      phone: input.phone?.trim() || undefined,
-      status: "completed_today",
-      isWalkIn: true,
-    });
+    let result: Record<string, unknown> | null = null;
+    let lastError: { code?: string; message?: string; details?: string; hint?: string } | null = null;
 
-    const { data: diagnostic, error: diagnosticError } = await supabaseServer
-      .from("diagnostic_orders")
-      .insert({
-        patient_id: patient.id,
-        name,
-        price,
-        status: "ordered",
-        ordered_by: staff.id,
-        referral_source: referringCenter,
-        external_referral: true,
-      })
-      .select("id")
-      .single();
+    // Patient + investigation + invoice line/handoff are one database transaction.
+    // Retry only patient-code collisions; never repeat unrelated failures.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const patientCode = `SPK-${Math.floor(10000 + Math.random() * 90000)}`;
+      const { data, error } = await supabaseServer.rpc(
+        "create_external_diagnostic_order_atomic",
+        {
+          p_patient_code: patientCode,
+          p_full_name: fullName,
+          p_age: age ?? null,
+          p_gender: input.gender?.trim() || null,
+          p_phone: input.phone?.trim() || null,
+          p_referring_center: referringCenter,
+          p_test_name: name,
+          p_price: price,
+          p_ordered_by: staff.id,
+        }
+      );
 
-    if (diagnosticError) throw diagnosticError;
+      if (!error) {
+        const value = Array.isArray(data) ? data[0] : data;
+        if (!value || typeof value !== "object") {
+          throw new Error("External diagnostic registration returned incomplete data.");
+        }
+        result = value as Record<string, unknown>;
+        break;
+      }
 
-    const invoice = await getOrCreateDraftInvoice(patient.id);
-    const { error: itemError } = await supabaseServer
-      .from("invoice_items")
-      .insert({
-        invoice_id: invoice.id,
-        category: "diagnostic",
-        name,
-        quantity: 1,
-        unit_price: price,
-        total_price: price,
-      });
-
-    if (itemError) {
-      console.error("External diagnostic invoice item creation failed:", itemError);
-      return {
-        success: false,
-        message: "Patient and investigation were registered, but the bill item could not be created. Please contact an administrator.",
-        id: diagnostic.id,
-      };
+      lastError = error;
+      const errorContext = `${error.message ?? ""} ${error.details ?? ""} ${error.hint ?? ""}`;
+      if (error.code === "23505" && /patient_code/i.test(errorContext) && attempt < 4) {
+        continue;
+      }
+      throw error;
     }
 
-    await recalcInvoice(invoice.id);
+    if (!result) {
+      throw lastError ?? new Error("Unable to register the external diagnostic patient.");
+    }
+
+    const patient = {
+      id: String(result.patient_id),
+      patient_code: String(result.patient_code),
+      full_name: String(result.patient_name),
+    };
+    const diagnosticId = String(result.diagnostic_id);
+    const invoiceId = result.invoice_id ? String(result.invoice_id) : null;
+    const pricePending = Boolean(result.price_pending);
+    let invoiceRefreshFailed = false;
+
+    if (invoiceId) {
+      try {
+        await recalcInvoice(invoiceId);
+      } catch (recalcError) {
+        invoiceRefreshFailed = true;
+        console.error("External diagnostic invoice recalculation failed after atomic registration:", recalcError);
+      }
+    }
+
     await logActivity({
       module: "Diagnostics",
       category: "CLINICAL",
@@ -374,7 +315,7 @@ export async function createExternalDiagnosticOrder(input: {
       staffId: staff.id,
       patientId: patient.id,
       details: JSON.stringify({
-        diagnosticOrderId: diagnostic.id,
+        diagnosticOrderId: diagnosticId,
         patientCode: patient.patient_code,
         testName: name,
         price,
@@ -390,8 +331,12 @@ export async function createExternalDiagnosticOrder(input: {
 
     return {
       success: true,
-      message: patient.full_name + " has been registered for investigation only. Please complete payment at the cashier before testing.",
-      id: diagnostic.id,
+      message: pricePending
+        ? `${patient.full_name} has been registered for investigation only and sent to Cashier for approved pricing. Do not treat this as a free test.`
+        : invoiceRefreshFailed
+          ? `${patient.full_name} and the investigation were registered, and the bill line was saved, but the displayed total could not be refreshed. Do not register the investigation again; ask Cashier to refresh the bill.`
+          : `${patient.full_name} has been registered for investigation only. Please complete payment at the cashier before testing.`,
+      id: diagnosticId,
     };
   } catch (error) {
     console.error("External diagnostic registration failed:", error);

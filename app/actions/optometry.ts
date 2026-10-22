@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { requireRole } from "@/lib/server-auth";
-import { registerPatient } from "@/lib/patient-flow";
 
 export type OptometryActionResponse = {
   success: boolean;
@@ -224,30 +223,49 @@ export async function registerVisitingOptometryPatient(input: {
       dateOfBirth = input.dateOfBirth;
     }
 
-    const patient = await registerPatient({
-      fullName,
-      age: age ?? undefined,
-      dateOfBirth,
-      gender: input.gender?.trim() || undefined,
-      phone: input.phone?.trim() || undefined,
-      address: input.address?.trim() || undefined,
-      status: "in_consultation",
-      isWalkIn: true,
-      optometryStatus: "referred",
-    });
+    let patient: { id: string; patient_code: string; full_name: string } | null = null;
 
-    const { error: encounterError } = await supabaseServer
-      .from("encounters")
-      .insert({
-        patient_id: patient.id,
-        encounter_type: "optometry",
-        optometry_source: "visiting",
-        optometry_visit_type: input.visitType,
-        status: "draft",
-        recorded_by: staff.id,
-        updated_at: new Date().toISOString(),
-      });
-    if (encounterError) throw encounterError;
+    // The database function creates the patient and encounter in one transaction.
+    // Retry only when the internal patient code collides with its unique constraint.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const patientCode = `SPK-${Math.floor(10000 + Math.random() * 90000)}`;
+      const { data, error } = await supabaseServer.rpc(
+        "register_visiting_optometry_patient",
+        {
+          p_patient_code: patientCode,
+          p_full_name: fullName,
+          p_age: age ?? null,
+          p_date_of_birth: dateOfBirth ?? null,
+          p_gender: input.gender?.trim() || null,
+          p_phone: input.phone?.trim() || null,
+          p_address: input.address?.trim() || null,
+          p_visit_type: input.visitType,
+          p_recorded_by: staff.id,
+        }
+      );
+
+      if (!error) {
+        const result = Array.isArray(data) ? data[0] : data;
+        if (!result) {
+          throw new Error("Optometry registration returned no patient record.");
+        }
+        patient = result as { id: string; patient_code: string; full_name: string };
+        break;
+      }
+
+      const errorContext = `${error.message} ${error.details ?? ""} ${error.hint ?? ""}`;
+      if (error.code === "23505" && /patient_code/i.test(errorContext) && attempt < 4) {
+        continue;
+      }
+      if (error.code === "23505" && /patient_code/i.test(errorContext)) {
+        throw new Error("Unable to generate a unique patient code. Please retry registration.");
+      }
+      throw error;
+    }
+
+    if (!patient) {
+      throw new Error("Unable to register the visiting optometry patient. Please retry.");
+    }
 
     await logActivity({
       patientId: patient.id,

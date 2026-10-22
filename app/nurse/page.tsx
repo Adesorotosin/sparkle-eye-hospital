@@ -319,7 +319,7 @@ export default function NurseDashboard() {
 
           {/* NEW VITALS */}
           <Link
-            href="/triage"
+            href="/nurse#patient-queue"
             className="inline-flex items-center gap-2 bg-[#6B21A8] hover:bg-[#581c87] text-white font-bold px-4 py-2 rounded-xl text-xs transition shadow-md"
           >
             <Plus className="w-4 h-4" />
@@ -381,7 +381,7 @@ export default function NurseDashboard() {
         </div>
 
         {/* CONTROLS */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        <div id="patient-queue" className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
             {(["All", "Waiting", "In Progress", "Completed"] as const).map(
               (tab) => (
