@@ -2,7 +2,7 @@ name: Release safeguards
 
 on:
   pull_request:
-    branches: [main, audit/doctor-module-hardening]
+    branches: [main, audit/doctor-module-hardening, audit/pre-handover-remediation]
   push:
     branches: [fix/inventory-paid-prescription-guard]
 
@@ -130,7 +130,8 @@ jobs:
             supabase/migrations/20261022150000_atomic_procedure_billing.sql \
             supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql \
             supabase/migrations/20261022170000_atomic_pharmacy_prescription_creation.sql \
-            supabase/migrations/20261022180000_atomic_diagnostic_orders.sql
+            supabase/migrations/20261022180000_atomic_diagnostic_orders.sql \
+            supabase/migrations/20261022190000_atomic_cashier_payment.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -153,3 +154,5 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_prescription_atomicity.sql
       - name: Run atomic diagnostic order safeguards after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/diagnostic_order_atomicity.sql
+      - name: Run atomic cashier payment safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/cashier_payment_atomicity.sql
