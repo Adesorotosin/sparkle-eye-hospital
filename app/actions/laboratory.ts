@@ -1144,105 +1144,20 @@ export async function saveLabResult(input: {
         })
       );
 
-    const { data: existingResult, error: existingError } =
-      await supabaseServer
-        .from("lab_results")
-        .select("id")
-        .eq("lab_order_id", labOrderId)
-        .eq("sample_id", sampleId)
-        .maybeSingle();
+    const { data: resultId, error: resultSaveError } = await supabaseServer.rpc(
+      "save_lab_result_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_id: sampleId,
+        p_result_data: normalisedResults,
+        p_laboratory_comments: clean(input.laboratoryComments) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (existingError) {
-      throw existingError;
+    if (resultSaveError || !resultId) {
+      throw resultSaveError ?? new Error("Laboratory result save returned no ID");
     }
-
-    let resultId: string;
-
-    if (existingResult) {
-      const { data: updatedResult, error } =
-        await supabaseServer
-          .from("lab_results")
-          .update({
-            result_data:
-              normalisedResults,
-            laboratory_comments:
-              clean(input.laboratoryComments) ||
-              null,
-            entered_by: staff.id,
-            entered_at:
-              new Date().toISOString(),
-            verified_by: null,
-            verified_at: null,
-            verification_notes: null,
-          })
-          .eq("id", existingResult.id)
-          .select("id")
-          .single();
-
-      if (error) throw error;
-
-      resultId = updatedResult.id;
-    } else {
-      const { data: newResult, error } =
-        await supabaseServer
-          .from("lab_results")
-          .insert({
-            lab_order_id: labOrderId,
-            sample_id: sampleId,
-            result_data:
-              normalisedResults,
-            laboratory_comments:
-              clean(input.laboratoryComments) ||
-              null,
-            entered_by: staff.id,
-            entered_at:
-              new Date().toISOString(),
-          })
-          .select("id")
-          .single();
-
-      if (error) throw error;
-
-      resultId = newResult.id;
-    }
-
-    const { error: sampleUpdateError } =
-      await supabaseServer
-        .from("lab_samples")
-        .update({
-          status: "COMPLETED",
-        })
-        .eq("id", sampleId)
-        .eq("status", "PROCESSING");
-
-    if (sampleUpdateError) {
-      throw sampleUpdateError;
-    }
-
-    const { error: orderUpdateError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "AWAITING_VERIFICATION",
-        })
-        .eq("id", labOrderId);
-
-    if (orderUpdateError) {
-      throw orderUpdateError;
-    }
-
-    await createLabEvent({
-      labOrderId,
-      sampleId,
-      eventType: "RESULT_ENTERED",
-      description: `Laboratory result entered for ${order.test_name}. Awaiting verification.`,
-      performedBy: staff.id,
-      metadata: {
-        resultId,
-        resultCount:
-          normalisedResults.length,
-      },
-    });
 
     await logActivity({
       module: "Laboratory",
