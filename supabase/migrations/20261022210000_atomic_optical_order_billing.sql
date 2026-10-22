@@ -97,13 +97,13 @@ BEGIN
     END IF;
   END IF;
 
-  IF v_order.status NOT IN ('referred', 'measurements') THEN
+  IF v_order.status NOT IN ('referred', 'measurements', 'ready_for_dispense') THEN
     RAISE EXCEPTION 'Only optical orders in preparation can be marked ready';
   END IF;
-  IF NOT NULLIF(BTRIM(COALESCE(v_order.pd_binocular, '')), '') IS NOT NULL
-     AND NOT (
-       NULLIF(BTRIM(COALESCE(v_order.pd_od, '')), '') IS NOT NULL
-       AND NULLIF(BTRIM(COALESCE(v_order.pd_os, '')), '') IS NOT NULL
+  IF NULLIF(BTRIM(COALESCE(v_order.pd_binocular, '')), '') IS NULL
+     AND (
+       NULLIF(BTRIM(COALESCE(v_order.pd_od, '')), '') IS NULL
+       OR NULLIF(BTRIM(COALESCE(v_order.pd_os, '')), '') IS NULL
      ) THEN
     RAISE EXCEPTION 'Record binocular PD or both monocular PD measurements before billing';
   END IF;
@@ -202,7 +202,7 @@ BEGIN
       updated_at = now(),
       recorded_by = p_staff_id
   WHERE id = v_order.id
-    AND status IN ('referred', 'measurements')
+    AND status IN ('referred', 'measurements', 'ready_for_dispense')
     AND charge_approval_status = 'approved';
 
   IF NOT FOUND THEN
