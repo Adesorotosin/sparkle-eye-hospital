@@ -933,79 +933,56 @@ export async function registerPatient(input: {
     );
   }
 
-  const patientCode =
-    `SPK-${Math.floor(
-      10000 +
-        Math.random() * 90000
-    )}`;
+  // The patient code has a database uniqueness constraint. Retry only when
+  // that specific identifier collides; never mask unrelated database errors.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const patientCode = `SPK-${Math.floor(10000 + Math.random() * 90000)}`;
 
-  const { data, error } =
-    await supabaseServer
+    const { data, error } = await supabaseServer
       .from("patients")
       .insert({
-        patient_code:
-          patientCode,
-
-        full_name:
-          fullName,
-
-        coverage_plan:
-          input.coveragePlan ||
-          "Self-Pay",
-
-        age:
-          input.age ??
-          null,
-
-        date_of_birth:
-          input.dateOfBirth ??
-          null,
-
-        gender:
-          input.gender ??
-          null,
-
-        phone:
-          input.phone ??
-          null,
-
-        allergies:
-          input.allergies ??
-          null,
-
-        address:
-          input.address ??
-          null,
-
-        next_of_kin:
-          input.nextOfKin ??
-          null,
-
-        next_of_kin_phone:
-          input.nextOfKinPhone ??
-          null,
-
-        status:
-          input.status ??
-          "waiting_triage",
-
-        is_walk_in:
-          input.isWalkIn ??
-          false,
-
-        optometry_status:
-          input.optometryStatus ??
-          null,
-
-        last_visit_at:
-          new Date().toISOString(),
+        patient_code: patientCode,
+        full_name: fullName,
+        coverage_plan: input.coveragePlan || "Self-Pay",
+        age: input.age ?? null,
+        date_of_birth: input.dateOfBirth ?? null,
+        gender: input.gender ?? null,
+        phone: input.phone ?? null,
+        allergies: input.allergies ?? null,
+        address: input.address ?? null,
+        next_of_kin: input.nextOfKin ?? null,
+        next_of_kin_phone: input.nextOfKinPhone ?? null,
+        status: input.status ?? "waiting_triage",
+        is_walk_in: input.isWalkIn ?? false,
+        optometry_status: input.optometryStatus ?? null,
+        last_visit_at: new Date().toISOString(),
       })
       .select("*")
       .single();
 
-  if (error) {
+    if (!error) {
+      return data;
+    }
+
+    const uniqueViolation = error.code === "23505";
+    const errorContext = `${error.message} ${error.details ?? ""} ${error.hint ?? ""}`;
+    const patientCodeCollision =
+      uniqueViolation && /patient_code/i.test(errorContext);
+
+    if (patientCodeCollision && attempt < 4) {
+      continue;
+    }
+
+    if (patientCodeCollision) {
+      throw new Error(
+        "Unable to generate a unique patient code after several attempts. Please retry registration."
+      );
+    }
+
     throw error;
   }
 
-  return data;
+  throw new Error(
+    "Unable to register patient. Please retry the registration."
+  );
 }
