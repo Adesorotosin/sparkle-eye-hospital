@@ -70,7 +70,7 @@ For each workflow, record: role used, preconditions, steps, expected result, act
 - Added an additive RPC and migration to save all triage measurements and queue handoff in one database transaction; added a rollback-only PostgreSQL integration test.
 - Reception's date default now uses the `Africa/Lagos` calendar date.
 - Patient-code generation retries on a patient-code unique-constraint collision without masking unrelated database errors.
-- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run lint/typecheck plus the triage atomicity test.
+- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus the triage atomicity test. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
 
 ## Current status
 
