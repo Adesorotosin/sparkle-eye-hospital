@@ -226,7 +226,10 @@ export async function recalcInvoice(invoiceId: string) {
     taxableAmount + vatAmount
   );
 
-  const { error: updateError } = await supabaseServer
+  // Never allow a stale recalculation to rewrite a bill after cashier has
+  // finalized payment. The status predicate is rechecked atomically by Postgres
+  // after any competing payment transaction releases its invoice-row lock.
+  const { data: updatedInvoice, error: updateError } = await supabaseServer
     .from("invoices")
     .update({
       subtotal,
@@ -235,10 +238,44 @@ export async function recalcInvoice(invoiceId: string) {
       vat_amount: vatAmount,
       grand_total: grandTotal,
     })
-    .eq("id", invoiceId);
+    .eq("id", invoiceId)
+    .in("status", ["draft", "pending"])
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     throw updateError;
+  }
+
+  if (!updatedInvoice) {
+    const { data: latestInvoice, error: latestInvoiceError } =
+      await supabaseServer
+        .from("invoices")
+        .select("status, discount_amount, vat_rate, vat_amount, subtotal, grand_total")
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+    if (latestInvoiceError) {
+      throw latestInvoiceError;
+    }
+    if (!latestInvoice) {
+      throw new Error("Invoice no longer exists.");
+    }
+
+    if (latestInvoice.status === "paid" || latestInvoice.status === "cancelled") {
+      const finalSubtotal = Number(latestInvoice.subtotal ?? 0);
+      const finalDiscount = Number(latestInvoice.discount_amount ?? 0);
+      return {
+        subtotal: finalSubtotal,
+        discountAmount: finalDiscount,
+        taxableAmount: Math.max(0, finalSubtotal - finalDiscount),
+        vatRate: Number(latestInvoice.vat_rate ?? 0),
+        vatAmount: Number(latestInvoice.vat_amount ?? 0),
+        grandTotal: Number(latestInvoice.grand_total ?? 0),
+      };
+    }
+
+    throw new Error("Invoice status changed while recalculating. Refresh the billing record.");
   }
 
   return {

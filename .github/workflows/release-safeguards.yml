@@ -2,7 +2,7 @@ name: Release safeguards
 
 on:
   pull_request:
-    branches: [main, audit/doctor-module-hardening, audit/pre-handover-remediation]
+    branches: [main, audit/doctor-module-hardening, audit/pre-handover-remediation, fix/atomic-cashier-payment, fix/atomic-pharmacy-defer-restore, fix/atomic-optical-billing]
   push:
     branches: [fix/inventory-paid-prescription-guard]
 
@@ -131,7 +131,10 @@ jobs:
             supabase/migrations/20261022160000_atomic_lab_workflow_transitions.sql \
             supabase/migrations/20261022170000_atomic_pharmacy_prescription_creation.sql \
             supabase/migrations/20261022180000_atomic_diagnostic_orders.sql \
-            supabase/migrations/20261022190000_atomic_cashier_payment.sql
+            supabase/migrations/20261022190000_atomic_cashier_payment.sql \
+            supabase/migrations/20261022200000_atomic_pharmacy_defer_restore.sql \
+            supabase/migrations/20261022210000_atomic_optical_order_billing.sql \
+            supabase/migrations/20261022220000_login_rate_limiting.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
@@ -156,3 +159,9 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/diagnostic_order_atomicity.sql
       - name: Run atomic cashier payment safeguards after upgrade
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/cashier_payment_atomicity.sql
+      - name: Run atomic pharmacy defer/restore safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/pharmacy_defer_restore_atomicity.sql
+      - name: Run atomic optical billing safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/optical_billing_atomicity.sql
+      - name: Run login rate-limit safeguards after upgrade
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/login_rate_limiting.sql
