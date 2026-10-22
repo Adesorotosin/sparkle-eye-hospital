@@ -29,6 +29,7 @@
 16. Procedure registration inserts a procedure order and invoice line separately. If invoice-line creation fails, the procedure remains without a corresponding bill line. This needs an atomic database operation.
 17. Pharmacy prescription creation/defer/restore and billing payment use multiple writes with compensating cleanup. These paths need concurrency and injected-failure tests; compensation alone is not equivalent to a database transaction.
 18. Login currently has no explicit rate limiting/lockout policy. Exact lookup filtering is fixed in this branch, but rate limiting still needs a reviewed policy that avoids locking out shared workstations or exposing account existence.
+19. Read-only production counts show 10 laboratory orders without a matching timeline event. These may be legacy records or evidence of earlier partial writes. Do not backfill events automatically; reconcile against clinical records and staff knowledge before handoff.
 
 ## Remediation tracks
 
@@ -68,8 +69,6 @@
 
 ## Additional high-priority remediation still required
 
-- Convert laboratory sample/result state transitions to transactional database functions, with concurrency and failure-injection coverage.
-- Make procedure order + invoice-line creation atomic.
 - Make prescription creation/defer/restore and cashier payment transitions transactional or provide verifiable compensating recovery for every write.
 - Implement a rate-limiting policy for login attempts and test it without exposing account existence.
 - Review remaining lint errors and warnings across the full codebase.
@@ -84,7 +83,7 @@ For each workflow, record: role used, preconditions, steps, expected result, act
 - Added an additive RPC and migration to save all triage measurements and queue handoff in one database transaction; added a rollback-only PostgreSQL integration test.
 - Reception's date default now uses the `Africa/Lagos` calendar date.
 - Patient-code generation retries on a patient-code unique-constraint collision without masking unrelated database errors.
-- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus atomic triage, visiting-optometry, draft-invoice, and procedure-billing database tests. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
+- Added `lint` and `typecheck` npm scripts and extended the existing release-safeguards workflow to run both plus atomic triage, visiting-optometry, draft-invoice, procedure-billing, and laboratory-lifecycle database tests. The first lint run found 81 existing errors and 62 warnings across the project, so lint is currently reported but non-blocking while TypeScript and database integration tests remain blocking. This lint debt must be reduced before handoff.
 
 ## Current status
 
