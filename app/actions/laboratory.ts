@@ -717,77 +717,22 @@ export async function collectLabSample(input: {
       };
     }
 
-    const { data: existingSamples, error: samplesError } =
-      await supabaseServer
-        .from("lab_samples")
-        .select("sample_number")
-        .eq("lab_order_id", labOrderId)
-        .order("sample_number", {
-          ascending: false,
-        })
-        .limit(1);
-
-    if (samplesError) throw samplesError;
-
-    const latestNumber =
-      existingSamples?.[0]?.sample_number ?? 0;
-
-    const sampleNumber =
-      Number(latestNumber) + 1;
-
     const sampleType =
       clean(input.sampleType) ||
       order.specimen_type;
 
-    const { data: sample, error: sampleError } =
-      await supabaseServer
-        .from("lab_samples")
-        .insert({
-          lab_order_id: labOrderId,
-          sample_number: sampleNumber,
-          sample_type: sampleType,
-          sample_id:
-            clean(input.sampleId) || null,
-          status: "COLLECTED",
-          condition: null,
-          collection_notes:
-            clean(input.collectionNotes) || null,
-          collected_by: staff.id,
-          collected_at:
-            new Date().toISOString(),
-        })
-        .select("id")
-        .single();
+    const { data: sampleId, error: sampleError } = await supabaseServer.rpc(
+      "collect_lab_sample_atomic",
+      {
+        p_lab_order_id: labOrderId,
+        p_sample_type: sampleType,
+        p_sample_id: clean(input.sampleId) || null,
+        p_collection_notes: clean(input.collectionNotes) || null,
+        p_performed_by: staff.id,
+      }
+    );
 
-    if (sampleError) throw sampleError;
-
-    const { error: orderError } =
-      await supabaseServer
-        .from("lab_orders")
-        .update({
-          status: "COLLECTED",
-        })
-        .eq("id", labOrderId)
-        .in("status", [
-          "PENDING",
-          "RECOLLECTION",
-        ]);
-
-    if (orderError) throw orderError;
-
-    await createLabEvent({
-      labOrderId,
-      sampleId: sample.id,
-      eventType: "SAMPLE_COLLECTED",
-      description: `Sample ${sampleNumber} collected.`,
-      performedBy: staff.id,
-      metadata: {
-        sampleNumber,
-        sampleType,
-        sampleId:
-          clean(input.sampleId) || null,
-      },
-    });
+    if (sampleError || !sampleId) throw sampleError ?? new Error("Sample collection returned no ID");
 
     await logActivity({
       module: "Laboratory",
@@ -798,8 +743,7 @@ export async function collectLabSample(input: {
       patientId: order.patient_id,
       details: JSON.stringify({
         labOrderId,
-        sampleId: sample.id,
-        sampleNumber,
+        sampleId,
         testName: order.test_name,
       }),
     });
@@ -809,7 +753,7 @@ export async function collectLabSample(input: {
     return {
       success: true,
       message: "Sample collected successfully.",
-      sampleId: sample.id,
+      sampleId,
     };
   } catch (error) {
     console.error(
