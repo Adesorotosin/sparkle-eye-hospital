@@ -210,8 +210,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // A successful password check clears failed-attempt counters for this pair
-    // and IP so legitimate staff are not left locked out by earlier typos.
+    // A successful password check clears the account/IP pair. The IP-wide
+    // counter is retained so a successful login to one account cannot reset
+    // password-spraying protection for other staff accounts.
     const { error: clearRateLimitError } = await supabaseServer.rpc(
       "clear_login_rate_limit",
       {
