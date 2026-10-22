@@ -1,3 +1,13 @@
+-- These fields are already used by the app but may be absent from older schema.sql baselines.
+ALTER TABLE public.patients
+  ADD COLUMN IF NOT EXISTS date_of_birth date,
+  ADD COLUMN IF NOT EXISTS address text,
+  ADD COLUMN IF NOT EXISTS optometry_status text;
+
+ALTER TABLE public.encounters
+  ADD COLUMN IF NOT EXISTS optometry_source text,
+  ADD COLUMN IF NOT EXISTS optometry_visit_type text;
+
 -- Atomically create an outside optometry patient and the linked encounter.
 -- A failure inserting the encounter rolls back the patient insert as well.
 CREATE OR REPLACE FUNCTION public.register_visiting_optometry_patient(
