@@ -27,6 +27,26 @@ BEGIN
   VALUES (v_patient_id, 'CI Test Medication', 'one daily', 1, 1500, 1500, 'pending_payment')
   RETURNING id INTO v_prescription_id;
 
+  -- A stale amount must fail without changing invoice or prescription state.
+  BEGIN
+    PERFORM public.process_invoice_payment_atomic(
+      v_invoice_id,
+      v_patient_id,
+      'cash',
+      1700,
+      now(),
+      jsonb_build_array(jsonb_build_object('prescriptionId', v_prescription_id, 'invoiceItemId', v_item_id)),
+      ARRAY[]::uuid[],
+      '[]'::jsonb,
+      ARRAY[]::uuid[]
+    );
+    RAISE EXCEPTION 'Stale invoice amount was not rejected';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM = 'Stale invoice amount was not rejected' THEN RAISE; END IF;
+  END;
+  SELECT status INTO v_status FROM public.invoices WHERE id = v_invoice_id;
+  IF v_status <> 'pending' THEN RAISE EXCEPTION 'Stale amount attempt changed invoice state'; END IF;
+
   v_result := public.process_invoice_payment_atomic(
     v_invoice_id,
     v_patient_id,
@@ -69,26 +89,6 @@ BEGIN
     RAISE EXCEPTION 'Duplicate payment attempt was not rejected';
   END IF;
 
-  -- A stale amount must fail without changing the invoice or prescription.
-  v_failed := false;
-  BEGIN
-    PERFORM public.process_invoice_payment_atomic(
-      v_invoice_id,
-      v_patient_id,
-      'cash',
-      1700,
-      now(),
-      jsonb_build_array(jsonb_build_object('prescriptionId', v_prescription_id, 'invoiceItemId', v_item_id)),
-      ARRAY[]::uuid[],
-      '[]'::jsonb,
-      ARRAY[]::uuid[]
-    );
-  EXCEPTION WHEN OTHERS THEN
-    v_failed := true;
-  END;
-  IF NOT v_failed THEN
-    RAISE EXCEPTION 'Stale invoice amount was not rejected';
-  END IF;
 END;
 $test$;
 
