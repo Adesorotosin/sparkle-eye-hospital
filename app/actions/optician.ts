@@ -1555,7 +1555,7 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
       .from("optical_orders")
       .select("id, patient_id, status, optical_charge, frame_selection, lens_type, lens_material, lens_coating, charge_approval_status, charge_submitted_at, patients(patient_code, full_name)")
       .in("status", ["measurements", "referred"])
-      .neq("charge_approval_status", "approved")
+      .eq("charge_approval_status", "pending")
       .order("charge_submitted_at", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
@@ -1600,7 +1600,7 @@ export async function decideOpticalChargeApproval(
       .maybeSingle();
     if (error) throw error;
     if (!order) return { success: false, message: "Optical order was not found." };
-    if (!["measurements", "referred"].includes(order.status) || order.charge_approval_status === "approved") {
+    if (!["measurements", "referred"].includes(order.status) || order.charge_approval_status !== "pending") {
       return { success: false, message: "This optical order is no longer awaiting Doctor billing review. Refresh the page and try again." };
     }
     const finalCharge = Number(approvedCharge);
@@ -1623,7 +1623,8 @@ export async function decideOpticalChargeApproval(
         updated_at: now,
       })
       .eq("id", order.id)
-      .neq("charge_approval_status", "approved")
+      .eq("charge_approval_status", "pending")
+      .in("status", ["measurements", "referred"])
       .select("id")
       .maybeSingle();
     if (updateError) throw updateError;
