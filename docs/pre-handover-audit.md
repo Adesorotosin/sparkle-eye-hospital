@@ -67,11 +67,22 @@
 - Fix Lagos-local date handling, loading/empty/error states, duplicate-click prevention, keyboard/mobile usability, and console errors.
 - Review database indexes against actual query filters/orderings.
 
-## Additional high-priority remediation still required
+## Release status after the remediation stack
 
-- Make prescription creation/defer/restore and cashier payment transitions transactional or provide verifiable compensating recovery for every write.
-- Implement a rate-limiting policy for login attempts and test it without exposing account existence.
-- Review remaining lint errors and warnings across the full codebase.
+- Transaction-backed RPCs and rollback-only PostgreSQL integration tests now cover triage vitals/queue handoff, visiting optometry registration, draft invoice creation, procedure billing, laboratory lifecycle transitions, pharmacy prescription creation/defer/restore, diagnostic orders, cashier payment, optical billing, and login rate limiting.
+- GitHub Actions migration-upgrade, database safeguards, and TypeScript checks have passed on the remediation commits. The latest consolidated commit is being rechecked after an additional guard preventing stale invoice recalculation from mutating a finalized invoice.
+- Live Supabase migration history and read-only schema inspection confirm the release migrations are present, including the login limiter functions/table and the optical-order billing link fields. Read-only checks still show 19 patients; no test patients or clinical/payment transactions were created as part of verification.
+- The legacy lint baseline remains non-blocking: 81 errors and 62 warnings were reported on the initial audit run. This remains documented technical debt, not a clean-lint claim.
+- The live database still has legacy records requiring owner/staff reconciliation: 16 patient rows without a registration number and 10 laboratory orders without a matching timeline event. Do not backfill either automatically.
+- The owner will perform the final authenticated end-to-end live workflow test. Do not use a production-connected preview to create test patients or test payments.
+- Vercel reported the daily deployment quota was exceeded during the preview cycle. Verify the eventual deployment is Ready before asking staff to test the updated application.
+
+## Remaining handover actions
+
+- Confirm the consolidated PR's final CI result and merge the remediation stack as one release to avoid intermediate production deployments.
+- Confirm Vercel production deployment status after merge; the code release must remain paired with the database schema/functions already verified above.
+- Owner to test the full workflow with real staff access, using an intentionally registered real patient only as part of the owner's approved live acceptance test; avoid dummy payments or clinical records.
+- Triage remaining lint debt and reconcile the identified legacy records as separate, deliberate follow-up work.
 
 ## Test evidence required before handoff
 
