@@ -7,7 +7,7 @@ import Link from "next/link";
 import {
   Activity, AlertTriangle, ArrowDownToLine, ArrowUpFromLine,
   Boxes, CheckCircle2, ClipboardList, LoaderCircle, Package, Plus,
-  RefreshCw, Search, Truck, X, LogOut,
+  RefreshCw, Search, Truck, X, LogOut, ArrowLeft,
 } from "lucide-react";
 import {
   createInventoryItem,
@@ -93,6 +93,14 @@ export default function InventoryPage() {
   useEffect(() => { void loadData(); }, [loadData]);
 
   const isManager = role === "IT_ADMIN";
+  const returnDestination: Record<string, { href: string; label: string }> = {
+    IT_ADMIN: { href: "/admin", label: "Back to Admin Dashboard" },
+    PHARMACIST: { href: "/pharmacy", label: "Back to Pharmacy" },
+    OPTICIAN: { href: "/optician", label: "Back to Optician Module" },
+    LAB_SCIENTIST: { href: "/laboratory", label: "Back to Laboratory" },
+    NURSE: { href: "/nurse", label: "Back to Nurse Dashboard" },
+  };
+  const returnLink = role ? returnDestination[role] : undefined;
   const canRecordSales = role === "IT_ADMIN" || role === "PHARMACIST";
   const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
@@ -216,6 +224,7 @@ export default function InventoryPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {returnLink && <Link href={returnLink.href} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-800 transition hover:bg-violet-100"><ArrowLeft className="h-4 w-4" /> {returnLink.label}</Link>}
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
             {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
             {canRecordSales && <button onClick={() => { setSaleForm((v) => ({ ...v, itemId: v.itemId || items.find((item) => item.domain === "pharmacy" && item.is_active && item.stock > 0)?.id || "" })); setModal("sale"); }} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><Activity className="h-4 w-4" /> Record daily sale</button>}
