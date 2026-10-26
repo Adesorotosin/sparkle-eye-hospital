@@ -21,131 +21,21 @@ export async function sendTreatmentPlanToCashier(input: {
   encounterId: string;
 }): Promise<{ success: boolean; message: string; id?: string }> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
-    const patientCode = input.patientCode?.trim();
-    const encounterId = input.encounterId?.trim();
-
-    if (!patientCode || !encounterId) {
-      return { success: false, message: "Save the consultation before sending its treatment plan to Cashier." };
-    }
-
-    const { data: patient, error: patientError } = await supabaseServer
-      .from("patients")
-      .select("id, patient_code, full_name")
-      .eq("patient_code", patientCode)
-      .maybeSingle();
-
-    if (patientError || !patient) {
-      console.error("Treatment billing patient lookup failed:", patientError);
-      return { success: false, message: "Unable to find this patient. Refresh the consultation and try again." };
-    }
-
-    const { data: encounter, error: encounterError } = await supabaseServer
-      .from("encounters")
-      .select("id, patient_id, treatment_plan")
-      .eq("id", encounterId)
-      .eq("patient_id", patient.id)
-      .maybeSingle();
-
-    if (encounterError || !encounter) {
-      console.error("Treatment billing encounter lookup failed:", encounterError);
-      return { success: false, message: "The saved consultation could not be verified. Save or refresh the consultation, then try again." };
-    }
-
-    const treatmentPlan = String(encounter.treatment_plan ?? "").trim();
-    if (!treatmentPlan) {
-      return { success: false, message: "Enter and save the treatment/follow-up plan before sending it to Cashier." };
-    }
-
-    const { data: existing, error: existingError } = await supabaseServer
-      .from("treatment_billing_requests")
-      .select("id, status, treatment_plan")
-      .eq("encounter_id", encounter.id)
-      .maybeSingle();
-
-    if (existingError) {
-      console.error("Treatment billing duplicate check failed:", existingError);
-      return { success: false, message: "Unable to check whether this plan has already been sent." };
-    }
-
-    if (existing) {
-      if (String(existing.treatment_plan ?? "").trim() === treatmentPlan) {
-        return {
-          success: true,
-          id: existing.id,
-          message: existing.status === "pending"
-            ? "This treatment plan is already waiting in the Cashier queue."
-            : "This treatment plan has already been sent to Cashier. Refresh the Cashier dashboard for its current status.",
-        };
-      }
-
-      // If the doctor edits a plan after sending it, update the same request
-      // and return it to the pending queue rather than creating a duplicate.
-      const { error: updateError } = await supabaseServer
-        .from("treatment_billing_requests")
-        .update({
-          treatment_plan: treatmentPlan,
-          status: "pending",
-          requested_by: staff.id,
-          requested_by_name: staff.name,
-          reviewed_by: null,
-          reviewed_by_name: null,
-          reviewed_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-
-      if (updateError) {
-        console.error("Treatment billing request update failed:", updateError);
-        return { success: false, message: "The plan was already sent, but its updated version could not be delivered to Cashier." };
-      }
-
-      revalidatePath("/cashier");
-      return { success: true, id: existing.id, message: "Updated treatment plan sent back to Cashier for billing review." };
-    }
-
-    const { data: request, error: insertError } = await supabaseServer
-      .from("treatment_billing_requests")
-      .insert({
-        patient_id: patient.id,
-        encounter_id: encounter.id,
-        treatment_plan: treatmentPlan,
-        status: "pending",
-        requested_by: staff.id,
-        requested_by_name: staff.name,
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !request) {
-      console.error("Treatment billing request creation failed:", insertError);
-      return { success: false, message: "Failed to send the treatment plan to Cashier. Please refresh before retrying." };
-    }
-
-    await logActivity({
-      module: "Billing",
-      category: "BILLING",
-      action: "Doctor sent treatment plan to Cashier for billing review",
-      performedBy: staff.name,
-      staffId: staff.id,
-      patientId: patient.id,
-      details: JSON.stringify({ requestId: request.id, encounterId: encounter.id }),
-    });
-
-    revalidatePath("/cashier");
-    revalidatePath("/billing");
-    revalidatePath(`/doctor/patients/${patientCode}/encounter`);
-
-    return { success: true, id: request.id, message: "Treatment plan sent to Cashier for billing review. No charge has been created automatically." };
+    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    void input;
+    return {
+      success: false,
+      message: "Bundled treatment-plan handoff is disabled. Send individual prescription, investigation, laboratory, optical and procedure requests through their dedicated workflows.",
+    };
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
-      return { success: false, message: "You must be signed in as a doctor to send a treatment plan." };
+      return { success: false, message: "You must be signed in to continue." };
     }
     if (error instanceof Error && error.message === "FORBIDDEN") {
-      return { success: false, message: "You are not authorized to send treatment plans to Cashier." };
+      return { success: false, message: "You are not authorized to send clinical requests." };
     }
-    console.error("Send treatment plan to Cashier failed:", error);
-    return { success: false, message: "An unexpected error occurred while sending the treatment plan." };
+    console.error("Disabled treatment-plan handoff was called:", error);
+    return { success: false, message: "Unable to process the request." };
   }
 }
 
