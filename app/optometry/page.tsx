@@ -56,8 +56,6 @@ export default function OptometryDashboard() {
 
   const loadQueue = useCallback(
     async () => {
-      setLoading(true);
-      setFeedback("");
 
       try {
         const result =
