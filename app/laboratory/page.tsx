@@ -387,7 +387,7 @@ export default function LaboratoryPage() {
     useState<Priority | "ALL">("ALL");
 
   const [sampleType, setSampleType] = useState("");
-  const [sampleId, setSampleId] = useState("");
+  const [, setSampleId] = useState("");
   const [collectionNotes, setCollectionNotes] =
     useState("");
 
