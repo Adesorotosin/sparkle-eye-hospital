@@ -82,7 +82,6 @@ export default function InventoryPage() {
   });
 
   const loadData = useCallback(async () => {
-    setLoading(true);
     const result = await getInventoryData();
     if (!result.success) {
       setError(result.message);
@@ -126,6 +125,7 @@ export default function InventoryPage() {
     setNotice(message);
     setError("");
     closeModal();
+    setLoading(true);
     await loadData();
   };
 
@@ -232,7 +232,7 @@ export default function InventoryPage() {
           <div className="flex flex-wrap items-center gap-2">
             {returnLink && <Link href={returnLink.href} className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-800 transition hover:bg-violet-100"><ArrowLeft className="h-4 w-4" /> {returnLink.label}</Link>}
             <Link href="/inventory/optical" className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-violet-800"><Package className="h-4 w-4" /> Glasses workflow</Link>
-            <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
+            <button onClick={() => { setLoading(true); void loadData(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
             {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
             {canRecordSales && <button onClick={() => { setSaleForm((v) => ({ ...v, itemId: v.itemId || items.find((item) => item.domain === "pharmacy" && item.is_active && item.stock > 0)?.id || "", saleDate: getLocalDateString() })); setModal("sale"); }} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><Activity className="h-4 w-4" /> Record daily sale</button>}
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
