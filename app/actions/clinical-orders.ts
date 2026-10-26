@@ -121,6 +121,19 @@ export async function createDiagnosticOrder(
       ? diagnosticResult[0]
       : diagnosticResult;
     const diagnosticId = String(result.diagnostic_id);
+    const { error: receptionHandoffError } = await supabaseServer
+      .from("clinical_handoffs")
+      .insert({
+        patient_id: patient.id,
+        destination: "RECEPTIONIST",
+        handoff_type: "PROCEDURE",
+        title: "Investigation request: " + name,
+        details: "Doctor-requested investigation for " + patient.full_name + " (" + patient.patient_code + "). Test: " + name + ". The investigation queue receives the clinical order directly; Reception should coordinate patient readiness and follow-up. Order ID: " + diagnosticId,
+        requested_by: staff.id,
+      });
+    if (receptionHandoffError) {
+      console.error("Investigation Reception handoff failed after order creation:", receptionHandoffError);
+    }
     const invoiceId = result.invoice_id ? String(result.invoice_id) : null;
     const pricePending = Boolean(result.price_pending);
     let invoiceRefreshFailed = false;
@@ -154,6 +167,7 @@ export async function createDiagnosticOrder(
     });
 
     revalidatePath("/diagnostics");
+    revalidatePath("/receptionist");
     revalidatePath("/billing");
     revalidatePath("/cashier");
     revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
@@ -161,7 +175,7 @@ export async function createDiagnosticOrder(
     if (pricePending) {
       return {
         success: true,
-        message: name + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.",
+        message: name + " has been sent to the investigation queue and Reception for coordination, and to Cashier for approved pricing. No zero-cost invoice item was created.",
         id: diagnosticId,
       };
     }
