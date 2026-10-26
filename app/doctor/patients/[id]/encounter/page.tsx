@@ -561,13 +561,7 @@ export default function DoctorEncounterPage() {
         // and avoid retrying blindly.
         if (response.id) await refreshPatient();
       } else {
-        const reception = await notifyReceptionOfClinicalRequest(
-          `Laboratory request: ${test.name}`,
-          `A laboratory request was sent to the Laboratory queue. Please coordinate the patient's arrival, billing timing, and any deferred visit. Order reference: ${response.id ?? "see Laboratory queue"}.`
-        );
-        setMessage(reception.success
-          ? `${response.message} Reception has also been notified.`
-          : `${response.message} However, Reception notification failed: ${reception.message}`);
+        setMessage(response.message);
         await refreshPatient();
       }
       setRequesting("");
