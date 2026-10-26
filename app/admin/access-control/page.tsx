@@ -545,6 +545,7 @@ export default function AccessControlPage() {
 
   useEffect(() => {
     if (selectedStaff) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable permission draft when the selected staff member changes.
       setDraftPermissions(
         getPermissionsForStaff(
           selectedStaff
