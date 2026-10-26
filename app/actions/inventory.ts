@@ -7,7 +7,6 @@ import { requireRole } from "@/lib/server-auth";
 
 const INVENTORY_READ_ROLES = [
   "IT_ADMIN",
-  "OPTICIAN",
   "LAB_SCIENTIST",
   "NURSE",
   "INVENTORY_MANAGER",
@@ -16,7 +15,6 @@ const INVENTORY_READ_ROLES = [
 const INVENTORY_MANAGER_ROLES = ["IT_ADMIN"] as const;
 const INVENTORY_STOCK_ROLES = [
   "IT_ADMIN",
-  "OPTICIAN",
   "LAB_SCIENTIST",
   "NURSE",
   "INVENTORY_MANAGER",
