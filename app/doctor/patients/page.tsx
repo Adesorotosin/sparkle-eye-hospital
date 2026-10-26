@@ -73,6 +73,7 @@ export default function PatientDirectoryPage() {
   const [notifications, setNotifications] = useState<
     { id: string; title: string; desc: string; time: string; unread: boolean }[]
   >([]);
+  const [activityLogs, setActivityLogs] = useState<{ text: string; time: string }[]>([]);
   // Active Selected Patient for Modals
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
@@ -96,7 +97,7 @@ export default function PatientDirectoryPage() {
       id: p.patientId,
       name: p.fullName,
       isWalkIn: p.isWalkIn,
-      ageSex: \`${p.age ?? "—"} Y / \`${(p.gender || "—").charAt(0)}\`,
+      ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
       phone: p.phone || "—",
       lastVisit: p.lastVisitAt
         ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
