@@ -97,13 +97,12 @@ export default function InventoryPage() {
   const returnDestination: Record<string, { href: string; label: string }> = {
     IT_ADMIN: { href: "/admin", label: "Back to Admin Dashboard" },
     PHARMACIST: { href: "/pharmacy", label: "Back to Pharmacy" },
-    OPTICIAN: { href: "/optician", label: "Back to Optician Module" },
     LAB_SCIENTIST: { href: "/laboratory", label: "Back to Laboratory" },
     NURSE: { href: "/nurse", label: "Back to Nurse Dashboard" },
   };
   const returnLink = role ? returnDestination[role] : undefined;
   const canRecordSales = role === "IT_ADMIN" || role === "PHARMACIST";
-  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
+  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
