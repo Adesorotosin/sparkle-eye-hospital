@@ -443,7 +443,7 @@ export async function createVisitingLabOrder(
   input: VisitingLabOrderInput
 ): Promise<LabOrderResponse> {
   try {
-    const staff = await getLabStaff();
+    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST", "LAB_SCIENTIST"]);
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();
