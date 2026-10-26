@@ -640,6 +640,21 @@ export async function createOpticalOrder(
       throw createError;
     }
 
+    const { error: receptionHandoffError } = await supabaseServer
+      .from("clinical_handoffs")
+      .insert({
+        patient_id: patient.id,
+        destination: "RECEPTIONIST",
+        handoff_type: "PROCEDURE",
+        title: "Spectacle / optical request",
+        details: "Doctor-requested spectacles for " + patient.full_name + " (" + patient.patient_code + "). Lens type: " + (instructions.lensType?.trim() || "See spectacle prescription") + ". The Inventory module manages frame selection, optical lab production, readiness and collection. Reception should coordinate patient readiness and follow-up.",
+        requested_by: staff.id,
+      });
+    if (receptionHandoffError) {
+      console.error("Optical Reception handoff failed after order creation:", receptionHandoffError);
+    }
+    revalidatePath("/receptionist");
+
     await logActivity({
       module: "Optician",
       category: "CLINICAL",
