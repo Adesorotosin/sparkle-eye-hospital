@@ -186,7 +186,7 @@ export default function PatientDirectoryPage() {
     status: "Waiting for Triage" as Patient["status"],
   });
 
-  const [activityLogs, setActivityLogs] = useState<{ text: string; time: string }[]>([]);
+
 
   // --- FILTERED DATA COMPUTATION ---
   const filteredPatients = useMemo(() => {
