@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { CheckCircle2, Glasses, LoaderCircle, PackageCheck, RefreshCw, Save } from "lucide-react";
 import {
   getOpticianQueue,
-  startOpticianMeasurements,
   saveOpticalOrder,
   submitOpticalChargeForApproval,
   markOpticalOrderReady,
@@ -135,8 +134,7 @@ export default function OpticalFulfillmentQueue() {
           <label className={labelClass+" sm:col-span-2 lg:col-span-3"}>Preparation notes<textarea rows={2} className={inputClass+" mt-1"} value={draft.dispensingNotes} onChange={(e) => edit(order.id,"dispensingNotes",e.target.value)} placeholder="Frame SKU, lens instructions, lab notes, promised collection date…"/></label>
         </div>}
         <div className="flex flex-wrap gap-2">
-          {order.status === "referred" && <button type="button" disabled={pending} onClick={() => runAction(() => startOpticianMeasurements(order.id))} className="rounded-xl border px-3 py-2 text-xs font-bold hover:bg-slate-50 disabled:opacity-50">Start preparation</button>}
-          {order.status !== "collected" && order.status !== "ready_for_dispense" && <button type="button" disabled={pending} onClick={() => save(order)} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-50"><Save className="h-4 w-4"/>Save frame & lens details</button>}
+          {order.status !== "collected" && order.status !== "ready_for_dispense" && <button type="button" disabled={pending} onClick={() => save(order)} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white hover:bg-violet-800 disabled:opacity-50"><Save className="h-4 w-4"/>{order.status === "referred" ? "Save details & send to optical lab" : "Save frame & lens details"}</button>}
           {["referred","measurements"].includes(order.status) && <button type="button" disabled={pending} onClick={() => runAction(() => submitOpticalChargeForApproval(order.id))} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 disabled:opacity-50">Send charge for doctor approval</button>}
           {order.status === "measurements" && <button type="button" disabled={pending} onClick={() => runAction(() => markOpticalOrderReady(order.id))} className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50"><PackageCheck className="h-4 w-4"/>Mark glasses fixed</button>}
           {order.status === "ready_for_dispense" && <button type="button" disabled={pending} onClick={() => runAction(() => markOpticalOrderCollected(order.id))} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-xs font-bold text-white hover:bg-blue-800 disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/>Mark glasses collected</button>}
