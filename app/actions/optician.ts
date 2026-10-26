@@ -1199,6 +1199,16 @@ export async function saveOpticalOrder(
       };
     }
 
+    if (
+      order.status === "referred" &&
+      (!input.frameSelection?.trim() || !input.lensType?.trim())
+    ) {
+      return {
+        success: false,
+        message: "Record the patient's chosen frame and prescribed lens type before sending this order to the optical lab.",
+      };
+    }
+
     const now =
       new Date().toISOString();
 
@@ -1341,8 +1351,9 @@ export async function saveOpticalOrder(
     await logActivity({
       module: "Optician",
       category: "CLINICAL",
-      action:
-        "Optical order measurements saved",
+      action: order.status === "referred"
+        ? "Optical order sent to optical lab; preparation started"
+        : "Optical order details saved",
       performedBy:
         staff.name,
       staffId:
@@ -1380,8 +1391,9 @@ export async function saveOpticalOrder(
 
     return {
       success: true,
-      message:
-        "Optical order saved successfully.",
+      message: order.status === "referred"
+        ? "Frame and lens details saved. The order has been sent to the optical lab and preparation has started."
+        : "Optical order saved successfully.",
       orderId:
         order.id,
     };
