@@ -735,6 +735,8 @@ export async function startOpticianMeasurements(
         id,
         patient_id,
         status,
+        frame_selection,
+        lens_type,
         patients (
           patient_code,
           full_name
@@ -766,6 +768,13 @@ export async function startOpticianMeasurements(
         success: false,
         message:
           "This optical order has already been collected.",
+      };
+    }
+
+    if (order.status === "referred" && (!order.frame_selection?.trim() || !order.lens_type?.trim())) {
+      return {
+        success: false,
+        message: "Record the patient's chosen frame and prescribed lens type before starting optical preparation.",
       };
     }
 
