@@ -407,7 +407,7 @@ export async function getOpticianQueue(): Promise<{
 
             opticalCharge:
               normalizeMoney(
-                order.optical_charge
+                order.optical_charge as string | number | null | undefined
               ),
 
             invoiceId:
@@ -1582,7 +1582,7 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
         id: order.id,
         patientCode: patient?.patient_code ?? "",
         patientName: patient?.full_name ?? "Unknown patient",
-        opticalCharge: normalizeMoney(order.optical_charge),
+        opticalCharge: normalizeMoney(order.optical_charge as string | number | null | undefined),
         frameSelection: order.frame_selection ?? "",
         lensType: order.lens_type ?? "",
         lensMaterial: order.lens_material ?? "",
