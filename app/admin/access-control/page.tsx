@@ -1692,7 +1692,7 @@ export default function AccessControlPage() {
 
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-xs leading-5 text-amber-800">
-                For security, the staff member's existing sessions will be signed out after the password changes. This helps prevent access through an old session.
+                For security, the staff member&apos;s existing sessions will be signed out after the password changes. This helps prevent access through an old session.
               </p>
             </div>
 
