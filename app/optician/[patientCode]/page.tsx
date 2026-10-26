@@ -53,6 +53,7 @@ export default function OpticianPatientPage() {
     }
   }, [patientCode]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPrescription updates state after its async request resolves.
   useEffect(() => { if (patientCode) void loadPrescription(); }, [loadPrescription]);
 
   const od = prescriptionValues(patient?.optometry.refractionOD);
