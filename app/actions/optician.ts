@@ -295,10 +295,10 @@ export async function getOpticianQueue(): Promise<{
 
     const mappedOrders: OpticalOrder[] =
       orders
-        .map((order: any) => {
+        .map((order: Record<string, unknown>) => {
           const patient =
             patientMap.get(
-              order.patient_id
+              String(order.patient_id)
             );
 
           if (!patient) {
@@ -308,7 +308,7 @@ export async function getOpticianQueue(): Promise<{
           const encounter =
             order.optometry_encounter_id
               ? encounterMap.get(
-                  order.optometry_encounter_id
+                  String(order.optometry_encounter_id)
                 )
               : null;
 
@@ -444,7 +444,7 @@ export async function getOpticianQueue(): Promise<{
 
             updatedAt:
               order.updated_at,
-          };
+          } as OpticalOrder;
         })
         .filter(Boolean) as OpticalOrder[];
 
@@ -1575,8 +1575,9 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
       .order("charge_submitted_at", { ascending: true, nullsFirst: true });
     if (error) throw error;
 
-    const items: OpticalChargeApprovalItem[] = (orders ?? []).map((order: any) => {
-      const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
+    const items: OpticalChargeApprovalItem[] = (orders ?? []).map((rawOrder: unknown) => {
+      const order = rawOrder as Record<string, unknown>;
+      const patient = (Array.isArray(order.patients) ? order.patients[0] : order.patients) as Record<string, unknown> | null;
       return {
         id: order.id,
         patientCode: patient?.patient_code ?? "",
@@ -1588,7 +1589,7 @@ export async function getPendingOpticalChargeApprovals(): Promise<{ success: boo
         lensCoating: order.lens_coating ?? "",
         chargeApprovalStatus: order.charge_approval_status ?? "not_submitted",
         submittedAt: order.charge_submitted_at ?? "",
-      };
+      } as OpticalChargeApprovalItem;
     });
     return { success: true, items };
   } catch (error) {
