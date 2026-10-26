@@ -3,32 +3,8 @@ import type { NextRequest } from "next/server";
 
 import {
   ROUTE_PERMISSIONS,
-  type UserRole,
 } from "@/lib/rbac-config";
 
-const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
-  IT_ADMIN: "/admin",
-
-  OPHTHALMOLOGIST: "/doctor",
-  DOCTOR: "/doctor",
-
-  NURSE: "/nurse",
-  PHARMACIST: "/pharmacy",
-  CASHIER: "/cashier",
-  RECEPTIONIST: "/receptionist",
-
-  LAB_SCIENTIST: "/laboratory",
-  OPTICIAN: "/optician",
-  OPTOMETRIST: "/optometry",
-  INVENTORY_MANAGER: "/inventory",
-};
-
-function normalizeRole(role: unknown): string {
-  return String(role ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-}
 
 function getProtectedRoute(pathname: string) {
   return Object.keys(ROUTE_PERMISSIONS).find(
