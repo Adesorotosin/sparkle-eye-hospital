@@ -1630,23 +1630,7 @@ function PharmacyContent() {
           </div>
         )}
 
-        {isDrugInventoryOpen && (
-          <DrugInventoryModal
-            drugInventory={
-              drugInventory
-            }
-            isLoading={
-              isLoadingDrugInventory
-            }
-            onClose={() =>
-              setIsDrugInventoryOpen(
-                false
-              )
-            } 
-          />
-        )}
-
-      </div>
+        </div>
     );
   }
 
@@ -1678,11 +1662,7 @@ function PharmacyContent() {
               <Pill className="h-4 w-4 text-violet-300" />
               Dashboard & queue
             </button>
-            <button type="button" onClick={handleOpenDrugInventory} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
-              <Boxes className="h-4 w-4" />
-              Drug inventory
-            </button>
-            <button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
+<button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
               <UserPlus className="h-4 w-4" />
               Register patient
             </button>
