@@ -552,6 +552,7 @@ export default function AccessControlPage() {
         )
       );
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the editable permission draft when no staff member is selected.
       setDraftPermissions({});
     }
   }, [selectedStaff]);
