@@ -198,6 +198,7 @@ export async function registerVisitingOptometryPatient(input: {
   gender?: string;
   phone?: string;
   address?: string;
+  allergies?: string;
   visitType: "external_referral" | "self_presenting";
 }): Promise<OptometryActionResponse & { patientCode?: string }> {
   try {
@@ -265,6 +266,17 @@ export async function registerVisitingOptometryPatient(input: {
 
     if (!patient) {
       throw new Error("Unable to register the visiting optometry patient. Please retry.");
+    }
+
+    if (input.allergies?.trim()) {
+      const { error: allergyError } = await supabaseServer
+        .from("patients")
+        .update({ allergies: input.allergies.trim() })
+        .eq("id", patient.id);
+      if (allergyError) {
+        console.error("Saving visiting optometry allergy notes failed:", allergyError);
+        throw new Error("Patient was registered, but allergy notes could not be saved. Open the patient record and record allergies before testing.");
+      }
     }
 
     await logActivity({
