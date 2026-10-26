@@ -199,21 +199,27 @@ export async function getClinicalHandoffs(destination: HandoffDestination) {
 
     return {
       success: true,
-      requests: (data ?? []).map((row: any) => ({
-        id: row.id,
-        destination: row.destination,
-        handoffType: row.handoff_type,
-        title: row.title,
-        details: row.details ?? "",
-        intervalValue: row.interval_value,
-        intervalUnit: row.interval_unit,
-        targetDate: row.target_date,
-        preferredTime: row.preferred_time,
-        status: row.status,
-        createdAt: row.created_at,
-        patientCode: row.patients.patient_code,
-        patientName: row.patients.full_name,
-      })) as ClinicalHandoff[],
+      requests: (data ?? []).map((rawRow: unknown) => {
+        const row = rawRow as Record<string, unknown>;
+        const patient = row.patients as
+          | { patient_code?: string | null; full_name?: string | null }
+          | null;
+        return {
+          id: row.id,
+          destination: row.destination,
+          handoffType: row.handoff_type,
+          title: row.title,
+          details: row.details ?? "",
+          intervalValue: row.interval_value,
+          intervalUnit: row.interval_unit,
+          targetDate: row.target_date,
+          preferredTime: row.preferred_time,
+          status: row.status,
+          createdAt: row.created_at,
+          patientCode: patient?.patient_code ?? "",
+          patientName: patient?.full_name ?? "",
+        } as ClinicalHandoff;
+      }),
     };
   } catch (error) {
     console.error("Loading clinical handoffs failed:", error);
