@@ -124,16 +124,8 @@ export default function NurseDashboard() {
   const [error, setError] = useState("");
   const [currentStaffLabel, setCurrentStaffLabel] = useState("Loading staff...");
 
-  const loadPatients = useCallback(async (showRefreshState = false) => {
+  const loadPatients = useCallback(async () => {
     try {
-      if (showRefreshState) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setError("");
-
       const response = await fetch("/api/patients", {
         method: "GET",
         cache: "no-store",
@@ -416,7 +408,7 @@ export default function NurseDashboard() {
 
             <button
               type="button"
-              onClick={() => void loadPatients(true)}
+              onClick={() => { setRefreshing(true); void loadPatients(); }}
               disabled={loading || refreshing}
               title="Refresh patient queue"
               className="shrink-0 w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -447,7 +439,7 @@ export default function NurseDashboard() {
 
             <button
               type="button"
-              onClick={() => void loadPatients()}
+              onClick={() => { setLoading(true); void loadPatients(); }}
               className="text-xs font-bold underline whitespace-nowrap"
             >
               Try Again
