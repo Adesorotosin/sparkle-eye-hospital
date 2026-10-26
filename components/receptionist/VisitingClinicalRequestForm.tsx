@@ -119,6 +119,7 @@ export default function VisitingClinicalRequestForm() {
           procedureCode: form.procedureCode,
           scheduledDate: form.scheduledDate || undefined,
           notes: form.notes,
+          referralType: "external_referral",
         });
         if (!result.success) {
           setPatientCode(code);
