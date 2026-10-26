@@ -24,6 +24,7 @@ export default function OpticianDashboard() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadOrders updates state after its async request resolves.
   useEffect(() => { void loadOrders(); }, []);
 
   async function logout() {
