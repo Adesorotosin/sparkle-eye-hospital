@@ -275,7 +275,11 @@ export async function registerVisitingOptometryPatient(input: {
         .eq("id", patient.id);
       if (allergyError) {
         console.error("Saving visiting optometry allergy notes failed:", allergyError);
-        throw new Error("Patient was registered, but allergy notes could not be saved. Open the patient record and record allergies before testing.");
+        return {
+          success: false,
+          message: `Patient ${patient.patient_code} was registered, but allergy notes could not be saved. Do not register the patient again; open the patient record and record allergies before testing.`,
+          patientCode: patient.patient_code,
+        };
       }
     }
 
