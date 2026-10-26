@@ -105,7 +105,15 @@ export default function VisitingClinicalRequestForm() {
           allergies: form.allergies,
           visitType: form.visitType,
         });
-        if (!result.success || !result.patientCode) throw new Error(result.message || "Could not register the refraction request.");
+        if (!result.success) {
+          if (result.patientCode) {
+            setPatientCode(result.patientCode);
+            setMessage(result.message);
+            return;
+          }
+          throw new Error(result.message || "Could not register the refraction request.");
+        }
+        if (!result.patientCode) throw new Error("The visiting patient was registered but no patient code was returned. Contact the administrator before retrying.");
         setPatientCode(result.patientCode);
         setMessage("Visiting patient registered for refraction. The request is available to Optometry; after assessment, the doctor can send the spectacle prescription to Inventory.");
       } else if (mode === "medication") {
