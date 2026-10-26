@@ -43,7 +43,8 @@ const id = params.id;
 
   const [activeTab, setActiveTab] = useState("Patient Info");
   const [patient, setPatient] = useState<PatientRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(Boolean(id));
+  const [loadedPatientId, setLoadedPatientId] = useState<string | null>(null);
+  const isLoading = Boolean(id) && loadedPatientId !== id;
   const [errorMessage, setErrorMessage] = useState<string | null>(
     id ? null : "Patient ID is missing."
   );
@@ -58,7 +59,6 @@ const id = params.id;
 
     async function loadPatient() {
       try {
-        setIsLoading(true);
         setErrorMessage(null);
 
         const res = await fetch(`/api/patients/${encodeURIComponent(id)}`, {
@@ -114,7 +114,7 @@ const id = params.id;
         );
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setLoadedPatientId(id);
         }
       }
     }
