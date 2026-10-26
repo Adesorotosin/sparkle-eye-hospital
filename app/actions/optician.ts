@@ -829,7 +829,7 @@ export async function startOpticianMeasurements(
       : order.patients;
 
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
       action:
         "Optical measurements started",
@@ -1349,7 +1349,7 @@ export async function saveOpticalOrder(
       : order.patients;
 
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
       action: order.status === "referred"
         ? "Optical order sent to optical lab; preparation started"
@@ -1465,7 +1465,7 @@ export async function submitOpticalChargeForApproval(orderId: string): Promise<O
 
     const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "BILLING",
       action: "Optical charge submitted for Doctor approval",
       performedBy: staff.name,
@@ -1645,7 +1645,7 @@ export async function markOpticalOrderReady(
 
     const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
       action: "Optical order marked ready for dispensing and billed",
       performedBy: staff.name,
