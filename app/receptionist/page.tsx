@@ -140,6 +140,7 @@ export default function ReceptionistPage() {
   const [toast, setToast] = useState("");
 
   const [showPatientModal, setShowPatientModal] = useState(false);
+  const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication">("general");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
@@ -345,6 +346,9 @@ export default function ReceptionistPage() {
       );
 
       await loadData();
+      if (registrationIntent === "medication") {
+        router.push(`/pharmacy?patientId=${encodeURIComponent(data.patient.patientId)}`);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -688,7 +692,7 @@ export default function ReceptionistPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <button
-              onClick={() => setShowPatientModal(true)}
+              onClick={() => { setRegistrationIntent("general"); setShowPatientModal(true); }}
               className="flex min-h-20 items-center gap-3 rounded-xl bg-purple-600 p-4 text-left text-white transition hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
@@ -717,6 +721,14 @@ export default function ReceptionistPage() {
             </button>
 
             <button
+              onClick={() => { setRegistrationIntent("medication"); setShowPatientModal(true); }}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left text-emerald-900 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><UserPlus className="h-5 w-5" /></span>
+              <span><span className="block text-sm font-extrabold">Visiting medication patient</span><span className="mt-1 block text-xs font-medium text-emerald-800">Register a walk-in and open the Pharmacy workspace for that patient.</span></span>
+            </button>
+
+            <button
               onClick={() => setShowVisitingInvestigationModal(true)}
               className="flex min-h-20 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-200"
             >
@@ -729,7 +741,7 @@ export default function ReceptionistPage() {
               className="flex min-h-20 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-left text-blue-900 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting refraction</span><span className="mt-1 block text-xs font-medium text-blue-800">Register an outside patient directly into the Optometry queue.</span></span>
+              <span><span className="block text-sm font-extrabold">Visiting glasses / refraction</span><span className="mt-1 block text-xs font-medium text-blue-800">Register an outside patient directly into the Optometry queue.</span></span>
             </button>
 
             <button
@@ -1140,7 +1152,7 @@ export default function ReceptionistPage() {
       {showVisitingRefractionModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
           <form onSubmit={handleRegisterVisitingRefraction} className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting refraction</h2><p className="mt-1 text-sm text-slate-500">Creates a visiting patient record and sends the patient directly to the Optometry queue.</p></div><button type="button" onClick={() => setShowVisitingRefractionModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting refraction</h2><p className="mt-1 text-sm text-slate-500">Register a patient who has arrived for glasses. The patient is sent directly to the Optometry queue for refraction.</p></div><button type="button" onClick={() => setShowVisitingRefractionModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingRefractionForm.fullName} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, fullName: e.target.value })} className={inputClass} /></label>
               <label className="block text-xs font-bold text-slate-600">Date of birth<input type="date" value={visitingRefractionForm.dateOfBirth} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, dateOfBirth: e.target.value })} className={inputClass} /></label>
