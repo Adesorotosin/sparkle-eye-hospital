@@ -150,7 +150,7 @@ export default function ReceptionistPage() {
   const [savingVisitingRequest, setSavingVisitingRequest] = useState(false);
   const [visitingInvestigationForm, setVisitingInvestigationForm] = useState({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
   const [visitingRefractionForm, setVisitingRefractionForm] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "self_presenting" | "external_referral" });
-  const [visitingLabForm, setVisitingLabForm] = useState({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL" as "NORMAL" | "URGENT" | "STAT", clinicalNotes: "" });
+  const [visitingLabForm, setVisitingLabForm] = useState({ patientCode: "", fullName: "", age: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL" as "NORMAL" | "URGENT" | "STAT", clinicalNotes: "" });
   const [savingProcedure, setSavingProcedure] = useState(false);
   const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
   const [procedurePrices, setProcedurePrices] = useState<Array<{ id: string; code: string; name: string; category: string; price: number; active: boolean }>>([]);
@@ -432,26 +432,29 @@ export default function ReceptionistPage() {
     setSavingVisitingRequest(true);
     setError("");
     try {
-      const patientResponse = await fetch("/api/patients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: visitingLabForm.fullName,
-          phone: visitingLabForm.contactPhone,
-          dateOfBirth: visitingLabForm.dateOfBirth || undefined,
-          age: visitingLabForm.dateOfBirth ? "" : undefined,
-          gender: visitingLabForm.sex,
-          coveragePlan: "Self-Pay",
-          allergies: "",
-          isWalkIn: true,
-          status: "in_consultation",
-        }),
-      });
-      const patientData = await patientResponse.json();
-      if (!patientResponse.ok || !patientData?.patient?.patientId) {
-        throw new Error(patientData?.error || "Unable to register the visiting laboratory patient.");
+      let patientCode = visitingLabForm.patientCode.trim();
+      if (!patientCode) {
+        const patientResponse = await fetch("/api/patients", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName: visitingLabForm.fullName,
+            phone: visitingLabForm.contactPhone,
+            dateOfBirth: visitingLabForm.dateOfBirth || undefined,
+            age: visitingLabForm.age || undefined,
+            gender: visitingLabForm.sex,
+            coveragePlan: "Self-Pay",
+            allergies: "",
+            isWalkIn: true,
+            status: "in_consultation",
+          }),
+        });
+        const patientData = await patientResponse.json();
+        if (!patientResponse.ok || !patientData?.patient?.patientId) {
+          throw new Error(patientData?.error || "Unable to register the visiting laboratory patient.");
+        }
+        patientCode = String(patientData.patient.patientId);
       }
-      const patientCode = String(patientData.patient.patientId);
       const order = await createLabOrder({
         patientCode,
         testCode: visitingLabForm.testCode,
@@ -465,7 +468,7 @@ export default function ReceptionistPage() {
         throw new Error(`Patient ${patientCode} was registered, but the lab order failed: ${order.message}. Do not register the patient again; retry the lab request using the patient code.`);
       }
       setShowVisitingLabModal(false);
-      setVisitingLabForm({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL", clinicalNotes: "" });
+      setVisitingLabForm({ patientCode: "", fullName: "", age: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL", clinicalNotes: "" });
       notify(`Visiting laboratory patient registered (${patientCode}). ${order.message}`);
       await loadData();
     } catch (err) {
@@ -1224,9 +1227,11 @@ export default function ReceptionistPage() {
           <form onSubmit={handleRegisterVisitingLab} className="w-full max-w-2xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting laboratory request</h2><p className="mt-1 text-sm text-slate-500">Creates a visiting-patient record and sends the test to the Laboratory queue.</p></div><button type="button" onClick={() => setShowVisitingLabModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingLabForm.fullName} onChange={e=>setVisitingLabForm({...visitingLabForm,fullName:e.target.value})} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Existing patient code (optional)<input value={visitingLabForm.patientCode} onChange={e=>setVisitingLabForm({...visitingLabForm,patientCode:e.target.value})} className={inputClass} placeholder="Use this to retry an order after patient registration" /><span className="mt-1 block font-normal text-slate-400">Leave blank to register a new visiting patient.</span></label>
+              {!visitingLabForm.patientCode && <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingLabForm.fullName} onChange={e=>setVisitingLabForm({...visitingLabForm,fullName:e.target.value})} className={inputClass} /></label>
               <label className="block text-xs font-bold text-slate-600">Referring centre / source *<input required value={visitingLabForm.sourceCenter} onChange={e=>setVisitingLabForm({...visitingLabForm,sourceCenter:e.target.value})} className={inputClass} /></label>
               <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingLabForm.contactPhone} onChange={e=>setVisitingLabForm({...visitingLabForm,contactPhone:e.target.value})} className={inputClass} /></label>
+              {!visitingLabForm.patientCode && <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingLabForm.age} onChange={e=>setVisitingLabForm({...visitingLabForm,age:e.target.value})} className={inputClass} /></label>}
               <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingLabForm.sex} onChange={e=>setVisitingLabForm({...visitingLabForm,sex:e.target.value})} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
               <label className="block text-xs font-bold text-slate-600">Date of birth<input type="date" value={visitingLabForm.dateOfBirth} onChange={e=>setVisitingLabForm({...visitingLabForm,dateOfBirth:e.target.value})} className={inputClass} /></label>
               <label className="block text-xs font-bold text-slate-600">Test code *<input required value={visitingLabForm.testCode} onChange={e=>setVisitingLabForm({...visitingLabForm,testCode:e.target.value})} className={inputClass} placeholder="e.g. FBS" /></label>
