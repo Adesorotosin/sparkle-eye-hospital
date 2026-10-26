@@ -34,6 +34,7 @@ export type OpticalOrder = {
   refractionOS: Record<string, unknown> | null;
 
   pdBinocular: string;
+  pdNear: string;
   pdOD: string;
   pdOS: string;
 
@@ -72,6 +73,7 @@ export type SaveOpticalOrderInput = {
   orderId: string;
 
   pdBinocular: string;
+  pdNear: string;
   pdOD: string;
   pdOS: string;
 
@@ -161,9 +163,10 @@ export async function getOpticianQueue(): Promise<{
   message?: string;
 }> {
   try {
-    await requireRole([
+    const staff = await requireRole([
       "IT_ADMIN",
       "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const {
@@ -177,6 +180,7 @@ export async function getOpticianQueue(): Promise<{
         optometry_encounter_id,
         status,
         pd_binocular,
+        pd_near,
         pd_od,
         pd_os,
         segment_height_od,
@@ -368,6 +372,10 @@ export async function getOpticianQueue(): Promise<{
               order.pd_binocular ??
               "",
 
+            pdNear:
+              order.pd_near ??
+              "",
+
             pdOD:
               order.pd_od ??
               "",
@@ -449,7 +457,23 @@ export async function getOpticianQueue(): Promise<{
 
     return {
       success: true,
-      orders: mappedOrders,
+      orders: staff.role === "OPTICIAN"
+        ? mappedOrders.map((order) => ({
+            ...order,
+            patientId: "",
+            optometryEncounterId: "",
+            frameSelection: "",
+            opticalCharge: 0,
+            invoiceId: null,
+            chargeApprovalStatus: "not_submitted" as const,
+            chargeApprovalNote: null,
+            chargeApprovedAt: null,
+            referredAt: null,
+            measurementsStartedAt: null,
+            readyAt: null,
+            collectedAt: null,
+          }))
+        : mappedOrders,
     };
   } catch (error) {
     const result = handleError(
@@ -695,7 +719,7 @@ export async function startOpticianMeasurements(
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const normalizedId =
@@ -718,6 +742,8 @@ export async function startOpticianMeasurements(
         id,
         patient_id,
         status,
+        frame_selection,
+        lens_type,
         patients (
           patient_code,
           full_name
@@ -749,6 +775,13 @@ export async function startOpticianMeasurements(
         success: false,
         message:
           "This optical order has already been collected.",
+      };
+    }
+
+    if (order.status === "referred" && (!order.frame_selection?.trim() || !order.lens_type?.trim())) {
+      return {
+        success: false,
+        message: "Record the patient's chosen frame and prescribed lens type before starting optical preparation.",
       };
     }
 
@@ -812,7 +845,7 @@ export async function startOpticianMeasurements(
       : order.patients;
 
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
       action:
         "Optical measurements started",
@@ -889,9 +922,12 @@ export async function getOpticianPatient(
         patient_code,
         full_name,
         age,
-        gender,
-        phone,
-        allergies
+        vitals (
+          visual_acuity_od_near,
+          visual_acuity_os_near,
+          visual_acuity_ou_near,
+          recorded_at
+        )
       `)
       .eq(
         "patient_code",
@@ -925,10 +961,6 @@ export async function getOpticianPatient(
         with_correction,
         refraction_od,
         refraction_os,
-        slit_lamp_od,
-        slit_lamp_os,
-        diagnosis,
-        status,
         created_at
       `)
       .eq(
@@ -962,6 +994,11 @@ export async function getOpticianPatient(
       };
     }
 
+    const patientVitals = Array.isArray(patient.vitals) ? patient.vitals : [];
+    const latestVitals = [...patientVitals].sort((a, b) =>
+      new Date(b.recorded_at ?? 0).getTime() - new Date(a.recorded_at ?? 0).getTime()
+    )[0];
+
     const {
       data: order,
       error: orderError,
@@ -972,26 +1009,16 @@ export async function getOpticianPatient(
         optometry_encounter_id,
         status,
         pd_binocular,
+        pd_near,
         pd_od,
         pd_os,
         segment_height_od,
         segment_height_os,
-        frame_selection,
         lens_type,
         lens_material,
         lens_coating,
         dispensing_notes,
-        optical_charge,
-        invoice_id,
-        charge_approval_status,
-        charge_approval_note,
-        charge_approved_at,
-        referred_at,
-        measurements_started_at,
-        ready_at,
-        collected_at,
-        created_at,
-        updated_at
+        created_at
       `)
       .eq(
         "patient_id",
@@ -1010,9 +1037,6 @@ export async function getOpticianPatient(
     return {
       success: true,
       patient: {
-        id:
-          patient.id,
-
         patientCode:
           patient.patient_code,
 
@@ -1025,22 +1049,7 @@ export async function getOpticianPatient(
             ? Number(patient.age)
             : null,
 
-        gender:
-          patient.gender ??
-          null,
-
-        phone:
-          patient.phone ??
-          null,
-
-        allergies:
-          patient.allergies ??
-          null,
-
         optometry: {
-          id:
-            optometryEncounter.id,
-
           visualAcuityOD:
             optometryEncounter.visual_acuity_od ??
             "",
@@ -1052,6 +1061,15 @@ export async function getOpticianPatient(
           visualAcuityOU:
             optometryEncounter.visual_acuity_ou ??
             "",
+
+          visualAcuityODNear:
+            latestVitals?.visual_acuity_od_near ?? "",
+
+          visualAcuityOSNear:
+            latestVitals?.visual_acuity_os_near ?? "",
+
+          visualAcuityOUNear:
+            latestVitals?.visual_acuity_ou_near ?? "",
 
           withCorrection:
             Boolean(
@@ -1066,32 +1084,18 @@ export async function getOpticianPatient(
             optometryEncounter.refraction_os ??
             null,
 
-          slitLampOD:
-            optometryEncounter.slit_lamp_od ??
-            "",
-
-          slitLampOS:
-            optometryEncounter.slit_lamp_os ??
-            "",
-
-          diagnosis:
-            optometryEncounter.diagnosis ??
-            "",
-
           createdAt:
             optometryEncounter.created_at,
         },
 
         opticalOrder: order
           ? {
-              id:
-                order.id,
-
-              status:
-                order.status as OpticalOrderStatus,
-
               pdBinocular:
                 order.pd_binocular ??
+                "",
+
+              pdNear:
+                order.pd_near ??
                 "",
 
               pdOD:
@@ -1110,10 +1114,6 @@ export async function getOpticianPatient(
                 order.segment_height_os ??
                 "",
 
-              frameSelection:
-                order.frame_selection ??
-                "",
-
               lensType:
                 order.lens_type ??
                 "",
@@ -1130,45 +1130,9 @@ export async function getOpticianPatient(
                 order.dispensing_notes ??
                 "",
 
-              opticalCharge:
-                normalizeMoney(
-                  order.optical_charge
-                ),
-
-              invoiceId:
-                order.invoice_id ??
-                null,
-
-              chargeApprovalStatus:
-                (order.charge_approval_status ?? "not_submitted") as "not_submitted" | "pending" | "approved" | "rejected",
-
-              chargeApprovalNote:
-                order.charge_approval_note ?? null,
-
-              chargeApprovedAt:
-                order.charge_approved_at ?? null,
-
-              referredAt:
-                order.referred_at ??
-                null,
-
-              measurementsStartedAt:
-                order.measurements_started_at ??
-                null,
-
-              readyAt:
-                order.ready_at ??
-                null,
-
-              collectedAt:
-                order.collected_at ??
-                null,
-
               createdAt:
                 order.created_at,
 
-              updatedAt:
-                order.updated_at,
             }
           : null,
       },
@@ -1212,7 +1176,7 @@ export async function saveOpticalOrder(
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const orderId =
@@ -1276,6 +1240,16 @@ export async function saveOpticalOrder(
       };
     }
 
+    if (
+      order.status === "referred" &&
+      (!input.frameSelection?.trim() || !input.lensType?.trim())
+    ) {
+      return {
+        success: false,
+        message: "Record the patient's chosen frame and prescribed lens type before sending this order to the optical lab.",
+      };
+    }
+
     const now =
       new Date().toISOString();
 
@@ -1305,6 +1279,11 @@ export async function saveOpticalOrder(
       pd_binocular:
         emptyToNull(
           input.pdBinocular
+        ),
+
+      pd_near:
+        emptyToNull(
+          input.pdNear
         ),
 
       pd_od:
@@ -1416,10 +1395,11 @@ export async function saveOpticalOrder(
       : order.patients;
 
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
-      action:
-        "Optical order measurements saved",
+      action: order.status === "referred"
+        ? "Optical order sent to optical lab; preparation started"
+        : "Optical order details saved",
       performedBy:
         staff.name,
       staffId:
@@ -1457,8 +1437,9 @@ export async function saveOpticalOrder(
 
     return {
       success: true,
-      message:
-        "Optical order saved successfully.",
+      message: order.status === "referred"
+        ? "Frame and lens details saved. The order has been sent to the optical lab and preparation has started."
+        : "Optical order saved successfully.",
       orderId:
         order.id,
     };
@@ -1488,7 +1469,7 @@ export interface OpticalChargeApprovalItem {
 
 export async function submitOpticalChargeForApproval(orderId: string): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
     const normalizedId = orderId?.trim();
     if (!normalizedId) return { success: false, message: "Optical order ID is required." };
 
@@ -1530,7 +1511,7 @@ export async function submitOpticalChargeForApproval(orderId: string): Promise<O
 
     const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "BILLING",
       action: "Optical charge submitted for Doctor approval",
       performedBy: staff.name,
@@ -1673,7 +1654,7 @@ export async function markOpticalOrderReady(
   orderId: string
 ): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
     const normalizedId = orderId?.trim();
     if (!normalizedId) {
       return { success: false, message: "Optical order ID is required." };
@@ -1710,7 +1691,7 @@ export async function markOpticalOrderReady(
 
     const patient = Array.isArray(order.patients) ? order.patients[0] : order.patients;
     await logActivity({
-      module: "Optician",
+      module: "Inventory",
       category: "CLINICAL",
       action: "Optical order marked ready for dispensing and billed",
       performedBy: staff.name,
@@ -1756,7 +1737,7 @@ export async function markOpticalOrderReady(
  * connected to optical orders.
  */
 export async function markOpticalOrderCollected(orderId: string) {
-  const user = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+  const user = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
 
   const { data: order, error: orderError } = await supabaseServer
     .from("optical_orders")
@@ -1839,15 +1820,18 @@ export async function markOpticalOrderCollected(orderId: string) {
   }
 
   await logActivity({
-  module: "OPTICIAN",
-  action: "optical_order_collected",
-  performedBy: user.id,
-  patientId: order.patient_id,
-  details: `Optical order collected for ${order.patient_name} (${order.patient_code}). Invoice ${invoice.id} was paid.`,
-});
+    module: "Inventory",
+    category: "CLINICAL",
+    action: "Glasses collected by patient",
+    performedBy: user.name,
+    staffId: user.id,
+    patientId: order.patient_id,
+    details: "Optical order collected for " + order.patient_name + " (" + order.patient_code + "). Invoice " + invoice.id + " was paid.",
+  });
 
   revalidatePath("/optician");
   revalidatePath(`/optician/${order.patient_code}`);
+  revalidatePath("/inventory");
   revalidatePath("/billing");
   revalidatePath("/cashier");
 

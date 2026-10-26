@@ -274,22 +274,22 @@ export async function createLabOrder(
         .from("clinical_handoffs")
         .insert({
           patient_id: patient.id,
-          destination: "CASHIER",
+          destination: "RECEPTIONIST",
           handoff_type: "PRICING_REVIEW",
-          title: "Pricing review required: " + testName,
-          details: "A laboratory order was created for " + testName + " (" + testCode + "), but no approved price is configured. Add the approved laboratory charge before billing; do not treat this as a free test. Order ID: " + labOrderId,
+          title: "Laboratory request — pricing coordination: " + testName,
+          details: "A laboratory order was created for " + testName + " (" + testCode + "), but no approved price is configured. Please coordinate with Cashier to add the approved laboratory charge and help schedule the patient for payment/testing when ready. Do not treat this as a free test. Order ID: " + labOrderId,
           requested_by: staff.id,
         });
       if (pricingHandoffError) {
         console.error("Laboratory pricing-review handoff failed:", pricingHandoffError);
-        return { success: false, message: "Laboratory order was created, but its pricing-review request could not be sent to Cashier. Refresh the patient record and notify the administrator; do not retry blindly.", id: labOrderId };
+        return { success: false, message: "Laboratory order was created, but Reception could not be notified for pricing coordination. Refresh the patient record and notify the administrator; do not retry blindly.", id: labOrderId };
       }
-      await logLabActivity({ action: "Laboratory order sent for pricing review: " + testName, staff, patientId: patient.id, details: { labOrderId, testCode, testName, pricePending: true } });
+      await logLabActivity({ action: "Laboratory order sent to Reception for pricing coordination: " + testName, staff, patientId: patient.id, details: { labOrderId, testCode, testName, pricePending: true } });
       revalidatePath("/laboratory");
       revalidatePath("/billing");
-      revalidatePath("/cashier");
+      revalidatePath("/receptionist");
       revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
-      return { success: true, message: testName + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: labOrderId };
+      return { success: true, message: testName + " has been ordered and sent to Laboratory; Reception has been notified to coordinate approved pricing and a later return visit. No zero-cost invoice item was created.", id: labOrderId };
     }
 
     let invoice;
@@ -443,7 +443,7 @@ export async function createVisitingLabOrder(
   input: VisitingLabOrderInput
 ): Promise<LabOrderResponse> {
   try {
-    const staff = await getLabStaff();
+    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST", "LAB_SCIENTIST"]);
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();

@@ -20,7 +20,6 @@ import {
   Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
-import { sendTreatmentPlanToCashier } from "@/app/actions/treatment-billing";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
@@ -158,14 +157,14 @@ const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
 ];
 
 const HISTORY_SECTIONS = [
-  { key: "presentingComplaints", title: "1. Presenting complaints", options: ["Reduced vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Double vision", "Lid swelling", "Trauma", "Other", "Right / OD", "Left / OS", "Both", "Sudden onset", "Gradual onset"] },
-  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Worsening", "Unchanged", "Constant", "Intermittent", "First episode", "Recurrent", "Associated symptoms / triggers", "Treatment tried"] },
-  { key: "pastOcularHistory", title: "3. Past ocular history", options: ["None known", "Glaucoma", "Cataract", "Refractive error", "Other eye disease", "Spectacles / contact lenses", "Eye injury", "Surgery / laser / injection"] },
-  { key: "pastMedicalHistory", title: "4. Past medical history", options: ["None known", "Diabetes", "Hypertension", "Asthma", "Sickle cell disease", "Other", "Previous surgery"] },
-  { key: "medicationAllergyHistory", title: "5. Medication and allergy history", options: ["No medication", "Eye drops", "Systemic medicines", "Steroids", "Traditional remedies", "No known allergies", "Allergy present", "Allergy status unknown"] },
-  { key: "familyHistory", title: "6. Family history", options: ["None known", "Unknown", "Diabetes", "Hypertension", "Sickle cell disease", "Other"] },
-  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Unknown", "Glaucoma", "Blindness", "Cataract", "Other"] },
-  { key: "socialOccupationalHistory", title: "8. Social / occupational history", options: ["Smoking", "Alcohol use", "Dust / chemical exposure", "Prolonged screen use"] },
+  { key: "presentingComplaints", title: "1. Presenting complaints, eye and duration", options: ["Poor vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Diplopia", "Trauma", "Right", "Left", "Both", "<1 day", "1-7 days", "1-4 weeks", "1-6 months", ">6 months"] },
+  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Stable", "Worsening", "Recurrent", "Distance affected", "Near affected", "Both distance and near affected", "Vision not affected", "No treatment tried", "Eye drops tried", "Glasses tried", "Traditional remedy tried", "Other treatment tried"] },
+  { key: "pastMedicalHistory", title: "3. Past medical history — conditions", options: ["None known", "Hypertension", "Diabetes", "Asthma", "Other"] },
+  { key: "medicationAllergyHistory", title: "4. Medicines and drug allergy", options: ["No medicines", "Antihypertensives", "Diabetes medicines", "Steroids", "Other medicines", "No known drug allergy", "Drug allergy present", "Drug allergy status unknown"] },
+  { key: "pastOcularHistory", title: "5. Past ocular history, procedures and eye drops", options: ["None known", "Glasses", "Eye injury", "Glaucoma", "Other eye history", "No procedures", "Surgery", "Laser", "Injection", "No eye drops", "Glaucoma drops", "Steroid drops", "Other eye drops"] },
+  { key: "familyHistory", title: "6. Family and social history", options: ["Family illness: none known", "Family hypertension", "Family diabetes", "Other family illness", "Family illness unknown", "Smoking: never", "Smoking: past", "Smoking: current", "Alcohol: none", "Alcohol: past", "Alcohol: current"] },
+  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Glaucoma", "Blindness", "Cataract", "Other eye condition", "Relative: parent", "Relative: sibling", "Relative: child", "Relative: other", "Not applicable"] },
+  { key: "socialOccupationalHistory", title: "8. Additional social / occupational notes", options: ["Smoking history reviewed", "Alcohol history reviewed", "Occupation / exposure notes"] },
 ] as const;
 
 const OCULAR_PARTS = [
@@ -526,67 +525,16 @@ export default function DoctorEncounterPage() {
     });
   };
 
-  const sendTreatmentPlanForBilling = () => {
-    setMessage("");
-    setError("");
-
-    if (!treatmentPlan.trim()) {
-      setError("Enter the treatment and follow-up plan before sending it to Cashier.");
-      document.getElementById("treatment")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-
-    setRequesting("cashier-treatment");
-    startTransition(async () => {
-      // Save the current clinical documentation first so Cashier receives
-      // the exact plan stored in the encounter, not unsaved text.
-      const saved = await saveConsultationEncounter({
-        patientId: patientCode,
-        encounterId,
-        presentingComplaint: historyText("presentingComplaints"),
-        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
-        pastMedicalHistory: historyText("pastMedicalHistory"),
-        pastOcularHistory: historyText("pastOcularHistory"),
-        familyOcularHistory: historyText("familyOcularHistory"),
-        historyProforma,
-        refractionNotes,
-        lensType,
-        ocularExamOD: JSON.stringify(ocularExamODRows),
-        ocularExamOS: JSON.stringify(ocularExamOSRows),
-        slitLampOD: "",
-        slitLampOS: "",
-        otherExaminationFindings: otherFindings,
-        iopOD: iopOD.trim() ? Number(iopOD) : null,
-        iopOS: iopOS.trim() ? Number(iopOS) : null,
-        iopInstrument,
-        refractionOD,
-        refractionOS,
-        diagnosis,
-        treatmentPlan,
-        status: "draft",
-      });
-
-      if (!saved.success || !saved.encounterId) {
-        setError(saved.message || "Save the consultation before sending the plan to Cashier.");
-        setRequesting("");
-        return;
-      }
-
-      setEncounterId(saved.encounterId);
-      setSavedStatus("draft");
-
-      const result = await sendTreatmentPlanToCashier({
-        patientCode,
-        encounterId: saved.encounterId,
-      });
-
-      if (result.success) {
-        setMessage(result.message);
-      } else {
-        setError(result.message);
-      }
-      setRequesting("");
+  const notifyReceptionOfClinicalRequest = async (title: string, details: string) => {
+    const handoff = await createClinicalHandoff({
+      patientCode,
+      destination: "RECEPTIONIST",
+      handoffType: "PROCEDURE",
+      title,
+      details,
+      encounterId,
     });
+    return handoff;
   };
 
   const requestLab = (test: LabRequest) => {
@@ -636,7 +584,13 @@ export default function DoctorEncounterPage() {
         setError(response.message);
         if (response.id) await refreshPatient();
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          `Investigation request: ${test.name}`,
+          `The doctor ordered ${test.name}. The investigation is in the clinical queue and the related bill remains available for cashier processing. Please coordinate arrival or a later visit. Order reference: ${response.id ?? "see investigation queue"}.`
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
       }
       setRequesting("");
@@ -661,7 +615,13 @@ export default function DoctorEncounterPage() {
       if (!response.success) {
         setError(response.message);
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          "Refraction request",
+          "The doctor referred this patient to Optometry for refraction. Please coordinate the patient's arrival and any deferred visit; the request is also in the Optometry queue."
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
         try {
           const optometry = await getOptometryPatient(patientCode);
@@ -723,7 +683,21 @@ export default function DoctorEncounterPage() {
         setError(response.message);
         if (response.orderId) await refreshPatient();
       } else {
-        setMessage(response.message);
+        const cashier = await createClinicalHandoff({
+          patientCode,
+          destination: "CASHIER",
+          handoffType: "PRICING_REVIEW",
+          title: "Optical request pricing review",
+          details: `A spectacle prescription was sent to Inventory for frame and lens preparation. Lens type: ${lensType || "to be confirmed from prescription"}. Please review the optical charge when the inventory team submits the final amount. Optical order reference: ${response.orderId ?? "see optical queue"}.`,
+          encounterId,
+        });
+        const reception = await notifyReceptionOfClinicalRequest(
+          "Spectacle prescription / glasses request",
+          `A spectacle prescription was sent to the optical workflow. Lens type: ${lensType || "to be confirmed from prescription"}. Please coordinate the patient's arrival, frame selection, and any deferred visit. Optical order reference: ${response.orderId ?? "see optical queue"}.`
+        );
+        setMessage(cashier.success && reception.success
+          ? `${response.message} Cashier and Reception have both been notified.`
+          : `${response.message} Notification status — Cashier: ${cashier.success ? "sent" : cashier.message}; Reception: ${reception.success ? "sent" : reception.message}.`);
         await refreshPatient();
       }
       setRequesting("");
@@ -894,8 +868,9 @@ export default function DoctorEncounterPage() {
               ["gonioscopy", "Gonioscopy"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
-              ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["refraction-notes", "Spectacle prescription"],
+              ["investigation", "Investigation"],
               ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
@@ -1139,6 +1114,28 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
+          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
+            <div className="space-y-4">
+              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+
+              <div className="rounded-2xl border p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Pill className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold">Prescription</h3>
+                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
+                  </div>
+                </div>
+                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
+                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
+                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
+                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
+                </button>
+              </div>
+            </div>
+          </Section>
+
           <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">Review the optometry result above where available, record the lens type and instructions, then send the order to the Optician. Supplier messages open in WhatsApp for staff review and manual sending.</p>
             <div className="grid gap-4 md:grid-cols-2">
@@ -1304,38 +1301,7 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
-          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
-            <div className="space-y-4">
-              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
-              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-violet-950">Send treatment plan to Cashier</h3>
-                    <p className="mt-1 text-xs text-violet-800">The saved plan will appear in the Cashier billing-review queue. Cashier must select and price the actual billable service; this action does not create a charge or invoice.</p>
-                  </div>
-                  <button type="button" onClick={sendTreatmentPlanForBilling} disabled={isPending || requesting === "cashier-treatment" || !treatmentPlan.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    {requesting === "cashier-treatment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    {requesting === "cashier-treatment" ? "Sending to Cashier..." : "Send to Cashier"}
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-2xl border p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Pill className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold">Prescription</h3>
-                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
-                  </div>
-                </div>
-                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
-                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
-                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
-                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
-                </button>
-              </div>
-            </div>
-          </Section>
+
 
           <Section id="procedure-request" title="Procedure request" icon={<Calendar className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">Send a procedure request to Reception for registration, pricing confirmation and scheduling. Do not enter an unapproved price here.</p>

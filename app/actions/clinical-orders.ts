@@ -21,6 +21,7 @@ export type ClinicalOrderResponse = {
   success: boolean;
   message: string;
   id?: string;
+  patientCode?: string;
 };
 
 async function findPatient(patientCode: string) {
@@ -337,6 +338,7 @@ export async function createExternalDiagnosticOrder(input: {
           ? `${patient.full_name} and the investigation were registered, and the bill line was saved, but the displayed total could not be refreshed. Do not register the investigation again; ask Cashier to refresh the bill.`
           : `${patient.full_name} has been registered for investigation only. Please complete payment at the cashier before testing.`,
       id: diagnosticId,
+      patientCode: patient.patient_code,
     };
   } catch (error) {
     console.error("External diagnostic registration failed:", error);

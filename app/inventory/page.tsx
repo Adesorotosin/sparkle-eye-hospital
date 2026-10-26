@@ -21,6 +21,7 @@ import {
   type InventoryMovementRecord,
   type InventorySupplierRecord,
 } from "@/app/actions/inventory";
+import OpticalFulfillmentQueue from "@/components/inventory/OpticalFulfillmentQueue";
 
 type TabKey = "all" | "optical" | "hospital" | "pharmacy";
 type ModalKey = "item" | "receive" | "issue" | "supplier" | "sale" | null;
@@ -96,13 +97,12 @@ export default function InventoryPage() {
   const returnDestination: Record<string, { href: string; label: string }> = {
     IT_ADMIN: { href: "/admin", label: "Back to Admin Dashboard" },
     PHARMACIST: { href: "/pharmacy", label: "Back to Pharmacy" },
-    OPTICIAN: { href: "/optician", label: "Back to Optician Module" },
     LAB_SCIENTIST: { href: "/laboratory", label: "Back to Laboratory" },
     NURSE: { href: "/nurse", label: "Back to Nurse Dashboard" },
   };
   const returnLink = role ? returnDestination[role] : undefined;
   const canRecordSales = role === "IT_ADMIN" || role === "PHARMACIST";
-  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "OPTICIAN", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
+  const canIssueStock = ["IT_ADMIN", "INVENTORY_MANAGER", "LAB_SCIENTIST", "NURSE"].includes(role ?? "");
   const filteredItems = useMemo(() => items.filter((item) => {
     const matchesTab = tab === "all" || item.domain === tab;
     const term = search.trim().toLowerCase();
@@ -250,6 +250,8 @@ export default function InventoryPage() {
             return <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-xs font-bold text-slate-500">{stat.label}</p><span className="rounded-xl bg-violet-50 p-2 text-violet-700"><Icon className="h-4 w-4" /></span></div><p className="mt-3 text-2xl font-extrabold tracking-tight text-slate-950">{stat.value}</p><p className="mt-1 text-xs text-slate-500">{stat.hint}</p></div>;
           })}
         </section>
+
+        {(role === "IT_ADMIN" || role === "INVENTORY_MANAGER") && <OpticalFulfillmentQueue />}
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-center lg:justify-between">

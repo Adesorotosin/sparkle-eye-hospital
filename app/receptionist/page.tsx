@@ -19,6 +19,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
+import VisitingClinicalRequestForm from "@/components/receptionist/VisitingClinicalRequestForm";
 
 type Patient = {
   id: string;
@@ -596,6 +597,7 @@ export default function ReceptionistPage() {
 
       <main className="mx-auto max-w-[1500px] space-y-6 p-6 md:p-8">
         <ClinicalHandoffInbox destination="RECEPTIONIST" />
+        <VisitingClinicalRequestForm />
         {/* ERROR */}
         {error && (
           <div className="flex items-start justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">

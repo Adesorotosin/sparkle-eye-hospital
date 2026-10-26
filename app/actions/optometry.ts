@@ -198,10 +198,11 @@ export async function registerVisitingOptometryPatient(input: {
   gender?: string;
   phone?: string;
   address?: string;
+  allergies?: string;
   visitType: "external_referral" | "self_presenting";
 }): Promise<OptometryActionResponse & { patientCode?: string }> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST", "RECEPTIONIST"]);
     const fullName = input.fullName?.trim();
     if (!fullName) return { success: false, message: "Patient full name is required." };
 
@@ -267,11 +268,26 @@ export async function registerVisitingOptometryPatient(input: {
       throw new Error("Unable to register the visiting optometry patient. Please retry.");
     }
 
+    if (input.allergies?.trim()) {
+      const { error: allergyError } = await supabaseServer
+        .from("patients")
+        .update({ allergies: input.allergies.trim() })
+        .eq("id", patient.id);
+      if (allergyError) {
+        console.error("Saving visiting optometry allergy notes failed:", allergyError);
+        return {
+          success: false,
+          message: `Patient ${patient.patient_code} was registered, but allergy notes could not be saved. Do not register the patient again; open the patient record and record allergies before testing.`,
+          patientCode: patient.patient_code,
+        };
+      }
+    }
+
     await logActivity({
       patientId: patient.id,
       module: "Optometry",
       category: "CLINICAL",
-      action: "Outside patient registered directly by Optometry",
+      action: "Outside patient registered for Optometry",
       performedBy: staff.name,
       staffId: staff.id,
       details: JSON.stringify({

@@ -88,6 +88,7 @@ export type ProcedureRegistrationInput = {
   procedureCode: string;
   scheduledDate?: string;
   notes?: string;
+  referralType?: "doctor_order" | "external_referral";
 };
 
 export async function registerProcedure(input: ProcedureRegistrationInput) {
@@ -153,6 +154,21 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
       };
     }
 
+    const referralType = input.referralType ?? "doctor_order";
+    if (referralType === "external_referral") {
+      const { error: sourceError } = await supabaseServer
+        .from("procedure_orders")
+        .update({ referral_type: "external_referral" })
+        .eq("id", String(procedureId));
+      if (sourceError) {
+        console.error("Marking visiting procedure source failed:", sourceError);
+        return {
+          success: false,
+          message: "The procedure and bill were created, but the visiting referral type could not be saved. Do not register it again; ask the administrator to correct the procedure source.",
+        };
+      }
+    }
+
     await recalcInvoice(invoice.id);
     await logActivity({
       module: "Procedures",
@@ -164,7 +180,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
       details: JSON.stringify({
         procedureOrderId: procedureId,
         patientCode: patient.patient_code,
-        workflow: "in_house_after_doctors_review",
+        workflow: referralType === "external_referral" ? "visiting_external_referral" : "in_house_after_doctors_review",
         scheduledDate: input.scheduledDate || null,
         price,
       }),
