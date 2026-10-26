@@ -32,6 +32,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [activePatient, setActivePatient] = useState<ActivePatient | null>(null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the active encounter banner with route changes.
   useEffect(() => {
     const match = pathname?.match(/^\/doctor\/patients\/([^/]+)\/encounter/);
     const patientCode = match?.[1];
