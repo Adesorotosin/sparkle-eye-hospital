@@ -141,7 +141,7 @@ export default function ReceptionistPage() {
   const [toast, setToast] = useState("");
 
   const [showPatientModal, setShowPatientModal] = useState(false);
-  const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication">("general");
+  const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication" | "procedure">("general");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
@@ -316,7 +316,7 @@ export default function ReceptionistPage() {
           coveragePlan: patientForm.coveragePlan,
           allergies: patientForm.allergies,
           isWalkIn: patientForm.isWalkIn,
-          status: registrationIntent === "medication" ? "in_consultation" : "waiting_triage",
+          status: registrationIntent === "medication" || registrationIntent === "procedure" ? "in_consultation" : "waiting_triage",
         }),
       });
 
@@ -351,6 +351,9 @@ export default function ReceptionistPage() {
       await loadData();
       if (registrationIntent === "medication") {
         router.push(`/pharmacy?patientId=${encodeURIComponent(data.patient.patientId)}`);
+      } else if (registrationIntent === "procedure") {
+        setProcedureForm(current => ({ ...current, patientCode: data.patient.patientId, scheduledDate: date }));
+        setShowProcedureModal(true);
       }
     } catch (err) {
       setError(
@@ -769,6 +772,14 @@ export default function ReceptionistPage() {
                 <span className="block text-sm font-extrabold">Register procedure</span>
                 <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor's review.</span>
               </span>
+            </button>
+
+            <button
+              onClick={() => { setRegistrationIntent("procedure"); setShowPatientModal(true); }}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-4 text-left text-fuchsia-900 transition hover:bg-fuchsia-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
+              <span><span className="block text-sm font-extrabold">Visiting procedure patient</span><span className="mt-1 block text-xs font-medium text-fuchsia-800">Register the walk-in first, then open procedure registration and billing.</span></span>
             </button>
 
             <button
