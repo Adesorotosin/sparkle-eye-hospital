@@ -34,6 +34,7 @@ export type OpticalOrder = {
   refractionOS: Record<string, unknown> | null;
 
   pdBinocular: string;
+  pdNear: string;
   pdOD: string;
   pdOS: string;
 
@@ -72,6 +73,7 @@ export type SaveOpticalOrderInput = {
   orderId: string;
 
   pdBinocular: string;
+  pdNear: string;
   pdOD: string;
   pdOS: string;
 
@@ -178,6 +180,7 @@ export async function getOpticianQueue(): Promise<{
         optometry_encounter_id,
         status,
         pd_binocular,
+        pd_near,
         pd_od,
         pd_os,
         segment_height_od,
@@ -367,6 +370,10 @@ export async function getOpticianQueue(): Promise<{
 
             pdBinocular:
               order.pd_binocular ??
+              "",
+
+            pdNear:
+              order.pd_near ??
               "",
 
             pdOD:
@@ -914,7 +921,13 @@ export async function getOpticianPatient(
         id,
         patient_code,
         full_name,
-        age
+        age,
+        vitals (
+          visual_acuity_od_near,
+          visual_acuity_os_near,
+          visual_acuity_ou_near,
+          recorded_at
+        )
       `)
       .eq(
         "patient_code",
@@ -981,6 +994,11 @@ export async function getOpticianPatient(
       };
     }
 
+    const patientVitals = Array.isArray(patient.vitals) ? patient.vitals : [];
+    const latestVitals = [...patientVitals].sort((a, b) =>
+      new Date(b.recorded_at ?? 0).getTime() - new Date(a.recorded_at ?? 0).getTime()
+    )[0];
+
     const {
       data: order,
       error: orderError,
@@ -991,6 +1009,7 @@ export async function getOpticianPatient(
         optometry_encounter_id,
         status,
         pd_binocular,
+        pd_near,
         pd_od,
         pd_os,
         segment_height_od,
@@ -1043,6 +1062,15 @@ export async function getOpticianPatient(
             optometryEncounter.visual_acuity_ou ??
             "",
 
+          visualAcuityODNear:
+            latestVitals?.visual_acuity_od_near ?? "",
+
+          visualAcuityOSNear:
+            latestVitals?.visual_acuity_os_near ?? "",
+
+          visualAcuityOUNear:
+            latestVitals?.visual_acuity_ou_near ?? "",
+
           withCorrection:
             Boolean(
               optometryEncounter.with_correction
@@ -1064,6 +1092,10 @@ export async function getOpticianPatient(
           ? {
               pdBinocular:
                 order.pd_binocular ??
+                "",
+
+              pdNear:
+                order.pd_near ??
                 "",
 
               pdOD:
@@ -1247,6 +1279,11 @@ export async function saveOpticalOrder(
       pd_binocular:
         emptyToNull(
           input.pdBinocular
+        ),
+
+      pd_near:
+        emptyToNull(
+          input.pdNear
         ),
 
       pd_od:
