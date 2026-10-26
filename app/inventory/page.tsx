@@ -97,6 +97,7 @@ export default function InventoryPage() {
     setLoading(false);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadData updates state after its async request resolves.
   useEffect(() => { void loadData(); }, [loadData]);
 
   const isManager = role === "IT_ADMIN";
