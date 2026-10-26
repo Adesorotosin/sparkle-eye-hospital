@@ -465,7 +465,12 @@ export default function ReceptionistPage() {
         clinicalNotes: [`Visiting patient — source: ${visitingLabForm.sourceCenter}`, visitingLabForm.clinicalNotes].filter(Boolean).join("\n"),
       });
       if (!order.success) {
-        throw new Error(`Patient ${patientCode} was registered, but the lab order failed: ${order.message}. Do not register the patient again; retry the lab request using the patient code.`);
+        if (order.id) {
+          setError(`Patient ${patientCode} is registered and lab order ${order.id} was created, but a downstream step failed: ${order.message} Do not submit the order again; ask Cashier or the administrator to resolve the existing order.`);
+          await loadData();
+          return;
+        }
+        throw new Error(`Patient ${patientCode} was registered, but no lab order was created: ${order.message}. Do not register the patient again; use the existing patient code to retry.`);
       }
       setShowVisitingLabModal(false);
       setVisitingLabForm({ patientCode: "", fullName: "", age: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL", clinicalNotes: "" });
