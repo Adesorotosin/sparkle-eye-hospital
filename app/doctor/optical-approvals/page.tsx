@@ -87,7 +87,7 @@ export default function OpticalChargeApprovalsPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Doctor Review</p>
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Optical Charge Approvals</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Set the final optical charge after reviewing the eyewear details. Only the Doctor-approved amount can be added to the patient's invoice; the Cashier records payment.
+              Set the final optical charge after reviewing the eyewear details. Only the Doctor-approved amount can be added to the patient&apos;s invoice; the Cashier records payment.
             </p>
           </div>
           <button type="button" onClick={() => void loadApprovals()} disabled={loading || isPending} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
