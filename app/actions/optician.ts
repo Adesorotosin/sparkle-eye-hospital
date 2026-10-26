@@ -161,7 +161,7 @@ export async function getOpticianQueue(): Promise<{
   message?: string;
 }> {
   try {
-    await requireRole([
+    const staff = await requireRole([
       "IT_ADMIN",
       "OPTICIAN",
       "INVENTORY_MANAGER",
@@ -450,7 +450,17 @@ export async function getOpticianQueue(): Promise<{
 
     return {
       success: true,
-      orders: mappedOrders,
+      orders: staff.role === "OPTICIAN"
+        ? mappedOrders.map((order) => ({
+            ...order,
+            frameSelection: "",
+            opticalCharge: 0,
+            invoiceId: null,
+            chargeApprovalStatus: "not_submitted" as const,
+            chargeApprovalNote: null,
+            chargeApprovedAt: null,
+          }))
+        : mappedOrders,
     };
   } catch (error) {
     const result = handleError(
