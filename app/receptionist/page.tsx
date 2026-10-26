@@ -313,7 +313,7 @@ export default function ReceptionistPage() {
           coveragePlan: patientForm.coveragePlan,
           allergies: patientForm.allergies,
           isWalkIn: patientForm.isWalkIn,
-          status: "waiting_triage",
+          status: registrationIntent === "medication" ? "in_consultation" : "waiting_triage",
         }),
       });
 
