@@ -544,6 +544,7 @@ export default function AccessControlPage() {
     void loadStaff();
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the editable permission draft with the selected staff record.
   useEffect(() => {
     if (selectedStaff) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable permission draft when the selected staff member changes.
