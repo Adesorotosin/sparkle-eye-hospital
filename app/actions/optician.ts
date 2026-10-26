@@ -1774,15 +1774,18 @@ export async function markOpticalOrderCollected(orderId: string) {
   }
 
   await logActivity({
-  module: "OPTICIAN",
-  action: "optical_order_collected",
-  performedBy: user.id,
-  patientId: order.patient_id,
-  details: `Optical order collected for ${order.patient_name} (${order.patient_code}). Invoice ${invoice.id} was paid.`,
-});
+    module: "Inventory",
+    category: "CLINICAL",
+    action: "Glasses collected by patient",
+    performedBy: user.name,
+    staffId: user.id,
+    patientId: order.patient_id,
+    details: "Optical order collected for " + order.patient_name + " (" + order.patient_code + "). Invoice " + invoice.id + " was paid.",
+  });
 
   revalidatePath("/optician");
   revalidatePath(`/optician/${order.patient_code}`);
+  revalidatePath("/inventory");
   revalidatePath("/billing");
   revalidatePath("/cashier");
 
