@@ -899,10 +899,7 @@ export async function getOpticianPatient(
         id,
         patient_code,
         full_name,
-        age,
-        gender,
-        phone,
-        allergies
+        age
       `)
       .eq(
         "patient_code",
@@ -936,10 +933,6 @@ export async function getOpticianPatient(
         with_correction,
         refraction_od,
         refraction_os,
-        slit_lamp_od,
-        slit_lamp_os,
-        diagnosis,
-        status,
         created_at
       `)
       .eq(
@@ -987,22 +980,11 @@ export async function getOpticianPatient(
         pd_os,
         segment_height_od,
         segment_height_os,
-        frame_selection,
         lens_type,
         lens_material,
         lens_coating,
         dispensing_notes,
-        optical_charge,
-        invoice_id,
-        charge_approval_status,
-        charge_approval_note,
-        charge_approved_at,
-        referred_at,
-        measurements_started_at,
-        ready_at,
-        collected_at,
-        created_at,
-        updated_at
+        created_at
       `)
       .eq(
         "patient_id",
@@ -1036,18 +1018,6 @@ export async function getOpticianPatient(
             ? Number(patient.age)
             : null,
 
-        gender:
-          patient.gender ??
-          null,
-
-        phone:
-          patient.phone ??
-          null,
-
-        allergies:
-          patient.allergies ??
-          null,
-
         optometry: {
           id:
             optometryEncounter.id,
@@ -1077,18 +1047,6 @@ export async function getOpticianPatient(
             optometryEncounter.refraction_os ??
             null,
 
-          slitLampOD:
-            optometryEncounter.slit_lamp_od ??
-            "",
-
-          slitLampOS:
-            optometryEncounter.slit_lamp_os ??
-            "",
-
-          diagnosis:
-            optometryEncounter.diagnosis ??
-            "",
-
           createdAt:
             optometryEncounter.created_at,
         },
@@ -1097,9 +1055,6 @@ export async function getOpticianPatient(
           ? {
               id:
                 order.id,
-
-              status:
-                order.status as OpticalOrderStatus,
 
               pdBinocular:
                 order.pd_binocular ??
@@ -1121,10 +1076,6 @@ export async function getOpticianPatient(
                 order.segment_height_os ??
                 "",
 
-              frameSelection:
-                order.frame_selection ??
-                "",
-
               lensType:
                 order.lens_type ??
                 "",
@@ -1141,45 +1092,9 @@ export async function getOpticianPatient(
                 order.dispensing_notes ??
                 "",
 
-              opticalCharge:
-                normalizeMoney(
-                  order.optical_charge
-                ),
-
-              invoiceId:
-                order.invoice_id ??
-                null,
-
-              chargeApprovalStatus:
-                (order.charge_approval_status ?? "not_submitted") as "not_submitted" | "pending" | "approved" | "rejected",
-
-              chargeApprovalNote:
-                order.charge_approval_note ?? null,
-
-              chargeApprovedAt:
-                order.charge_approved_at ?? null,
-
-              referredAt:
-                order.referred_at ??
-                null,
-
-              measurementsStartedAt:
-                order.measurements_started_at ??
-                null,
-
-              readyAt:
-                order.ready_at ??
-                null,
-
-              collectedAt:
-                order.collected_at ??
-                null,
-
               createdAt:
                 order.created_at,
 
-              updatedAt:
-                order.updated_at,
             }
           : null,
       },
