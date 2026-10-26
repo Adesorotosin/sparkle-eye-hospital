@@ -159,6 +159,7 @@ export default function NurseDashboard() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPatients updates state after the fetch resolves.
     void loadPatients();
   }, [loadPatients]);
 
