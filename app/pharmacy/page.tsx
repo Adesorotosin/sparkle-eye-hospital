@@ -256,6 +256,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
 
   useEffect(() => {
     if (patientId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPatient updates state after its async request resolves.
       void loadPatient(patientId);
     }
     void loadQueue();
