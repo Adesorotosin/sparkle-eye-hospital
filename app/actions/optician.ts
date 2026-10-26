@@ -453,12 +453,18 @@ export async function getOpticianQueue(): Promise<{
       orders: staff.role === "OPTICIAN"
         ? mappedOrders.map((order) => ({
             ...order,
+            patientId: "",
+            optometryEncounterId: "",
             frameSelection: "",
             opticalCharge: 0,
             invoiceId: null,
             chargeApprovalStatus: "not_submitted" as const,
             chargeApprovalNote: null,
             chargeApprovedAt: null,
+            referredAt: null,
+            measurementsStartedAt: null,
+            readyAt: null,
+            collectedAt: null,
           }))
         : mappedOrders,
     };
@@ -1003,9 +1009,6 @@ export async function getOpticianPatient(
     return {
       success: true,
       patient: {
-        id:
-          patient.id,
-
         patientCode:
           patient.patient_code,
 
@@ -1019,9 +1022,6 @@ export async function getOpticianPatient(
             : null,
 
         optometry: {
-          id:
-            optometryEncounter.id,
-
           visualAcuityOD:
             optometryEncounter.visual_acuity_od ??
             "",
@@ -1053,9 +1053,6 @@ export async function getOpticianPatient(
 
         opticalOrder: order
           ? {
-              id:
-                order.id,
-
               pdBinocular:
                 order.pd_binocular ??
                 "",
