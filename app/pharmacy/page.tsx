@@ -60,6 +60,12 @@ interface DrugStockItem {
 
 function PharmacyContent() {
   const searchParams = useSearchParams();
+  const patientId = searchParams.get("patientId") || "";
+
+  return <PharmacyWorkspace key={patientId || "no-patient"} patientId={patientId} />;
+}
+
+function PharmacyWorkspace({ patientId }: { patientId: string }) {
   const router = useRouter();
 
   /*
@@ -67,8 +73,6 @@ function PharmacyContent() {
    * PATIENT / QUEUE STATE
    * --------------------------------------------------
    */
-
-  const patientId = searchParams.get("patientId") || "";
 
   const [patient, setPatient] =
     useState<PharmacyPatient | null>(null);
@@ -79,7 +83,7 @@ function PharmacyContent() {
   const [queueSearch, setQueueSearch] = useState("");
 
   const [isLoadingPatient, setIsLoadingPatient] =
-    useState(false);
+    useState(Boolean(patientId));
 
   const [isLoadingQueue, setIsLoadingQueue] =
     useState(false);
@@ -107,6 +111,8 @@ function PharmacyContent() {
 
   const [administeredDrugs, setAdministeredDrugs] =
     useState<Record<string, boolean>>({});
+
+  const [selectedPrescription, setSelectedPrescription] = useState("");
 
   /*
    * --------------------------------------------------
@@ -175,14 +181,7 @@ function PharmacyContent() {
   const loadPatient = async (code: string) => {
     const normalizedCode = code.trim();
 
-    if (!normalizedCode) {
-      setPatient(null);
-      setPatientLoadError(null);
-      return;
-    }
-
-    setIsLoadingPatient(true);
-    setPatientLoadError(null);
+    if (!normalizedCode) return;
 
     try {
       const result =
@@ -198,6 +197,7 @@ function PharmacyContent() {
       }
 
       setPatient(result.patient);
+      setSelectedPrescription(result.patient.fullName);
     } catch (error) {
       console.error(
         "Load pharmacy patient error:",
@@ -257,27 +257,9 @@ function PharmacyContent() {
 
   useEffect(() => {
     if (patientId) {
-      loadPatient(patientId);
-    } else {
-      setPatient(null);
-      setPatientLoadError(null);
+      void loadPatient(patientId);
     }
-
-    loadQueue();
-  }, [patientId]);
-
-  /*
-   * --------------------------------------------------
-   * RESET UI WHEN PATIENT CHANGES
-   * --------------------------------------------------
-   */
-
-  useEffect(() => {
-    setDispenseSuccess(false);
-    setActionError(null);
-    setAffordabilityNotice(null);
-    setSelectedForDeferral({});
-    setAdministeredDrugs({});
+    void loadQueue();
   }, [patientId]);
 
   /*
@@ -328,17 +310,6 @@ function PharmacyContent() {
           new Date().toLocaleDateString(),
       }
     : null;
-
-  const [selectedPrescription, setSelectedPrescription] =
-    useState("");
-
-  useEffect(() => {
-    if (bannerPatient) {
-      setSelectedPrescription(
-        bannerPatient.name
-      );
-    }
-  }, [bannerPatient?.name]);
 
   /*
    * --------------------------------------------------
