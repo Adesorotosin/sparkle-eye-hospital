@@ -157,15 +157,15 @@ const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
 ];
 
 const HISTORY_SECTIONS = [
-  { key: "presentingComplaints", title: "1. Presenting complaints", options: ["Reduced vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Double vision", "Lid swelling", "Trauma", "Other", "Right / OD", "Left / OS", "Both", "Sudden onset", "Gradual onset"] },
-  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Worsening", "Unchanged", "Constant", "Intermittent", "First episode", "Recurrent", "Associated symptoms / triggers", "Treatment tried"] },
-  { key: "pastOcularHistory", title: "3. Past ocular history", options: ["None known", "Glaucoma", "Cataract", "Refractive error", "Other eye disease", "Spectacles / contact lenses", "Eye injury", "Surgery / laser / injection"] },
-  { key: "pastMedicalHistory", title: "4. Past medical history", options: ["None known", "Diabetes", "Hypertension", "Asthma", "Sickle cell disease", "Other", "Previous surgery"] },
-  { key: "medicationAllergyHistory", title: "5. Medication and allergy history", options: ["No medication", "Eye drops", "Systemic medicines", "Steroids", "Traditional remedies", "No known allergies", "Allergy present", "Allergy status unknown"] },
-  { key: "familyHistory", title: "6. Family history", options: ["None known", "Unknown", "Diabetes", "Hypertension", "Sickle cell disease", "Other"] },
-  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Unknown", "Glaucoma", "Blindness", "Cataract", "Other"] },
-  { key: "socialOccupationalHistory", title: "8. Social / occupational history", options: ["Smoking", "Alcohol use", "Dust / chemical exposure", "Prolonged screen use"] },
-] as const;
+  { key: "presentingComplaints", title: "1. Presenting complaints, eye and duration", options: ["Poor vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Diplopia", "Trauma", "Right", "Left", "Both", "<1 day", "1-7 days", "1-4 weeks", "1-6 months", ">6 months"] },
+  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Stable", "Worsening", "Recurrent", "Distance affected", "Near affected", "Both distance and near affected", "Vision not affected", "No treatment tried", "Eye drops tried", "Glasses tried", "Traditional remedy tried", "Other treatment tried"] },
+  { key: "pastMedicalHistory", title: "3. Past medical history — conditions", options: ["None known", "Hypertension", "Diabetes", "Asthma", "Other"] },
+  { key: "medicationAllergyHistory", title: "4. Medicines and drug allergy", options: ["No medicines", "Antihypertensives", "Diabetes medicines", "Steroids", "Other medicines", "No known drug allergy", "Drug allergy present", "Drug allergy status unknown"] },
+  { key: "pastOcularHistory", title: "5. Past ocular history, procedures and eye drops", options: ["None known", "Glasses", "Eye injury", "Glaucoma", "Other eye history", "No procedures", "Surgery", "Laser", "Injection", "No eye drops", "Glaucoma drops", "Steroid drops", "Other eye drops"] },
+  { key: "familyHistory", title: "6. Family and social history", options: ["Family illness: none known", "Family hypertension", "Family diabetes", "Other family illness", "Family illness unknown", "Smoking: never", "Smoking: past", "Smoking: current", "Alcohol: none", "Alcohol: past", "Alcohol: current"] },
+  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Glaucoma", "Blindness", "Cataract", "Other eye condition", "Relative: parent", "Relative: sibling", "Relative: child", "Relative: other", "Not applicable"] },
+  { key: "socialOccupationalHistory", title: "8. Additional social / occupational notes", options: ["Smoking history reviewed", "Alcohol history reviewed", "Occupation / exposure notes"] },
+
 
 const OCULAR_PARTS = [
   "Lid", "Globe", "Extraocular muscle movement", "Conjunctiva", "Cornea",
@@ -874,8 +874,9 @@ export default function DoctorEncounterPage() {
               ["gonioscopy", "Gonioscopy"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
-              ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["refraction-notes", "Spectacle prescription"],
+              ["investigation", "Investigation"],
               ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
