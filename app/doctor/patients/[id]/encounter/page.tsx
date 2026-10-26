@@ -157,14 +157,12 @@ const INVESTIGATION_REQUESTS: DiagnosticRequest[] = [
 ];
 
 const HISTORY_SECTIONS = [
-  { key: "presentingComplaints", title: "1. Presenting complaints", options: ["Reduced vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Double vision", "Lid swelling", "Trauma", "Other", "Right / OD", "Left / OS", "Both", "Sudden onset", "Gradual onset"] },
-  { key: "historyOfPresentingComplaints", title: "2. History of presenting complaints", options: ["Sudden onset", "Gradual onset", "Improving", "Worsening", "Unchanged", "Constant", "Intermittent", "First episode", "Recurrent", "Associated symptoms / triggers", "Treatment tried"] },
-  { key: "pastOcularHistory", title: "3. Past ocular history", options: ["None known", "Glaucoma", "Cataract", "Refractive error", "Other eye disease", "Spectacles / contact lenses", "Eye injury", "Surgery / laser / injection"] },
-  { key: "pastMedicalHistory", title: "4. Past medical history", options: ["None known", "Diabetes", "Hypertension", "Asthma", "Sickle cell disease", "Other", "Previous surgery"] },
-  { key: "medicationAllergyHistory", title: "5. Medication and allergy history", options: ["No medication", "Eye drops", "Systemic medicines", "Steroids", "Traditional remedies", "No known allergies", "Allergy present", "Allergy status unknown"] },
-  { key: "familyHistory", title: "6. Family history", options: ["None known", "Unknown", "Diabetes", "Hypertension", "Sickle cell disease", "Other"] },
-  { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Unknown", "Glaucoma", "Blindness", "Cataract", "Other"] },
-  { key: "socialOccupationalHistory", title: "8. Social / occupational history", options: ["Smoking", "Alcohol use", "Dust / chemical exposure", "Prolonged screen use"] },
+  { key: "presentingComplaints", title: "Presenting complaints and duration", options: ["Poor vision", "Pain", "Redness", "Itching", "Discharge", "Tearing", "Photophobia", "Flashes / floaters", "Diplopia", "Trauma", "Right eye", "Left eye", "Both eyes", "<1 day", "1–7 days", "1–4 weeks", "1–6 months", ">6 months"] },
+  { key: "historyOfPresentingComplaints", title: "History of presenting complaints", options: ["Onset: Sudden", "Onset: Gradual", "Course: Improving", "Course: Stable", "Course: Worsening", "Course: Recurrent", "Vision affected: Distance", "Vision affected: Near", "Vision affected: Both", "Vision affected: Not affected", "Treatment tried: None", "Treatment tried: Eye drops", "Treatment tried: Glasses", "Treatment tried: Traditional remedy", "Treatment tried: Other"] },
+  { key: "pastMedicalHistory", title: "Past medical history", options: ["Condition: None known", "Condition: Hypertension", "Condition: Diabetes", "Condition: Asthma", "Condition: Other", "Medicine: None", "Medicine: Antihypertensives", "Medicine: Diabetes medicines", "Medicine: Steroids", "Medicine: Other", "Drug allergy: None known", "Drug allergy: Yes", "Drug allergy: Unknown"] },
+  { key: "pastOcularHistory", title: "Past ocular history", options: ["History: None known", "History: Glasses", "History: Eye injury", "History: Glaucoma", "History: Other", "Procedure: None", "Procedure: Surgery", "Procedure: Laser", "Procedure: Injection", "Eye drops: None", "Eye drops: Glaucoma drops", "Eye drops: Steroid drops", "Eye drops: Other"] },
+  { key: "familySocialHistory", title: "Family and social history", options: ["Family illness: None known", "Family illness: Hypertension", "Family illness: Diabetes", "Family illness: Other", "Family illness: Unknown", "Smoking: Never", "Smoking: Past", "Smoking: Current", "Alcohol: None", "Alcohol: Past", "Alcohol: Current"] },
+  { key: "familyOcularHistory", title: "Family ocular history", options: ["Eye conditions: None known", "Eye conditions: Glaucoma", "Eye conditions: Blindness", "Eye conditions: Cataract", "Eye conditions: Other", "Relative: Parent", "Relative: Sibling", "Relative: Child", "Relative: Other", "Relative: Not applicable"] },
 ] as const;
 
 const OCULAR_PARTS = [
