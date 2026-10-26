@@ -23,6 +23,7 @@ import {
   Check,
   Syringe,
   Plus,
+  Package,
   X,
   UserPlus,
   LogOut,
@@ -163,6 +164,10 @@ function PharmacyContent() {
 
   const [drugInventory, setDrugInventory] =
     useState<DrugStockItem[]>([]);
+
+  const [isLoadingDrugInventory, setIsLoadingDrugInventory] = useState(false);
+
+  const [newDrugStock, setNewDrugStock] = useState({ name: "", category: "Antibiotics", stock: "", reorderLevel: "", price: "" });
 
   const [drugSuggestions, setDrugSuggestions] =
     useState<string[]>([]);
@@ -988,6 +993,7 @@ function PharmacyContent() {
 
   const loadDrugInventory =
     async () => {
+      setIsLoadingDrugInventory(true);
       try {
         const response =
           await fetch(
@@ -1015,6 +1021,8 @@ function PharmacyContent() {
         );
 
         setDrugInventory([]);
+      } finally {
+        setIsLoadingDrugInventory(false);
       }
     };
 
