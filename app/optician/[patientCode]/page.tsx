@@ -16,7 +16,7 @@ function display(value: unknown) {
 }
 function prescriptionValues(value: unknown) {
   const refraction = record(value);
-  if (!refraction) return { sphere: "—", cylinder: "—", axis: "—", add: "—" };
+  if (!refraction) return { sphere: "—", cylinder: "—", axis: "—", add: "—", nearVA: "—" };
   const subjective = record(refraction.subjective);
   const objective = record(refraction.objective);
   const values = subjective && Object.values(subjective).some(v => v !== null && v !== undefined && String(v).trim() !== "")
