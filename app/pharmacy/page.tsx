@@ -390,24 +390,6 @@ function PharmacyContent() {
   );
 
   /*
-   * Patients with the currently selected patient
-   * displayed as the unfulfilled/current patient.
-   *
-   * The old hardcoded Amina/Jamess/etc. entries
-   * have been removed.
-   */
-
-  const unfulfilledOrders = patient
-    ? [
-        {
-          id: patient.patientId,
-          name: patient.fullName,
-          time: "Current",
-        },
-      ]
-    : [];
-
-  /*
    * --------------------------------------------------
    * ACTIVE PRESCRIPTIONS
    * --------------------------------------------------
