@@ -68,7 +68,7 @@ export default function OpticalFulfillmentQueue() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { const timer = window.setTimeout(() => { void load(); }, 0); return () => window.clearTimeout(timer); }, [load]);
 
   const edit = (id: string, field: keyof Draft, value: string) => {
     setDrafts((current) => ({ ...current, [id]: { ...toDraft(orders.find((order) => order.id === id)!), ...current[id], [field]: value } }));
@@ -114,7 +114,7 @@ export default function OpticalFulfillmentQueue() {
 
   return <section className="overflow-hidden rounded-2xl border border-violet-200 bg-white shadow-sm">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-violet-100 bg-violet-50/60 p-5">
-      <div className="flex items-center gap-3"><span className="rounded-xl bg-white p-2 text-violet-700"><Glasses className="h-5 w-5"/></span><div><h2 className="font-extrabold text-slate-950">Optical inventory & glasses workflow</h2><p className="mt-1 text-xs text-slate-600">Record the patient's chosen frame, prescribed lens type, preparation status and collection. Managed by Inventory.</p></div></div>
+      <div className="flex items-center gap-3"><span className="rounded-xl bg-white p-2 text-violet-700"><Glasses className="h-5 w-5"/></span><div><h2 className="font-extrabold text-slate-950">Optical inventory & glasses workflow</h2><p className="mt-1 text-xs text-slate-600">Record the patient&apos;s chosen frame, prescribed lens type, preparation status and collection. Managed by Inventory.</p></div></div>
       <button type="button" onClick={() => void load()} disabled={loading || pending} className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/>Refresh</button>
     </div>
     {error && <p role="alert" className="mx-5 mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
