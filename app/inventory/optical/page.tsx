@@ -87,6 +87,7 @@ export default function InventoryOpticalPage() {
     }
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadOrders updates state after its async request resolves.
   useEffect(() => { void loadOrders(); }, [loadOrders]);
 
   function updateForm(orderId: string, field: keyof ProductionForm, value: string) {
