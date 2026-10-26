@@ -539,6 +539,7 @@ export default function AccessControlPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadStaff updates state after its async request resolves.
   useEffect(() => {
     void loadStaff();
   }, []);
