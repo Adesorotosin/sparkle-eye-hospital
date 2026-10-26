@@ -71,8 +71,6 @@ export default function InventoryOpticalPage() {
   const [notice, setNotice] = useState("");
 
   const loadOrders = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const result = await getOpticianQueue();
       if (!result.success) throw new Error(result.message || "Unable to load optical production orders.");
@@ -169,7 +167,7 @@ export default function InventoryOpticalPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div className="flex items-center gap-3"><Link href="/inventory" className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="Back to inventory"><ArrowLeft className="h-4 w-4" /></Link><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Inventory module</p><h1 className="text-xl font-extrabold">Glasses production & collection</h1><p className="text-xs text-slate-500">Manage frames, lens orders, optical lab status, fitting and collection.</p></div></div><button onClick={() => void loadOrders()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button></div></header>
+      <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div className="mx-auto flex max-w-7xl items-center justify-between gap-4"><div className="flex items-center gap-3"><Link href="/inventory" className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50" aria-label="Back to inventory"><ArrowLeft className="h-4 w-4" /></Link><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Inventory module</p><h1 className="text-xl font-extrabold">Glasses production & collection</h1><p className="text-xs text-slate-500">Manage frames, lens orders, optical lab status, fitting and collection.</p></div></div><button onClick={() => { setLoading(true); void loadOrders(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button></div></header>
       <main className="mx-auto max-w-7xl space-y-5 px-5 py-8 sm:px-8">
         <section className="grid gap-3 sm:grid-cols-4">{[{label:"Awaiting Inventory",count:orders.filter(o=>o.status==="referred").length},{label:"Sent to optical lab",count:orders.filter(o=>o.status==="measurements").length},{label:"Ready for collection",count:orders.filter(o=>o.status==="ready_for_dispense").length},{label:"Collected",count:orders.filter(o=>o.status==="collected").length}].map(item=><div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4"><p className="text-xs font-bold text-slate-500">{item.label}</p><p className="mt-2 text-2xl font-extrabold">{item.count}</p></div>)}</section>
         {error && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>}
