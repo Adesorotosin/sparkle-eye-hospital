@@ -100,6 +100,10 @@ export default function InventoryOpticalPage() {
 
   async function saveProduction(order: OpticalOrder) {
     const form = forms[order.id] ?? formFromOrder(order);
+    if (!form.frameSelection.trim() || !form.lensType.trim()) {
+      setError("Enter the frame selected by the patient and the required lens type before sending the order to the optical lab.");
+      return;
+    }
     setSavingId(order.id);
     setError("");
     setNotice("");
