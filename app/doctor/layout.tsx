@@ -37,6 +37,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     const patientCode = match?.[1];
 
     if (!patientCode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the encounter banner when leaving a patient encounter route.
       setActivePatient(null);
       return;
     }
