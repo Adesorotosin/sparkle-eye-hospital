@@ -43,18 +43,16 @@ const id = params.id;
 
   const [activeTab, setActiveTab] = useState("Patient Info");
   const [patient, setPatient] = useState<PatientRecord | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(Boolean(id));
+  const [errorMessage, setErrorMessage] = useState<string | null>(
+    id ? null : "Patient ID is missing."
+  );
   const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(
     null
   );
 
   useEffect(() => {
-    if (!id) {
-      setErrorMessage("Patient ID is missing.");
-      setIsLoading(false);
-      return;
-    }
+    if (!id) return;
 
     let cancelled = false;
 
