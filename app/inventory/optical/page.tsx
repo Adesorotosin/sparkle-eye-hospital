@@ -8,6 +8,7 @@ import {
   markOpticalOrderCollected,
   markOpticalOrderReady,
   saveOpticalOrder,
+  submitOpticalChargeForApproval,
   type OpticalOrder,
 } from "@/app/actions/optician";
 
@@ -114,6 +115,22 @@ export default function InventoryOpticalPage() {
     }
   }
 
+  async function submitCharge(order: OpticalOrder) {
+    setActionId(order.id);
+    setError("");
+    setNotice("");
+    try {
+      const result = await submitOpticalChargeForApproval(order.id);
+      if (!result.success) throw new Error(result.message);
+      setNotice(result.message);
+      await loadOrders();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to submit the optical charge for approval.");
+    } finally {
+      setActionId("");
+    }
+  }
+
   async function markReady(order: OpticalOrder) {
     setActionId(order.id);
     setError("");
@@ -165,7 +182,7 @@ export default function InventoryOpticalPage() {
             <label className="text-xs font-bold text-slate-600">Segment height (R / L)<span className="mt-1 grid grid-cols-2 gap-2"><input aria-label="Right segment height" value={form.segmentHeightOD} onChange={e=>updateForm(order.id,"segmentHeightOD",e.target.value)} className={inputClass} placeholder="R" /><input aria-label="Left segment height" value={form.segmentHeightOS} onChange={e=>updateForm(order.id,"segmentHeightOS",e.target.value)} className={inputClass} placeholder="L" /></span></label>
             <label className="text-xs font-bold text-slate-600">Total optical charge (₦)<input type="number" min="0" step="0.01" value={form.opticalCharge} onChange={e=>updateForm(order.id,"opticalCharge",e.target.value)} className={inputClass} placeholder="Enter approved price" /></label>
             <label className="text-xs font-bold text-slate-600 sm:col-span-2">Optical lab / fitting notes<textarea rows={2} value={form.dispensingNotes} onChange={e=>updateForm(order.id,"dispensingNotes",e.target.value)} className={inputClass} placeholder="Lens fitting, lab instructions, collection notes…" /></label>
-          </div><div className="mt-4 flex flex-wrap gap-2"><button disabled={savingId===order.id} onClick={()=>void saveProduction(order)} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingId===order.id?<Loader2 className="h-4 w-4 animate-spin"/>:<Save className="h-4 w-4"/>} Save details & send to lab</button>{order.status!=="collected" && order.status!=="ready_for_dispense" && <button disabled={actionId===order.id} onClick={()=>void markReady(order)} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-extrabold text-emerald-800 disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/> Mark glasses fixed / ready</button>}{order.status==="ready_for_dispense" && <button disabled={actionId===order.id} onClick={()=>void markCollected(order)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/> Mark glasses collected</button>}</div><p className="mt-3 text-[11px] leading-5 text-slate-500">Marking glasses ready uses the existing billing safeguards. Collection is blocked until the linked invoice is paid.</p></div></div></section>})}</div>}
+          </div><div className="mt-4 flex flex-wrap gap-2"><button disabled={savingId===order.id} onClick={()=>void saveProduction(order)} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingId===order.id?<Loader2 className="h-4 w-4 animate-spin"/>:<Save className="h-4 w-4"/>} Save details & send to lab</button>{order.status==="measurements" && order.chargeApprovalStatus!=="approved" && order.chargeApprovalStatus!=="pending" && order.opticalCharge>0 && <button disabled={actionId===order.id} onClick={()=>void submitCharge(order)} className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-extrabold text-amber-900 disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/> Submit charge for doctor approval</button>}{order.status==="measurements" && <button disabled={actionId===order.id} onClick={()=>void markReady(order)} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs font-extrabold text-emerald-800 disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/> Mark glasses fixed / ready</button>}{order.status==="ready_for_dispense" && <button disabled={actionId===order.id} onClick={()=>void markCollected(order)} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50"><CheckCircle2 className="h-4 w-4"/> Mark glasses collected</button>}</div><p className="mt-3 text-[11px] leading-5 text-slate-500">Marking glasses ready uses the existing billing safeguards. Collection is blocked until the linked invoice is paid.</p></div></div></section>})}</div>}
       </main>
     </div>
   );
