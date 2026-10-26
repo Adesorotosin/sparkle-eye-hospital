@@ -525,6 +525,18 @@ export default function DoctorEncounterPage() {
     });
   };
 
+  const notifyReceptionOfClinicalRequest = async (title: string, details: string) => {
+    const handoff = await createClinicalHandoff({
+      patientCode,
+      destination: "RECEPTIONIST",
+      handoffType: "PROCEDURE",
+      title,
+      details,
+      encounterId,
+    });
+    return handoff;
+  };
+
   const requestLab = (test: LabRequest) => {
     if (!patient) return;
     setRequesting(test.code);
@@ -549,7 +561,13 @@ export default function DoctorEncounterPage() {
         // and avoid retrying blindly.
         if (response.id) await refreshPatient();
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          `Laboratory request: ${test.name}`,
+          `A laboratory request was sent to the Laboratory queue. Please coordinate the patient's arrival, billing timing, and any deferred visit. Order reference: ${response.id ?? "see Laboratory queue"}.`
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
       }
       setRequesting("");
@@ -572,7 +590,13 @@ export default function DoctorEncounterPage() {
         setError(response.message);
         if (response.id) await refreshPatient();
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          `Investigation request: ${test.name}`,
+          `The doctor ordered ${test.name}. The investigation is in the clinical queue and the related bill remains available for cashier processing. Please coordinate arrival or a later visit. Order reference: ${response.id ?? "see investigation queue"}.`
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
       }
       setRequesting("");
@@ -597,7 +621,13 @@ export default function DoctorEncounterPage() {
       if (!response.success) {
         setError(response.message);
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          "Refraction request",
+          "The doctor referred this patient to Optometry for refraction. Please coordinate the patient's arrival and any deferred visit; the request is also in the Optometry queue."
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
         try {
           const optometry = await getOptometryPatient(patientCode);
@@ -659,7 +689,13 @@ export default function DoctorEncounterPage() {
         setError(response.message);
         if (response.orderId) await refreshPatient();
       } else {
-        setMessage(response.message);
+        const reception = await notifyReceptionOfClinicalRequest(
+          "Spectacle prescription / glasses request",
+          `A spectacle prescription was sent to the optical workflow. Lens type: ${lensType || "to be confirmed from prescription"}. Please coordinate the patient's arrival, frame selection, and any deferred visit. Optical order reference: ${response.orderId ?? "see optical queue"}.`
+        );
+        setMessage(reception.success
+          ? `${response.message} Reception has also been notified.`
+          : `${response.message} However, Reception notification failed: ${reception.message}`);
         await refreshPatient();
       }
       setRequesting("");
