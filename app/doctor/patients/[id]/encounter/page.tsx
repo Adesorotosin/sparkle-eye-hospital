@@ -828,8 +828,9 @@ export default function DoctorEncounterPage() {
               ["gonioscopy", "Gonioscopy"],
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
-              ["investigation", "Investigation"],
               ["treatment", "Treatment / plan"],
+              ["refraction-notes", "Refraction result and lens instructions"],
+              ["investigation", "Investigation"],
               ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
@@ -1073,7 +1074,37 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
-          <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
+          <Section id="diagnosis" title="Diagnosis" icon={<Hospital className="h-5 w-5" />}>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-gray-700">Diagnosis / clinical impression</span>
+              <textarea id="diagnosis" rows={5} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={inputClass} placeholder="Enter the working or confirmed diagnosis..." />
+            </label>
+          </Section>
+
+          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
+            <div className="space-y-4">
+              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+              <div className="rounded-2xl border p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Pill className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold">Prescription</h3>
+                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
+                  </div>
+                </div>
+                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
+                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
+                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
+                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
+                </button>
+              </div>
+            </div>
+          </Section>
+
+          
+
+<Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">Review the optometry result above where available, record the lens type and instructions, then send the order to the Optician. Supplier messages open in WhatsApp for staff review and manual sending.</p>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Lens type" value={lensType} onChange={setLensType} rows={2} placeholder="e.g. single vision, bifocal or progressive, according to the prescription" />
@@ -1109,14 +1140,9 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
-          <Section id="diagnosis" title="Diagnosis" icon={<Hospital className="h-5 w-5" />}>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-gray-700">Diagnosis / clinical impression</span>
-              <textarea id="diagnosis" rows={5} value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className={inputClass} placeholder="Enter the working or confirmed diagnosis..." />
-            </label>
-          </Section>
+          
 
-          <Section id="investigation" title="Investigation" icon={<TestTube2 className="h-5 w-5" />}>
+<Section id="investigation" title="Investigation" icon={<TestTube2 className="h-5 w-5" />}>
             <div className="space-y-6">
               <div>
                 <div className="mb-3 flex items-center justify-between">
@@ -1234,27 +1260,6 @@ export default function DoctorEncounterPage() {
                     ))}
                   </div>
                 </div>
-              </div>
-            </div>
-          </Section>
-
-          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
-            <div className="space-y-4">
-              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
-              <div className="rounded-2xl border p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Pill className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold">Prescription</h3>
-                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
-                  </div>
-                </div>
-                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
-                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
-                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
-                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
-                </button>
               </div>
             </div>
           </Section>
