@@ -25,6 +25,12 @@ import {
 type TabKey = "all" | "optical" | "hospital" | "pharmacy";
 type ModalKey = "item" | "receive" | "issue" | "supplier" | "sale" | null;
 
+const getLocalDateString = () => {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 10);
+};
+
 const money = (value: number) => new Intl.NumberFormat("en-NG", {
   style: "currency", currency: "NGN", maximumFractionDigits: 2,
 }).format(Number(value || 0));
@@ -71,7 +77,7 @@ export default function InventoryPage() {
   const [saleForm, setSaleForm] = useState({
     itemId: "",
     quantity: "1",
-    saleDate: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
+    saleDate: "",
     notes: "",
   });
 
@@ -188,7 +194,7 @@ export default function InventoryPage() {
       setSaleForm({
         itemId: "",
         quantity: "1",
-        saleDate: new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10),
+        saleDate: getLocalDateString(),
         notes: "",
       });
       await refreshAfterSuccess(result.message);
@@ -228,7 +234,7 @@ export default function InventoryPage() {
             <Link href="/inventory/optical" className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2.5 text-xs font-bold text-white hover:bg-violet-800"><Package className="h-4 w-4" /> Glasses workflow</Link>
             <button onClick={() => void loadData()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><RefreshCw className="h-4 w-4" /> Refresh</button>
             {canIssueStock && <button onClick={() => setModal("issue")} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold hover:bg-slate-50"><ArrowUpFromLine className="h-4 w-4" /> Issue stock</button>}
-            {canRecordSales && <button onClick={() => { setSaleForm((v) => ({ ...v, itemId: v.itemId || items.find((item) => item.domain === "pharmacy" && item.is_active && item.stock > 0)?.id || "" })); setModal("sale"); }} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><Activity className="h-4 w-4" /> Record daily sale</button>}
+            {canRecordSales && <button onClick={() => { setSaleForm((v) => ({ ...v, itemId: v.itemId || items.find((item) => item.domain === "pharmacy" && item.is_active && item.stock > 0)?.id || "", saleDate: getLocalDateString() })); setModal("sale"); }} className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100"><Activity className="h-4 w-4" /> Record daily sale</button>}
             {isManager && <button onClick={() => setModal("receive")} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-violet-700"><ArrowDownToLine className="h-4 w-4" /> Receive stock</button>}
             <button onClick={() => void handleSignOut()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"><LogOut className="h-4 w-4" /> Sign out</button>
           </div>
