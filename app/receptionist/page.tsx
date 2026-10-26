@@ -18,6 +18,8 @@ import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
+import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
+import { registerVisitingOptometryPatient } from "@/app/actions/optometry";
 import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 
 type Patient = {
@@ -140,6 +142,11 @@ export default function ReceptionistPage() {
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
+  const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
+  const [showVisitingRefractionModal, setShowVisitingRefractionModal] = useState(false);
+  const [savingVisitingRequest, setSavingVisitingRequest] = useState(false);
+  const [visitingInvestigationForm, setVisitingInvestigationForm] = useState({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
+  const [visitingRefractionForm, setVisitingRefractionForm] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "self_presenting" | "external_referral" });
   const [savingProcedure, setSavingProcedure] = useState(false);
   const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
   const [procedurePrices, setProcedurePrices] = useState<Array<{ id: string; code: string; name: string; category: string; price: number; active: boolean }>>([]);
@@ -381,6 +388,58 @@ export default function ReceptionistPage() {
       setError(err instanceof Error ? err.message : "Could not register procedure.");
     } finally {
       setSavingProcedure(false);
+    }
+  }
+
+  async function handleRegisterVisitingInvestigation(event: FormEvent) {
+    event.preventDefault();
+    setSavingVisitingRequest(true);
+    setError("");
+    try {
+      const result = await createExternalDiagnosticOrder({
+        fullName: visitingInvestigationForm.fullName,
+        age: visitingInvestigationForm.age ? Number(visitingInvestigationForm.age) : undefined,
+        gender: visitingInvestigationForm.gender || undefined,
+        phone: visitingInvestigationForm.phone || undefined,
+        referringCenter: visitingInvestigationForm.referringCenter,
+        testName: visitingInvestigationForm.testName,
+        price: Number(visitingInvestigationForm.price),
+      });
+      if (!result.success) throw new Error(result.message);
+      setShowVisitingInvestigationModal(false);
+      setVisitingInvestigationForm({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
+      notify(result.message);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to register the visiting investigation.");
+    } finally {
+      setSavingVisitingRequest(false);
+    }
+  }
+
+  async function handleRegisterVisitingRefraction(event: FormEvent) {
+    event.preventDefault();
+    setSavingVisitingRequest(true);
+    setError("");
+    try {
+      const result = await registerVisitingOptometryPatient({
+        fullName: visitingRefractionForm.fullName,
+        age: visitingRefractionForm.age ? Number(visitingRefractionForm.age) : undefined,
+        dateOfBirth: visitingRefractionForm.dateOfBirth || undefined,
+        gender: visitingRefractionForm.gender || undefined,
+        phone: visitingRefractionForm.phone || undefined,
+        address: visitingRefractionForm.address || undefined,
+        visitType: visitingRefractionForm.visitType,
+      });
+      if (!result.success) throw new Error(result.message);
+      setShowVisitingRefractionModal(false);
+      setVisitingRefractionForm({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" });
+      notify(result.patientCode ? `Visiting refraction registered. Patient code: ${result.patientCode}. The patient is now in the Optometry queue.` : result.message);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to register the visiting refraction.");
+    } finally {
+      setSavingVisitingRequest(false);
     }
   }
 
@@ -655,6 +714,22 @@ export default function ReceptionistPage() {
                 <span className="block text-sm font-extrabold">Register procedure</span>
                 <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor's review.</span>
               </span>
+            </button>
+
+            <button
+              onClick={() => setShowVisitingInvestigationModal(true)}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
+              <span><span className="block text-sm font-extrabold">Visiting investigation</span><span className="mt-1 block text-xs font-medium text-amber-800">Register an outside patient for a test and send it to the investigation queue and Cashier.</span></span>
+            </button>
+
+            <button
+              onClick={() => setShowVisitingRefractionModal(true)}
+              className="flex min-h-20 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-left text-blue-900 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
+              <span><span className="block text-sm font-extrabold">Visiting refraction</span><span className="mt-1 block text-xs font-medium text-blue-800">Register an outside patient directly into the Optometry queue.</span></span>
             </button>
 
             <button
@@ -1040,6 +1115,42 @@ export default function ReceptionistPage() {
                 {savingProcedure ? "Registering..." : "Register and send bill to cashier"}
               </button>
             </div>
+          </form>
+        </div>
+      )}
+
+      {showVisitingInvestigationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
+          <form onSubmit={handleRegisterVisitingInvestigation} className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting investigation</h2><p className="mt-1 text-sm text-slate-500">For patients who arrive for an investigation without going through the normal hospital registration route.</p></div><button type="button" onClick={() => setShowVisitingInvestigationModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingInvestigationForm.fullName} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, fullName: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingInvestigationForm.age} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, age: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingInvestigationForm.gender} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, gender: e.target.value })} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
+              <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingInvestigationForm.phone} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, phone: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Referring centre / source *<input required value={visitingInvestigationForm.referringCenter} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, referringCenter: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Investigation / test *<input required value={visitingInvestigationForm.testName} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, testName: e.target.value })} placeholder="Enter the investigation requested" className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Approved price (₦) *<input required type="number" min="0" step="0.01" value={visitingInvestigationForm.price} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, price: e.target.value })} className={inputClass} /><span className="mt-1 block font-normal text-slate-400">If price is not configured, Cashier will need to review it before payment.</span></label>
+            </div>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingInvestigationModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send request"}</button></div>
+          </form>
+        </div>
+      )}
+
+      {showVisitingRefractionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
+          <form onSubmit={handleRegisterVisitingRefraction} className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting refraction</h2><p className="mt-1 text-sm text-slate-500">Creates a visiting patient record and sends the patient directly to the Optometry queue.</p></div><button type="button" onClick={() => setShowVisitingRefractionModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingRefractionForm.fullName} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, fullName: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Date of birth<input type="date" value={visitingRefractionForm.dateOfBirth} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, dateOfBirth: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingRefractionForm.age} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, age: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingRefractionForm.gender} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, gender: e.target.value })} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
+              <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingRefractionForm.phone} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, phone: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Address<input value={visitingRefractionForm.address} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, address: e.target.value })} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Visit type<select value={visitingRefractionForm.visitType} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, visitType: e.target.value as "self_presenting" | "external_referral" })} className={inputClass}><option value="self_presenting">Self-presenting</option><option value="external_referral">External referral</option></select></label>
+            </div>
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingRefractionModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Optometry"}</button></div>
           </form>
         </div>
       )}
