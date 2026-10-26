@@ -180,7 +180,7 @@ export async function GET(
           log.action
             .toLowerCase()
             .includes(search) ||
-          log.user
+          (log.user ?? "")
             .toLowerCase()
             .includes(search) ||
           log.details
