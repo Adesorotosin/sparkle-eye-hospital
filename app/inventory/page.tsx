@@ -21,6 +21,7 @@ import {
   type InventoryMovementRecord,
   type InventorySupplierRecord,
 } from "@/app/actions/inventory";
+import OpticalFulfillmentQueue from "@/components/inventory/OpticalFulfillmentQueue";
 
 type TabKey = "all" | "optical" | "hospital" | "pharmacy";
 type ModalKey = "item" | "receive" | "issue" | "supplier" | "sale" | null;
@@ -250,6 +251,8 @@ export default function InventoryPage() {
             return <div key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><p className="text-xs font-bold text-slate-500">{stat.label}</p><span className="rounded-xl bg-violet-50 p-2 text-violet-700"><Icon className="h-4 w-4" /></span></div><p className="mt-3 text-2xl font-extrabold tracking-tight text-slate-950">{stat.value}</p><p className="mt-1 text-xs text-slate-500">{stat.hint}</p></div>;
           })}
         </section>
+
+        {(role === "IT_ADMIN" || role === "INVENTORY_MANAGER") && <OpticalFulfillmentQueue />}
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-slate-100 p-5 lg:flex-row lg:items-center lg:justify-between">
