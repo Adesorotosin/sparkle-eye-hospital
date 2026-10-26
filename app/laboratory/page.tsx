@@ -10,7 +10,6 @@ import {
   receiveLabSample,
   requestLabRecollection,
   saveLabResult,
-  startLabProcessing,
   verifyLabResult,
 } from "@/app/actions/lab-orders";
 
@@ -731,35 +730,6 @@ export default function LaboratoryPage() {
         error instanceof Error
           ? error.message
           : "Failed to receive sample."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function beginProcessing() {
-    if (!selectedOrder) return;
-
-    setIsSubmitting(true);
-    setActionMessage("");
-
-    try {
-      const response = await startLabProcessing({
-        labOrderId: selectedOrder.id,
-        processingNotes:
-          processingNotes.trim() || undefined,
-      });
-
-      setActionMessage(response.message);
-
-      if (response.success) {
-        await refreshOrders();
-      }
-    } catch (error) {
-      setActionMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to start processing."
       );
     } finally {
       setIsSubmitting(false);
