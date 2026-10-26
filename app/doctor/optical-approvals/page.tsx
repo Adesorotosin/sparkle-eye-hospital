@@ -122,7 +122,7 @@ export default function OpticalChargeApprovalsPage() {
                     <p className="text-xs font-medium text-violet-600">Current charge (editable)</p>
                     <p className="mt-1 text-xl font-bold text-violet-900">{formatCurrency(item.opticalCharge)}</p>
                     <label className="mt-3 block text-left">
-                      <span className="text-xs font-medium text-violet-700">Doctor's final charge (₦)</span>
+                      <span className="text-xs font-medium text-violet-700">Doctor&apos;s final charge (₦)</span>
                       <input type="number" min="0.01" step="0.01" value={charges[item.id] ?? ""} onChange={(event) => setCharges((current) => ({ ...current, [item.id]: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" placeholder="Enter final amount" />
                     </label>
                   </div>
