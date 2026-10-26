@@ -198,7 +198,7 @@ export default function NurseDashboard() {
       console.error("Logout request failed:", error);
     } finally {
       localStorage.removeItem("sparkle_staff_token");
-      window.location.href = "/";
+      router.push("/");
     }
   };
 
