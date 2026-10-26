@@ -125,12 +125,8 @@ export async function getOptometryQueue(): Promise<{
       const vitals = Array.isArray(patient.vitals)
         ? [...(patient.vitals as Record<string, unknown>[])].sort(
             (a, b) =>
-              new Date(
-                b.recorded_at ?? 0
-              ).getTime() -
-              new Date(
-                a.recorded_at ?? 0
-              ).getTime()
+              new Date(String(b.recorded_at ?? "")).getTime() -
+              new Date(String(a.recorded_at ?? "")).getTime()
           )[0]
         : (patient.vitals as Record<string, unknown> | null);
 
