@@ -14,8 +14,6 @@ import {
   ShieldCheck,
   Activity,
   X,
-  Plus,
-  CreditCard,
 } from "lucide-react";
 
 export type CareStage = "checkin" | "triage" | "consultation" | "optical" | "pharmacy" | "billing" | "completed";
