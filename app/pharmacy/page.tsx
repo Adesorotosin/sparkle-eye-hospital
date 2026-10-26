@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import React, {
+  useCallback,
   useEffect,
   useState,
   Suspense,
@@ -86,7 +87,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
     useState(Boolean(patientId));
 
   const [isLoadingQueue, setIsLoadingQueue] =
-    useState(false);
+    useState(true);
 
   const [patientLoadError, setPatientLoadError] =
     useState<string | null>(null);
@@ -178,7 +179,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
    * --------------------------------------------------
    */
 
-  const loadPatient = async (code: string) => {
+  const loadPatient = useCallback(async (code: string) => {
     const normalizedCode = code.trim();
 
     if (!normalizedCode) return;
@@ -214,7 +215,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
     } finally {
       setIsLoadingPatient(false);
     }
-  };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -222,9 +223,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
    * --------------------------------------------------
    */
 
-  const loadQueue = async () => {
-    setIsLoadingQueue(true);
-
+  const loadQueue = useCallback(async () => {
     try {
       const result =
         await getPharmacyQueue();
@@ -247,7 +246,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
     } finally {
       setIsLoadingQueue(false);
     }
-  };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -260,7 +259,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
       void loadPatient(patientId);
     }
     void loadQueue();
-  }, [patientId]);
+  }, [patientId, loadPatient, loadQueue]);
 
   /*
    * --------------------------------------------------
