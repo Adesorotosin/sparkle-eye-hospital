@@ -97,6 +97,20 @@ export async function referPatientToOptometry(
       }),
     });
 
+    const { error: receptionHandoffError } = await supabaseServer
+      .from("clinical_handoffs")
+      .insert({
+        patient_id: patient.id,
+        destination: "RECEPTIONIST",
+        handoff_type: "PROCEDURE",
+        title: "Refraction request",
+        details: "Doctor-requested refraction for " + patient.full_name + " (" + patient.patient_code + "). The Optometry queue receives the clinical referral directly; Reception should coordinate patient readiness and follow-up.",
+        requested_by: staff.id,
+      });
+    if (receptionHandoffError) {
+      console.error("Refraction Reception handoff failed after referral creation:", receptionHandoffError);
+    }
+    revalidatePath("/receptionist");
     revalidatePath(`/doctor/patients/${normalizedCode}/encounter`);
     revalidatePath("/doctor/patients");
     revalidatePath("/optometry");
