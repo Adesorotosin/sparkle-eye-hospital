@@ -38,6 +38,7 @@ export default function ProcedurePricesPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPrices updates state after its async request resolves.
     void loadPrices();
   }, [loadPrices]);
 
