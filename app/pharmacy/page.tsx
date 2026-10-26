@@ -2104,7 +2104,7 @@ function PharmacyContent() {
 
                 <p className="text-[11px] text-sky-800 font-medium mt-0.5">
                   Medication added here is saved
-                  to the patient's real prescription
+                  to the patient&apos;s real prescription
                   record and added to billing.
                   Dispensing deducts pharmacy stock.
                 </p>
