@@ -164,6 +164,7 @@ export async function getOpticianQueue(): Promise<{
     await requireRole([
       "IT_ADMIN",
       "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const {
@@ -639,6 +640,21 @@ export async function createOpticalOrder(
       throw createError;
     }
 
+    const { error: receptionHandoffError } = await supabaseServer
+      .from("clinical_handoffs")
+      .insert({
+        patient_id: patient.id,
+        destination: "RECEPTIONIST",
+        handoff_type: "PROCEDURE",
+        title: "Spectacle / optical request",
+        details: "Doctor-requested spectacles for " + patient.full_name + " (" + patient.patient_code + "). Lens type: " + (instructions.lensType?.trim() || "See spectacle prescription") + ". The Inventory module manages frame selection, optical lab production, readiness and collection. Reception should coordinate patient readiness and follow-up.",
+        requested_by: staff.id,
+      });
+    if (receptionHandoffError) {
+      console.error("Optical Reception handoff failed after order creation:", receptionHandoffError);
+    }
+    revalidatePath("/receptionist");
+
     await logActivity({
       module: "Optician",
       category: "CLINICAL",
@@ -695,7 +711,7 @@ export async function startOpticianMeasurements(
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const normalizedId =
@@ -1212,7 +1228,7 @@ export async function saveOpticalOrder(
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "OPTICIAN",
+      "INVENTORY_MANAGER",
     ]);
 
     const orderId =
@@ -1488,7 +1504,7 @@ export interface OpticalChargeApprovalItem {
 
 export async function submitOpticalChargeForApproval(orderId: string): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
     const normalizedId = orderId?.trim();
     if (!normalizedId) return { success: false, message: "Optical order ID is required." };
 
@@ -1673,7 +1689,7 @@ export async function markOpticalOrderReady(
   orderId: string
 ): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
     const normalizedId = orderId?.trim();
     if (!normalizedId) {
       return { success: false, message: "Optical order ID is required." };
@@ -1756,7 +1772,7 @@ export async function markOpticalOrderReady(
  * connected to optical orders.
  */
 export async function markOpticalOrderCollected(orderId: string) {
-  const user = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+  const user = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
 
   const { data: order, error: orderError } = await supabaseServer
     .from("optical_orders")
