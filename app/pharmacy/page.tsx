@@ -23,7 +23,6 @@ import {
   Check,
   Syringe,
   Plus,
-  Package,
   X,
   UserPlus,
   LogOut,
@@ -1146,10 +1145,6 @@ function PharmacyContent() {
               <Pill className="h-4 w-4 text-violet-300" />
               Dashboard & queue
             </button>
-            <button type="button" onClick={() => router.push("/inventory")} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
-              <Package className="h-4 w-4" />
-              Shared Inventory
-            </button>
             <button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
               <UserPlus className="h-4 w-4" />
               Register patient
@@ -1491,10 +1486,6 @@ function PharmacyContent() {
             <button type="button" onClick={() => router.push("/pharmacy")} className="w-full flex items-center gap-3 rounded-xl bg-slate-800 px-3 py-3 text-sm font-bold text-white">
               <Pill className="h-4 w-4 text-violet-300" />
               Dashboard & queue
-            </button>
-            <button type="button" onClick={() => router.push("/inventory")} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
-              <Package className="h-4 w-4" />
-              Shared Inventory
             </button>
             <button type="button" onClick={() => setIsRegisterModalOpen(true)} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800/70 hover:text-white">
               <UserPlus className="h-4 w-4" />
