@@ -20,6 +20,7 @@ export default function ClinicalHandoffInbox({ destination }: { destination: Han
     setLoading(false);
   }, [destination]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- load updates state after its async request resolves.
   useEffect(() => { void load(); }, [load]);
 
   const update = async (item: ClinicalHandoff, status: "acknowledged" | "completed") => {
