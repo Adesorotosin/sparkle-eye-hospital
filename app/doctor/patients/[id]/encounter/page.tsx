@@ -689,13 +689,21 @@ export default function DoctorEncounterPage() {
         setError(response.message);
         if (response.orderId) await refreshPatient();
       } else {
+        const cashier = await createClinicalHandoff({
+          patientCode,
+          destination: "CASHIER",
+          handoffType: "PRICING_REVIEW",
+          title: "Optical request pricing review",
+          details: `A spectacle prescription was sent to Inventory for frame and lens preparation. Lens type: ${lensType || "to be confirmed from prescription"}. Please review the optical charge when the inventory team submits the final amount. Optical order reference: ${response.orderId ?? "see optical queue"}.`,
+          encounterId,
+        });
         const reception = await notifyReceptionOfClinicalRequest(
           "Spectacle prescription / glasses request",
           `A spectacle prescription was sent to the optical workflow. Lens type: ${lensType || "to be confirmed from prescription"}. Please coordinate the patient's arrival, frame selection, and any deferred visit. Optical order reference: ${response.orderId ?? "see optical queue"}.`
         );
-        setMessage(reception.success
-          ? `${response.message} Reception has also been notified.`
-          : `${response.message} However, Reception notification failed: ${reception.message}`);
+        setMessage(cashier.success && reception.success
+          ? `${response.message} Cashier and Reception have both been notified.`
+          : `${response.message} Notification status — Cashier: ${cashier.success ? "sent" : cashier.message}; Reception: ${reception.success ? "sent" : reception.message}.`);
         await refreshPatient();
       }
       setRequesting("");
