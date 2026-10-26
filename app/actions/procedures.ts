@@ -15,6 +15,20 @@ export type ProcedurePrice = {
   active: boolean;
 };
 
+type ProcedureRegistrationSummary = {
+  id: string;
+  procedureName: string;
+  referralType: string;
+  orderReference: string | null;
+  scheduledDate: string | null;
+  price: number;
+  status: string;
+  createdAt: string;
+  patientCode: string;
+  registrationNumber: string | null;
+  patientName: string;
+};
+
 export async function getProcedurePriceCatalog() {
   try {
     await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
@@ -27,14 +41,17 @@ export async function getProcedurePriceCatalog() {
     if (error) throw error;
     return {
       success: true,
-      procedures: (data ?? []).map((row: any) => ({
-        id: row.id,
-        code: row.code,
-        name: row.name,
-        category: row.category,
-        price: Number(row.price ?? 0),
-        active: Boolean(row.active),
-      })) as ProcedurePrice[],
+      procedures: (data ?? []).map((rawRow: unknown) => {
+        const row = rawRow as Record<string, unknown>;
+        return {
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          category: row.category,
+          price: Number(row.price ?? 0),
+          active: Boolean(row.active),
+        } as ProcedurePrice;
+      }),
     };
   } catch (error) {
     console.error("Loading procedure price catalogue failed:", error);
@@ -200,19 +217,27 @@ export async function getRecentProcedures() {
     if (error) throw error;
     return {
       success: true,
-      procedures: (data ?? []).map((row: any) => ({
-        id: row.id,
-        procedureName: row.procedure_name,
-        referralType: row.referral_type,
-        orderReference: row.order_reference,
-        scheduledDate: row.scheduled_date,
-        price: Number(row.price ?? 0),
-        status: row.status,
-        createdAt: row.created_at,
-        patientCode: row.patients.patient_code,
-        registrationNumber: row.patients.registration_number ?? null,
-        patientName: row.patients.full_name,
-      })),
+      procedures: (data ?? []).map((rawRow: unknown) => {
+        const row = rawRow as Record<string, unknown>;
+        const patient = row.patients as {
+          patient_code?: string | null;
+          registration_number?: string | null;
+          full_name?: string | null;
+        } | null;
+        return {
+          id: row.id,
+          procedureName: row.procedure_name,
+          referralType: row.referral_type,
+          orderReference: row.order_reference ?? null,
+          scheduledDate: row.scheduled_date ?? null,
+          price: Number(row.price ?? 0),
+          status: row.status,
+          createdAt: row.created_at,
+          patientCode: patient?.patient_code ?? "",
+          registrationNumber: patient?.registration_number ?? null,
+          patientName: patient?.full_name ?? "",
+        } as ProcedureRegistrationSummary;
+      }),
     };
   } catch (error) {
     console.error("Loading procedures failed:", error);
