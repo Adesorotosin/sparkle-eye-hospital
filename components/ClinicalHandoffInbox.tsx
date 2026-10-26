@@ -14,8 +14,6 @@ export default function ClinicalHandoffInbox({ destination }: { destination: Han
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
     const response = await getClinicalHandoffs(destination);
     if (response.success) setRequests(response.requests);
     else setError(response.message ?? "Unable to load requests.");
@@ -48,7 +46,7 @@ export default function ClinicalHandoffInbox({ destination }: { destination: Han
           <div><h2 className="font-semibold text-gray-900">{title}</h2><p className="text-xs text-gray-500">Requests sent from the Doctor&apos;s module</p></div>
           {requests.length > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">{requests.length} pending</span>}
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
+        <button type="button" onClick={() => { setLoading(true); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh</button>
       </div>
       {(message || error) && <p className={`mb-3 rounded-lg p-3 text-sm ${error ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{error || message}</p>}
       {loading ? <div className="flex items-center gap-2 py-6 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading requests...</div> :
