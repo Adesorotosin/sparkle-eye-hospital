@@ -283,7 +283,7 @@ export async function registerVisitingOptometryPatient(input: {
       patientId: patient.id,
       module: "Optometry",
       category: "CLINICAL",
-      action: "Outside patient registered directly by Optometry",
+      action: "Outside patient registered for Optometry",
       performedBy: staff.name,
       staffId: staff.id,
       details: JSON.stringify({
