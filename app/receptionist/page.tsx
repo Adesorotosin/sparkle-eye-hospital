@@ -19,7 +19,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
-import { createVisitingLabOrder } from "@/app/actions/lab-orders";
+import { createLabOrder } from "@/app/actions/lab-orders";
 import { registerVisitingOptometryPatient } from "@/app/actions/optometry";
 import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 
@@ -150,7 +150,7 @@ export default function ReceptionistPage() {
   const [savingVisitingRequest, setSavingVisitingRequest] = useState(false);
   const [visitingInvestigationForm, setVisitingInvestigationForm] = useState({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
   const [visitingRefractionForm, setVisitingRefractionForm] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "self_presenting" | "external_referral" });
-  const [visitingLabForm, setVisitingLabForm] = useState({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", priority: "NORMAL" as "NORMAL" | "URGENT" | "STAT", clinicalNotes: "" });
+  const [visitingLabForm, setVisitingLabForm] = useState({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL" as "NORMAL" | "URGENT" | "STAT", clinicalNotes: "" });
   const [savingProcedure, setSavingProcedure] = useState(false);
   const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
   const [procedurePrices, setProcedurePrices] = useState<Array<{ id: string; code: string; name: string; category: string; price: number; active: boolean }>>([]);
@@ -429,22 +429,41 @@ export default function ReceptionistPage() {
     setSavingVisitingRequest(true);
     setError("");
     try {
-      const result = await createVisitingLabOrder({
-        fullName: visitingLabForm.fullName,
-        sourceCenter: visitingLabForm.sourceCenter,
-        contactPhone: visitingLabForm.contactPhone || undefined,
-        sex: visitingLabForm.sex || undefined,
-        dateOfBirth: visitingLabForm.dateOfBirth || undefined,
+      const patientResponse = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: visitingLabForm.fullName,
+          phone: visitingLabForm.contactPhone,
+          dateOfBirth: visitingLabForm.dateOfBirth || undefined,
+          age: visitingLabForm.dateOfBirth ? "" : undefined,
+          gender: visitingLabForm.sex,
+          coveragePlan: "Self-Pay",
+          allergies: "",
+          isWalkIn: true,
+          status: "in_consultation",
+        }),
+      });
+      const patientData = await patientResponse.json();
+      if (!patientResponse.ok || !patientData?.patient?.patientId) {
+        throw new Error(patientData?.error || "Unable to register the visiting laboratory patient.");
+      }
+      const patientCode = String(patientData.patient.patientId);
+      const order = await createLabOrder({
+        patientCode,
         testCode: visitingLabForm.testCode,
         testName: visitingLabForm.testName,
         specimenType: visitingLabForm.specimenType,
+        price: Number(visitingLabForm.price),
         priority: visitingLabForm.priority,
-        clinicalNotes: visitingLabForm.clinicalNotes || undefined,
+        clinicalNotes: [`Visiting patient — source: ${visitingLabForm.sourceCenter}`, visitingLabForm.clinicalNotes].filter(Boolean).join("\n"),
       });
-      if (!result.success) throw new Error(result.message);
+      if (!order.success) {
+        throw new Error(`Patient ${patientCode} was registered, but the lab order failed: ${order.message}. Do not register the patient again; retry the lab request using the patient code.`);
+      }
       setShowVisitingLabModal(false);
-      setVisitingLabForm({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", priority: "NORMAL", clinicalNotes: "" });
-      notify(result.message);
+      setVisitingLabForm({ fullName: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL", clinicalNotes: "" });
+      notify(`Visiting laboratory patient registered (${patientCode}). ${order.message}`);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to register the visiting laboratory request.");
@@ -1202,10 +1221,10 @@ export default function ReceptionistPage() {
               <label className="block text-xs font-bold text-slate-600">Test code *<input required value={visitingLabForm.testCode} onChange={e=>setVisitingLabForm({...visitingLabForm,testCode:e.target.value})} className={inputClass} placeholder="e.g. FBS" /></label>
               <label className="block text-xs font-bold text-slate-600">Test name *<input required value={visitingLabForm.testName} onChange={e=>setVisitingLabForm({...visitingLabForm,testName:e.target.value})} className={inputClass} /></label>
               <label className="block text-xs font-bold text-slate-600">Specimen type *<input required value={visitingLabForm.specimenType} onChange={e=>setVisitingLabForm({...visitingLabForm,specimenType:e.target.value})} className={inputClass} /></label>
+              <label className="block text-xs font-bold text-slate-600">Approved price (₦) *<input required type="number" min="0" step="0.01" value={visitingLabForm.price} onChange={e=>setVisitingLabForm({...visitingLabForm,price:e.target.value})} className={inputClass} /><span className="mt-1 block font-normal text-slate-400">If zero, the order is sent for Cashier pricing review; it is not treated as free.</span></label>
               <label className="block text-xs font-bold text-slate-600">Priority<select value={visitingLabForm.priority} onChange={e=>setVisitingLabForm({...visitingLabForm,priority:e.target.value as "NORMAL"|"URGENT"|"STAT"})} className={inputClass}><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="STAT">STAT</option></select></label>
               <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Clinical notes<textarea rows={2} value={visitingLabForm.clinicalNotes} onChange={e=>setVisitingLabForm({...visitingLabForm,clinicalNotes:e.target.value})} className={inputClass} /></label>
             </div>
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">This visiting-lab workflow currently places the patient and test in the Laboratory queue. Payment/invoice linking for the separate visiting-lab patient record must be handled by Reception/Cashier using the approved local process.</p>
             <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingLabModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Laboratory"}</button></div>
           </form>
         </div>
