@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity, AlertTriangle, ArrowDownToLine, ArrowUpFromLine,
   Boxes, CheckCircle2, ClipboardList, LoaderCircle, Package, Plus,
@@ -50,6 +51,7 @@ const categoriesByDomain: Record<InventoryDomain, string[]> = {
 const departments = ["Optician", "Pharmacy", "Laboratory", "Nursing", "Consulting Room", "Reception", "Investigation Room", "Other"];
 
 export default function InventoryPage() {
+  const router = useRouter();
   const [items, setItems] = useState<InventoryItemRecord[]>([]);
   const [suppliers, setSuppliers] = useState<InventorySupplierRecord[]>([]);
   const [movements, setMovements] = useState<InventoryMovementRecord[]>([]);
@@ -133,7 +135,7 @@ export default function InventoryPage() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
-      window.location.href = "/";
+      router.push("/");
     }
   };
 
