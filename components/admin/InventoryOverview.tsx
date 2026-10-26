@@ -114,6 +114,7 @@ export default function InventoryOverview() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load updates state after its async request resolves.
     void load();
   }, [load]);
 
