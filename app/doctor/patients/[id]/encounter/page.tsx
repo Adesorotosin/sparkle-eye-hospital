@@ -20,7 +20,6 @@ import {
   Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
-import { sendTreatmentPlanToCashier } from "@/app/actions/treatment-billing";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
@@ -523,69 +522,6 @@ export default function DoctorEncounterPage() {
       setSavedStatus(status);
       setEncounterId(status === "draft" ? response.encounterId : undefined);
       setMessage(response.message);
-    });
-  };
-
-  const sendTreatmentPlanForBilling = () => {
-    setMessage("");
-    setError("");
-
-    if (!treatmentPlan.trim()) {
-      setError("Enter the treatment and follow-up plan before sending it to Cashier.");
-      document.getElementById("treatment")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-
-    setRequesting("cashier-treatment");
-    startTransition(async () => {
-      // Save the current clinical documentation first so Cashier receives
-      // the exact plan stored in the encounter, not unsaved text.
-      const saved = await saveConsultationEncounter({
-        patientId: patientCode,
-        encounterId,
-        presentingComplaint: historyText("presentingComplaints"),
-        historyOfPresentingComplaint: historyText("historyOfPresentingComplaints"),
-        pastMedicalHistory: historyText("pastMedicalHistory"),
-        pastOcularHistory: historyText("pastOcularHistory"),
-        familyOcularHistory: historyText("familyOcularHistory"),
-        historyProforma,
-        refractionNotes,
-        lensType,
-        ocularExamOD: JSON.stringify(ocularExamODRows),
-        ocularExamOS: JSON.stringify(ocularExamOSRows),
-        slitLampOD: "",
-        slitLampOS: "",
-        otherExaminationFindings: otherFindings,
-        iopOD: iopOD.trim() ? Number(iopOD) : null,
-        iopOS: iopOS.trim() ? Number(iopOS) : null,
-        iopInstrument,
-        refractionOD,
-        refractionOS,
-        diagnosis,
-        treatmentPlan,
-        status: "draft",
-      });
-
-      if (!saved.success || !saved.encounterId) {
-        setError(saved.message || "Save the consultation before sending the plan to Cashier.");
-        setRequesting("");
-        return;
-      }
-
-      setEncounterId(saved.encounterId);
-      setSavedStatus("draft");
-
-      const result = await sendTreatmentPlanToCashier({
-        patientCode,
-        encounterId: saved.encounterId,
-      });
-
-      if (result.success) {
-        setMessage(result.message);
-      } else {
-        setError(result.message);
-      }
-      setRequesting("");
     });
   };
 
@@ -1139,6 +1075,28 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
+          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
+            <div className="space-y-4">
+              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
+
+              <div className="rounded-2xl border p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <Pill className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="font-semibold">Prescription</h3>
+                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
+                  </div>
+                </div>
+                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
+                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
+                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
+                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
+                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
+                </button>
+              </div>
+            </div>
+          </Section>
+
           <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">Review the optometry result above where available, record the lens type and instructions, then send the order to the Optician. Supplier messages open in WhatsApp for staff review and manual sending.</p>
             <div className="grid gap-4 md:grid-cols-2">
@@ -1304,38 +1262,7 @@ export default function DoctorEncounterPage() {
             </div>
           </Section>
 
-          <Section id="treatment" title="Treatment / plan" icon={<Pill className="h-5 w-5" />}>
-            <div className="space-y-4">
-              <Field label="Treatment and follow-up plan" value={treatmentPlan} onChange={setTreatmentPlan} rows={5} />
-              <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-violet-950">Send treatment plan to Cashier</h3>
-                    <p className="mt-1 text-xs text-violet-800">The saved plan will appear in the Cashier billing-review queue. Cashier must select and price the actual billable service; this action does not create a charge or invoice.</p>
-                  </div>
-                  <button type="button" onClick={sendTreatmentPlanForBilling} disabled={isPending || requesting === "cashier-treatment" || !treatmentPlan.trim()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50">
-                    {requesting === "cashier-treatment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    {requesting === "cashier-treatment" ? "Sending to Cashier..." : "Send to Cashier"}
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-2xl border p-4">
-                <div className="mb-4 flex items-center gap-2">
-                  <Pill className="h-5 w-5 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold">Prescription</h3>
-                    <p className="text-xs text-gray-500">Write the prescription in plain language. Pharmacy will review the request, select the medication, and confirm quantity and price before billing.</p>
-                  </div>
-                </div>
-                <label htmlFor="prescription-text" className="mb-1.5 block text-sm font-medium text-gray-700">Prescription instructions</label>
-                <textarea id="prescription-text" value={prescriptionText} onChange={(e) => setPrescriptionText(e.target.value)} maxLength={5000} rows={5} placeholder="Enter medication name(s), strength, dose, route, frequency, duration, and any special instructions..." className={`${inputClass} min-h-32 w-full resize-y`} />
-                <p className="mt-1 text-xs text-gray-500">Do not enter prices here. The pharmacist will confirm the dispensed medication and approved price.</p>
-                <button onClick={prescribe} disabled={isPending || !prescriptionText.trim()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                  <Send className="h-4 w-4" /> Send Prescription to Pharmacy
-                </button>
-              </div>
-            </div>
-          </Section>
+
 
           <Section id="procedure-request" title="Procedure request" icon={<Calendar className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">Send a procedure request to Reception for registration, pricing confirmation and scheduling. Do not enter an unapproved price here.</p>
