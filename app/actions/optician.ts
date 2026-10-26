@@ -1504,7 +1504,7 @@ export interface OpticalChargeApprovalItem {
 
 export async function submitOpticalChargeForApproval(orderId: string): Promise<OpticianActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTICIAN"]);
+    const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
     const normalizedId = orderId?.trim();
     if (!normalizedId) return { success: false, message: "Optical order ID is required." };
 
