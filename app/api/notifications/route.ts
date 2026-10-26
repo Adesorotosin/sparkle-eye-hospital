@@ -55,7 +55,7 @@ type UnpaidInvoiceRow = {
   invoice_no?: string | null;
   grand_total?: number | string | null;
   created_at: string;
-  patients?: { full_name?: string | null } | null;
+  patients?: { full_name?: string | null } | { full_name?: string | null }[] | null;
 };
 
 type RiskyLoginRow = {
@@ -284,9 +284,10 @@ export async function GET() {
     // 2. UNPAID INVOICES
     // ----------------------------------------------------------
     unpaidInvoices.forEach((invoice: UnpaidInvoiceRow) => {
-      const patientName =
-        invoice.patients?.full_name ??
-        "a patient";
+      const patient = Array.isArray(invoice.patients)
+        ? invoice.patients[0]
+        : invoice.patients;
+      const patientName = patient?.full_name ?? "a patient";
 
       derived.push({
         id: `invoice-${invoice.id}`,
