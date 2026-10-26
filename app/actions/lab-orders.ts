@@ -269,6 +269,21 @@ export async function createLabOrder(
       };
     }
 
+    const { error: receptionHandoffError } = await supabaseServer
+      .from("clinical_handoffs")
+      .insert({
+        patient_id: patient.id,
+        destination: "RECEPTIONIST",
+        handoff_type: "PROCEDURE",
+        title: "Laboratory request: " + testName,
+        details: "Doctor-requested laboratory test for " + patient.full_name + " (" + patient.patient_code + "). Test: " + testName + "; specimen: " + specimenType + ". The laboratory queue receives the clinical order directly; Reception should coordinate patient readiness and follow-up. Order ID: " + labOrderId,
+        requested_by: staff.id,
+      });
+    if (receptionHandoffError) {
+      console.error("Laboratory Reception handoff failed after order creation:", receptionHandoffError);
+    }
+    revalidatePath("/receptionist");
+
     if (price === 0) {
       const { error: pricingHandoffError } = await supabaseServer
         .from("clinical_handoffs")
@@ -289,7 +304,7 @@ export async function createLabOrder(
       revalidatePath("/billing");
       revalidatePath("/cashier");
       revalidatePath("/doctor/patients/" + patient.patient_code + "/encounter");
-      return { success: true, message: testName + " has been ordered and sent to Cashier for approved pricing. No zero-cost invoice item was created.", id: labOrderId };
+      return { success: true, message: testName + " has been sent to Laboratory and Reception for coordination, and to Cashier for approved pricing. No zero-cost invoice item was created.", id: labOrderId };
     }
 
     let invoice;
@@ -384,7 +399,7 @@ export async function createLabOrder(
     return {
       success: true,
       message:
-        `${testName} has been ordered and added to the patient's laboratory bill.`,
+        `${testName} has been sent to Laboratory and Reception for coordination, and added to the patient's laboratory bill.`,
       id: labOrderId,
     };
   } catch (error) {
