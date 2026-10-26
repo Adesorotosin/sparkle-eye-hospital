@@ -63,7 +63,6 @@ export default function InventoryOverview() {
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       // Reuse the authenticated inventory server action instead of parsing an
       // API response that may be an HTML login/error page rather than JSON.
@@ -137,7 +136,7 @@ export default function InventoryOverview() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {data && <span className="text-[11px] text-slate-400">Updated {dateTime(data.updatedAt)}</span>}
-          <button type="button" onClick={() => void load()} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+          <button type="button" onClick={() => { setLoading(true); void load(); }} disabled={loading} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </button>
           <Link href="/inventory" className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-700">
