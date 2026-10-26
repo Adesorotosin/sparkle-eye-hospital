@@ -120,9 +120,10 @@ export async function getOptometryQueue(): Promise<{
 
     const patients: OptometryPatient[] = (
       data ?? []
-    ).map((patient: any) => {
+    ).map((rawPatient: unknown) => {
+      const patient = rawPatient as Record<string, unknown>;
       const vitals = Array.isArray(patient.vitals)
-        ? [...patient.vitals].sort(
+        ? [...(patient.vitals as Record<string, unknown>[])].sort(
             (a, b) =>
               new Date(
                 b.recorded_at ?? 0
@@ -131,7 +132,7 @@ export async function getOptometryQueue(): Promise<{
                 a.recorded_at ?? 0
               ).getTime()
           )[0]
-        : patient.vitals;
+        : (patient.vitals as Record<string, unknown> | null);
 
       return {
         id: patient.id,
@@ -166,7 +167,7 @@ export async function getOptometryQueue(): Promise<{
           vitals?.recorded_at ??
           patient.created_at ??
           null,
-      };
+      } as OptometryPatient;
     });
 
     return {
@@ -583,7 +584,7 @@ export async function getOptometryPatient(
 
     const optometryEncounter =
       encounters.find(
-        (encounter: any) =>
+        (encounter: Record<string, unknown>) =>
           encounter.encounter_type ===
           "optometry"
       );
