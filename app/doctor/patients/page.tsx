@@ -55,6 +55,36 @@ interface ActivityLogsResponse {
   logs: ActivityLog[];
 }
 
+const STATUS_TO_DISPLAY: Record<string, Patient["status"]> = {
+  waiting_triage: "Waiting for Triage",
+  in_consultation: "In Consultation",
+  completed_today: "Completed Today",
+};
+
+const STATUS_TO_DB: Record<Patient["status"], string> = {
+  "Waiting for Triage": "waiting_triage",
+  "In Consultation": "in_consultation",
+  "Completed Today": "completed_today",
+};
+
+function mapApiPatient(p: ApiPatient): Patient {
+  return {
+    id: p.patientId,
+    name: p.fullName,
+    isWalkIn: p.isWalkIn,
+    ageSex: \`\${p.age ?? "—"} Y / \${(p.gender || "—").charAt(0)}\`,
+    phone: p.phone || "—",
+    lastVisit: p.lastVisitAt
+      ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        })
+      : "—",
+    status: STATUS_TO_DISPLAY[p.status ?? ""] || "Waiting for Triage",
+  };
+}
+
 export default function PatientDirectoryPage() {
   // --- STATES ---
   const [globalSearch, setGlobalSearch] = useState("");
@@ -80,35 +110,6 @@ export default function PatientDirectoryPage() {
   // Real Patient Data — fetched from /api/patients (previously a hardcoded
   // array of "SESH-2026-xxx" ids disconnected from every other page)
   const [patients, setPatients] = useState<Patient[]>([]);
-
-  const STATUS_TO_DISPLAY: Record<string, Patient["status"]> = {
-    waiting_triage: "Waiting for Triage",
-    in_consultation: "In Consultation",
-    completed_today: "Completed Today",
-  };
-  const STATUS_TO_DB: Record<Patient["status"], string> = {
-    "Waiting for Triage": "waiting_triage",
-    "In Consultation": "in_consultation",
-    "Completed Today": "completed_today",
-  };
-
-  function mapApiPatient(p: ApiPatient): Patient {
-    return {
-      id: p.patientId,
-      name: p.fullName,
-      isWalkIn: p.isWalkIn,
-      ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
-      phone: p.phone || "—",
-      lastVisit: p.lastVisitAt
-        ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          })
-        : "—",
-      status: STATUS_TO_DISPLAY[p.status ?? ""] || "Waiting for Triage",
-    };
-  }
 
   useEffect(() => {
     let cancelled = false;
