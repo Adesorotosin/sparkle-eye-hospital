@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { Lock, Sparkles } from "lucide-react";
 
 interface SessionLockModalProps {
@@ -8,7 +8,6 @@ interface SessionLockModalProps {
 }
 
 export default function SessionLockScreen({ onUnlock }: SessionLockModalProps) {
-  const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
 
   const handleUnlockClick = () => {
     if (onUnlock) {
