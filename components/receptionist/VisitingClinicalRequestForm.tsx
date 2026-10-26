@@ -42,7 +42,7 @@ export default function VisitingClinicalRequestForm() {
   const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const resetFeedback = () => { setError(""); setMessage(""); setPatientCode(""); };
 
-  async function registerStandardPatient() {
+  async function registerStandardPatient(status: "waiting_triage" | "in_consultation" = "waiting_triage") {
     const response = await fetch("/api/patients", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -54,7 +54,7 @@ export default function VisitingClinicalRequestForm() {
         allergies: form.allergies.trim() || undefined,
         coveragePlan: "Self-Pay",
         isWalkIn: true,
-        status: "waiting_triage",
+        status,
       }),
     });
     const data = await response.json();
@@ -108,11 +108,11 @@ export default function VisitingClinicalRequestForm() {
         setPatientCode(result.patientCode);
         setMessage("Visiting patient registered for refraction. The request is available to Optometry; after assessment, the doctor can send the spectacle prescription to Inventory.");
       } else if (mode === "medication") {
-        const code = await registerStandardPatient();
+        const code = await registerStandardPatient("in_consultation");
         setPatientCode(code);
         setMessage("Visiting patient registered. Open the Pharmacy module to review and process the medication request.");
       } else {
-        const code = await registerStandardPatient();
+        const code = await registerStandardPatient("in_consultation");
         const result = await registerProcedure({
           patientCode: code,
           procedureCode: form.procedureCode,
@@ -145,7 +145,7 @@ export default function VisitingClinicalRequestForm() {
     <div className="mb-4"><h2 className="font-extrabold text-slate-950">Visiting patients & direct requests</h2><p className="mt-1 text-xs text-slate-500">Register an outside patient for a specific service without requiring the full Reception → Triage → Doctor route. Use the appropriate clinical queue for the actual assessment or procedure.</p></div>
     <div className="mb-5 flex flex-wrap gap-2">{modes.map((item) => { const Icon = item.icon; return <button key={item.key} type="button" onClick={() => { setMode(item.key); resetFeedback(); }} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold ${mode === item.key ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}><Icon className="h-4 w-4"/>{item.label}</button>; })}</div>
     {error && <p role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
-    {message && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><p>{message}</p>{patientCode && <p className="mt-2 font-bold">Patient code: {patientCode}</p>}{patientCode && mode === "medication" && <Link className="mt-2 inline-flex rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white" href={`/pharmacy?patientId=${encodeURIComponent(patientCode)}`}>Open in Pharmacy</Link>}{patientCode && mode === "refraction" && <Link className="mt-2 inline-flex rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white" href={`/optometry/${encodeURIComponent(patientCode)}`}>Open refraction record</Link>}</div>}
+    {message && <div role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"><p>{message}</p>{patientCode && <p className="mt-2 font-bold">Patient code: {patientCode}</p>}{patientCode && mode === "medication" && <Link className="mt-2 inline-flex rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white" href={`/pharmacy?patientId=${encodeURIComponent(patientCode)}`}>Open in Pharmacy</Link>}{mode === "investigation" && message && <Link className="mt-2 inline-flex rounded-lg border px-3 py-2 text-xs font-bold" href="/diagnostics">Open investigation queue</Link>}{mode === "laboratory" && message && <Link className="mt-2 inline-flex rounded-lg border px-3 py-2 text-xs font-bold" href="/laboratory">Open laboratory queue</Link>}{patientCode && mode === "refraction" && <Link className="mt-2 inline-flex rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white" href={`/optometry/${encodeURIComponent(patientCode)}`}>Open refraction record</Link>}</div>}
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <label className={label}>Patient full name *<input required className={field+" mt-1"} value={form.fullName} onChange={(e) => update("fullName",e.target.value)} /></label>
       <label className={label}>Age<input type="number" min="0" max="150" className={field+" mt-1"} value={form.age} onChange={(e) => update("age",e.target.value)} /></label>
