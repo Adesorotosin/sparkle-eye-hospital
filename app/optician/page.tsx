@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ClipboardList, Glasses, LogOut, RefreshCw } from "lucide-react";
 import { getOpticianQueue, type OpticalOrder } from "@/app/actions/optician";
 
 export default function OpticianDashboard() {
+  const router = useRouter();
   const [orders, setOrders] = useState<OpticalOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   async function loadOrders() {
-    setLoading(true);
-    setError("");
     try {
       const result = await getOpticianQueue();
       if (!result.success) throw new Error(result.message || "Unable to load spectacle prescriptions.");
@@ -30,7 +30,7 @@ export default function OpticianDashboard() {
     try { await fetch("/api/auth/logout", { method: "POST" }); }
     finally {
       localStorage.removeItem("sparkle_staff_token");
-      window.location.href = "/";
+      router.push("/");
     }
   }
 
@@ -39,7 +39,7 @@ export default function OpticianDashboard() {
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-3"><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Sparkle Eye Specialist Hospital</p><h1 className="text-xl font-extrabold">Spectacle prescriptions</h1><p className="text-xs text-slate-500">Review the prescription sent by the doctor. Glasses production is managed by Inventory.</p></div></div>
-          <div className="flex gap-2"><button onClick={() => void loadOrders()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button><button onClick={() => void logout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><LogOut className="h-4 w-4" /> Sign out</button></div>
+          <div className="flex gap-2"><button onClick={() => { setLoading(true); void loadOrders(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button><button onClick={() => void logout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><LogOut className="h-4 w-4" /> Sign out</button></div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl space-y-5 px-5 py-8 sm:px-8">
