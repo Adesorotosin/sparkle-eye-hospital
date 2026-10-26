@@ -95,7 +95,7 @@ export default function AdminBillingSettingsPage() {
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-200">Administrator controls</p>
               <h1 className="mt-1 text-2xl font-extrabold tracking-tight">Billing & VAT Settings</h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-violet-100">
-                Configure whether VAT is applied to unpaid invoices and set the hospital's VAT rate. Cashiers can collect payment but cannot change this policy.
+                Configure whether VAT is applied to unpaid invoices and set the hospital&apos;s VAT rate. Cashiers can collect payment but cannot change this policy.
               </p>
             </div>
           </div>
