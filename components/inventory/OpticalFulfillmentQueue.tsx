@@ -17,6 +17,7 @@ type Draft = {
   lensMaterial: string;
   lensCoating: string;
   pdBinocular: string;
+  pdNear: string;
   pdOD: string;
   pdOS: string;
   segmentHeightOD: string;
@@ -31,6 +32,7 @@ const toDraft = (order: OpticalOrder): Draft => ({
   lensMaterial: order.lensMaterial || "",
   lensCoating: order.lensCoating || "",
   pdBinocular: order.pdBinocular || "",
+  pdNear: order.pdNear || "",
   pdOD: order.pdOD || "",
   pdOS: order.pdOS || "",
   segmentHeightOD: order.segmentHeightOD || "",
@@ -95,6 +97,7 @@ export default function OpticalFulfillmentQueue() {
       lensMaterial: draft.lensMaterial,
       lensCoating: draft.lensCoating,
       pdBinocular: draft.pdBinocular,
+      pdNear: draft.pdNear,
       pdOD: draft.pdOD,
       pdOS: draft.pdOS,
       segmentHeightOD: draft.segmentHeightOD,
@@ -128,6 +131,7 @@ export default function OpticalFulfillmentQueue() {
           <label className={labelClass}>Lens material<input className={inputClass+" mt-1"} value={draft.lensMaterial} onChange={(e) => edit(order.id,"lensMaterial",e.target.value)} placeholder="Lens material"/></label>
           <label className={labelClass}>Lens finish / coating<input className={inputClass+" mt-1"} value={draft.lensCoating} onChange={(e) => edit(order.id,"lensCoating",e.target.value)} placeholder="White, photochromic, blue coated…"/></label>
           <label className={labelClass}>Distance IPD — binocular (mm)<input className={inputClass+" mt-1"} value={draft.pdBinocular} onChange={(e) => edit(order.id,"pdBinocular",e.target.value)} placeholder="Distance IPD"/></label>
+          <label className={labelClass}>Near IPD (mm)<input className={inputClass+" mt-1"} value={draft.pdNear} onChange={(e) => edit(order.id,"pdNear",e.target.value)} placeholder="Near IPD"/></label>
           <label className={labelClass}>Monocular IPD — R / L (mm)<div className="mt-1 grid grid-cols-2 gap-2"><input aria-label="Right monocular IPD" className={inputClass} value={draft.pdOD} onChange={(e) => edit(order.id,"pdOD",e.target.value)} placeholder="Right"/><input aria-label="Left monocular IPD" className={inputClass} value={draft.pdOS} onChange={(e) => edit(order.id,"pdOS",e.target.value)} placeholder="Left"/></div></label>
           <label className={labelClass}>Segment height — R / L (mm)<div className="mt-1 grid grid-cols-2 gap-2"><input aria-label="Right segment height" className={inputClass} value={draft.segmentHeightOD} onChange={(e) => edit(order.id,"segmentHeightOD",e.target.value)} placeholder="Right"/><input aria-label="Left segment height" className={inputClass} value={draft.segmentHeightOS} onChange={(e) => edit(order.id,"segmentHeightOS",e.target.value)} placeholder="Left"/></div></label>
           <label className={labelClass}>Optical charge (₦)<input type="number" min="0" step="0.01" className={inputClass+" mt-1"} value={draft.opticalCharge} onChange={(e) => edit(order.id,"opticalCharge",e.target.value)} placeholder="Enter approved charge"/></label>
