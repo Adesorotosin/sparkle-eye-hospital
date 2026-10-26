@@ -914,7 +914,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
       if (typeof window !== "undefined") {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = "/";
+        router.push("/");
       }
     }
   };
