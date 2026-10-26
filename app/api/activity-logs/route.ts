@@ -5,6 +5,19 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
+type ActivityLogRow = {
+  id: string;
+  created_at: string;
+  performed_by?: string | null;
+  staff?: { name?: string | null; staff_id?: string | null; role?: string | null } | null;
+  category?: string | null;
+  action: string;
+  details?: string | null;
+  financial_amount?: number | string | null;
+  module?: string | null;
+  patients?: { full_name?: string | null } | null;
+};
+
 function roleColorFor(
   role: string | null
 ) {
@@ -104,7 +117,7 @@ export async function GET(
 
     let logs = (
       data ?? []
-    ).map((row: any) => ({
+    ).map((row: ActivityLogRow) => ({
       id: row.id,
       timestamp:
         row.created_at,
