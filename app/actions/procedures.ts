@@ -19,11 +19,11 @@ type ProcedureRegistrationSummary = {
   id: string;
   procedureName: string;
   referralType: string;
-  orderReference: string | null;
-  scheduledDate: string | null;
+  orderReference: string;
+  scheduledDate?: string | null;
   price: number;
   status: string;
-  createdAt: string;
+  createdAt?: string;
   patientCode: string;
   registrationNumber: string | null;
   patientName: string;
@@ -228,7 +228,7 @@ export async function getRecentProcedures() {
           id: row.id,
           procedureName: row.procedure_name,
           referralType: row.referral_type,
-          orderReference: row.order_reference ?? null,
+          orderReference: String(row.order_reference ?? ""),
           scheduledDate: row.scheduled_date ?? null,
           price: Number(row.price ?? 0),
           status: row.status,
