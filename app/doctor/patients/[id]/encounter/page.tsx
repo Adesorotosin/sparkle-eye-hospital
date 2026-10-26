@@ -318,7 +318,8 @@ export default function DoctorEncounterPage() {
   const patientCode = params?.id ?? "";
   const [isPending, startTransition] = useTransition();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadedPatientCode, setLoadedPatientCode] = useState<string | null>(null);
+  const loading = Boolean(patientCode) && loadedPatientCode !== patientCode;
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [savedStatus, setSavedStatus] = useState<"draft" | "completed">("draft");
@@ -364,7 +365,7 @@ export default function DoctorEncounterPage() {
   const [requesting, setRequesting] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
-  const [optometryResult, setOptometryResult] = useState<any>(null);
+  const [optometryResult, setOptometryResult] = useState<{ previousOptometryEncounter?: { status?: string | null } | null } | null>(null);
 
   const latestEncounter = patient?.encounters?.[0];
   const optometryAssessmentCompleted =
@@ -386,7 +387,6 @@ export default function DoctorEncounterPage() {
     if (!patientCode) return;
 
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/patients/${encodeURIComponent(patientCode)}`, { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
@@ -456,7 +456,7 @@ export default function DoctorEncounterPage() {
         if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load patient.");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedPatientCode(patientCode);
       });
 
     return () => {
@@ -982,7 +982,7 @@ export default function DoctorEncounterPage() {
 
           <Section id="gonioscopy" title="Gonioscopy" icon={<Activity className="h-5 w-5" />}>
             <p className="mb-4 text-sm text-gray-500">
-              Record the gonioscopy findings for each eye. These findings are saved to the patient's clinical record.
+              Record the gonioscopy findings for each eye. These findings are saved to the patient&apos;s clinical record.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <Field
