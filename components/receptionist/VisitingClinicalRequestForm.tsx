@@ -123,7 +123,9 @@ export default function VisitingClinicalRequestForm() {
         });
         if (!result.success) {
           setPatientCode(code);
-          throw new Error(`Patient registered with code ${code}, but the procedure request failed: ${result.message} You can retry the procedure from Reception actions.`);
+          throw new Error(result.message.includes("Do not register it again")
+            ? result.message
+            : `Patient registered with code ${code}, but the procedure request failed: ${result.message} You can retry the procedure from Reception actions.`);
         }
         setPatientCode(code);
         setMessage(result.message);
