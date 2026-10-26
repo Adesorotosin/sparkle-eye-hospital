@@ -332,6 +332,7 @@ export default function OptometryExaminationPage() {
 
   useEffect(() => {
     if (patientCode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPatient updates state after its async request resolves.
       void loadPatient();
     }
   }, [loadPatient]);
