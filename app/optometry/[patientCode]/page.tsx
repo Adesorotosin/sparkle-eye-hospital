@@ -702,7 +702,7 @@ export default function OptometryExaminationPage() {
                 </span>
 
                 <span className="block text-xs text-slate-500">
-                  Visual acuity was measured with the patient's current correction.
+                  Visual acuity was measured with the patient&apos;s current correction.
                 </span>
               </span>
             </label>
