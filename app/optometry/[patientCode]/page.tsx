@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import React, {
   useCallback,
   useEffect,
@@ -476,9 +477,11 @@ export default function OptometryExaminationPage() {
             </button>
 
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
-              <img
+              <Image
                 src="/Logo.png"
                 alt="Sparkle Eye Specialist Hospital"
+                width={40}
+                height={40}
                 className="h-full w-full object-contain"
               />
             </div>
