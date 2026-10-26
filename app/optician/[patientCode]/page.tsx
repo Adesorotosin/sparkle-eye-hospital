@@ -15,9 +15,10 @@ function formatRx(value: unknown) {
   const objective = asRecord(root.objective);
   const hasValues = (item: Record<string, unknown> | null) => Boolean(item && ["sphere", "cylinder", "axis", "add"].some((key) => item[key] !== null && item[key] !== undefined && String(item[key]).trim() !== ""));
   const rx = hasValues(subjective) ? subjective! : hasValues(objective) ? objective! : root;
-  const parts = [
+  const fields: Array<[string, unknown]> = [
     ["SPH", rx.sphere], ["CYL", rx.cylinder], ["AXIS", rx.axis], ["ADD", rx.add],
-  ].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "").map(([label, value]) => `${label} ${String(value)}`);
+  ];
+  const parts = fields.filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "").map(([label, value]) => `${label} ${String(value)}`);
   return parts.join(" · ") || "—";
 }
 
