@@ -48,7 +48,7 @@ function rxValue(refraction: Record<string, unknown> | null, key: string) {
   const objective = refraction.objective && typeof refraction.objective === "object" ? refraction.objective as Record<string, unknown> : null;
   const hasValues = (values: Record<string, unknown> | null) => Boolean(values && Object.values(values).some(value => value !== null && value !== undefined && String(value).trim() !== ""));
   const values = hasValues(subjective) ? subjective : hasValues(objective) ? objective : refraction;
-  const value = values[key];
+  const value = (values ?? refraction)[key];
   return value === null || value === undefined || String(value).trim() === "" ? "—" : String(value);
 }
 
