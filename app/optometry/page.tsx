@@ -249,7 +249,7 @@ export default function OptometryDashboard() {
         "sparkle_staff_token"
       );
 
-      window.location.href = "/";
+      router.push("/");
     }
   }
 
