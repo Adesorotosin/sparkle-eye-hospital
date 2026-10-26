@@ -91,7 +91,8 @@ export default function OptometryDashboard() {
   );
 
   useEffect(() => {
-    loadQueue();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadQueue updates state after its async request resolves.
+    void loadQueue();
   }, [loadQueue]);
 
   const waiting = patients.filter(
