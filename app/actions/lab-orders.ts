@@ -65,6 +65,7 @@ const LAB_ORDER_CREATE_ROLES: UserRole[] = [
   "IT_ADMIN",
   "OPHTHALMOLOGIST",
   "DOCTOR",
+  "RECEPTIONIST",
 ];
 
 const LAB_ORDER_VIEW_ROLES: UserRole[] = [
