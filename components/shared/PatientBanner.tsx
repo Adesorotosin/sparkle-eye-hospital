@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import {
   User,
   Eye,
@@ -65,7 +66,7 @@ export default function PatientBanner({ patient, activeModule }: PatientBannerPr
           <div className="relative">
             <div className="w-14 h-14 rounded-2xl bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5] font-bold text-xl flex items-center justify-center shadow-sm overflow-hidden">
               {patient.avatarUrl ? (
-                <img src={patient.avatarUrl} alt={patient.name} className="w-full h-full object-cover" />
+                <Image src={patient.avatarUrl} alt={patient.name} width={56} height={56} unoptimized className="w-full h-full object-cover" />
               ) : (
                 patient.name
                   .split(" ")
