@@ -386,7 +386,10 @@ export default function DoctorEncounterPage() {
       const saved = window.localStorage.getItem("sparkle-eye-supplier-contacts");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) setSupplierContacts(parsed.filter((item) => item && typeof item.name === "string" && typeof item.phone === "string"));
+        if (Array.isArray(parsed)) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate optional browser-only shortcuts from localStorage.
+          setSupplierContacts(parsed.filter((item) => item && typeof item.name === "string" && typeof item.phone === "string"));
+        }
       }
     } catch {
       // Supplier shortcuts are optional; manual entry remains available.
