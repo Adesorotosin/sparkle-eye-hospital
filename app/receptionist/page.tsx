@@ -707,7 +707,7 @@ export default function ReceptionistPage() {
                     "sparkle_staff_token"
                   );
 
-                  window.location.href = "/";
+                  router.push("/");
                 }
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
