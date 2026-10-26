@@ -165,7 +165,7 @@ const HISTORY_SECTIONS = [
   { key: "familyHistory", title: "6. Family and social history", options: ["Family illness: none known", "Family hypertension", "Family diabetes", "Other family illness", "Family illness unknown", "Smoking: never", "Smoking: past", "Smoking: current", "Alcohol: none", "Alcohol: past", "Alcohol: current"] },
   { key: "familyOcularHistory", title: "7. Family ocular history", options: ["None known", "Glaucoma", "Blindness", "Cataract", "Other eye condition", "Relative: parent", "Relative: sibling", "Relative: child", "Relative: other", "Not applicable"] },
   { key: "socialOccupationalHistory", title: "8. Additional social / occupational notes", options: ["Smoking history reviewed", "Alcohol history reviewed", "Occupation / exposure notes"] },
-
+] as const;
 
 const OCULAR_PARTS = [
   "Lid", "Globe", "Extraocular muscle movement", "Conjunctiva", "Cornea",
