@@ -49,6 +49,7 @@ export default function OpticalChargeApprovalsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadApprovals updates state after its async request resolves.
     void loadApprovals();
   }, [loadApprovals]);
 
