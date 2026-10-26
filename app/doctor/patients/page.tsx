@@ -72,7 +72,7 @@ function mapApiPatient(p: ApiPatient): Patient {
     id: p.patientId,
     name: p.fullName,
     isWalkIn: p.isWalkIn,
-    ageSex: \`\${p.age ?? "—"} Y / \${(p.gender || "—").charAt(0)}\`,
+    ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
     phone: p.phone || "—",
     lastVisit: p.lastVisitAt
       ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
@@ -155,7 +155,7 @@ export default function PatientDirectoryPage() {
           logs.slice(0, 6).map((log, idx) => ({
             id: log.id,
             title: log.action,
-            desc: log.details || \`Logged by \${log.user || "Unknown user"}\`,
+            desc: log.details || `Logged by ${log.user || "Unknown user"}`,
             time: new Date(log.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
