@@ -365,7 +365,17 @@ export default function DoctorEncounterPage() {
   const [requesting, setRequesting] = useState("");
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
-  const [optometryResult, setOptometryResult] = useState<{ previousOptometryEncounter?: { status?: string | null } | null } | null>(null);
+  const [optometryResult, setOptometryResult] = useState<{
+    previousOptometryEncounter?: {
+      status?: string | null;
+      visualAcuityOD?: string | null;
+      visualAcuityOS?: string | null;
+      visualAcuityOU?: string | null;
+      diagnosis?: string | null;
+      refractionOD?: unknown;
+      refractionOS?: unknown;
+    } | null;
+  } | null>(null);
 
   const latestEncounter = patient?.encounters?.[0];
   const optometryAssessmentCompleted =
