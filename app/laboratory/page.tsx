@@ -458,6 +458,7 @@ export default function LaboratoryPage() {
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate the user's locally saved seen-request IDs.
           setSeenRequestIds(parsed);
         }
       }
