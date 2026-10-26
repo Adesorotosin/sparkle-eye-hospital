@@ -458,7 +458,7 @@ export async function createVisitingLabOrder(
   input: VisitingLabOrderInput
 ): Promise<LabOrderResponse> {
   try {
-    const staff = await getLabStaff();
+    const staff = await requireRole(["IT_ADMIN", "LAB_SCIENTIST", "RECEPTIONIST"]);
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();
@@ -517,7 +517,8 @@ export async function createVisitingLabOrder(
       details: { orderId, visitingPatientId: visitingPatient.id, fullName, sourceCenter, testCode, testName, specimenType, priority },
     });
     revalidatePath("/laboratory");
-    return { success: true, message: `${testName} has been added to the visiting laboratory queue.`, id: orderId };
+    revalidatePath("/receptionist");
+    return { success: true, message: `${testName} has been added to the visiting laboratory queue. Reception should coordinate payment and the patient’s return when ready.`, id: orderId };
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHENTICATED") {
       return { success: false, message: "You must be signed in to perform this action." };
