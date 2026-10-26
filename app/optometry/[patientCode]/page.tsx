@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useCallback,
   useEffect,
   useState,
   useTransition,
@@ -180,9 +181,7 @@ export default function OptometryExaminationPage() {
 
 
 
-  async function loadPatient() {
-    setLoading(true);
-    setError("");
+  const loadPatient = useCallback(async () => {
 
     try {
       const result =
@@ -328,13 +327,13 @@ export default function OptometryExaminationPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [patientCode]);
 
   useEffect(() => {
     if (patientCode) {
-      loadPatient();
+      void loadPatient();
     }
-  }, [patientCode]);
+  }, [loadPatient]);
 
   function updateRefraction(
     eye: "OD" | "OS",
