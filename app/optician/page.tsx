@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Glasses, RefreshCw } from "lucide-react";
+import { Glasses } from "lucide-react";
 import { getOpticianQueue, type OpticalOrder } from "@/app/actions/optician";
 
 function refractionText(value: Record<string, unknown> | null | undefined) {
