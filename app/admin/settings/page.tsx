@@ -1283,7 +1283,7 @@ export default function AdminSettingsPage() {
                 </h3>
 
                 <p className="text-xs text-[#64748B] mt-1">
-                  Configure the facility's operating
+                  Configure the facility&apos;s operating
                   schedule.
                 </p>
               </div>
