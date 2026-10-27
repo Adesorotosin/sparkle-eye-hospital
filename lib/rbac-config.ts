@@ -113,7 +113,6 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   ],
 
   "/appointments": [
-    "RECEPTIONIST",
     "NURSE",
     "DOCTOR",
     "OPHTHALMOLOGIST",
