@@ -650,7 +650,11 @@ export async function createOpticalOrder(
     }
 
     if (existingOrder) {
-      const orderUpdates: Record<string, string | null> = { ...prescriptionFields };
+      const orderUpdates: Record<string, string | null> = Object.fromEntries(
+        Object.entries(prescriptionFields).filter(([key, value]) =>
+          key === "prescription_date" || key === "prescriber_name" || key === "prescriber_signature" || value !== null
+        )
+      );
       if (Object.keys(orderUpdates).length > 0) {
         const { error: updateOrderError } = await supabaseServer
           .from("optical_orders")
