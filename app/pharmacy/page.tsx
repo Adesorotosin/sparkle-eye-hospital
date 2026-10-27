@@ -22,7 +22,6 @@ import {
   Pill,
   Check,
   Syringe,
-  Plus,
   X,
   UserPlus,
   LogOut,
@@ -171,7 +170,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
     useState<DrugStockItem[]>([]);
 
   const [isLoadingDrugInventory, setIsLoadingDrugInventory] =
-    useState(false);
+    useState(true);
 
   const [stockSearch, setStockSearch] = useState("");
 
@@ -857,8 +856,6 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
    */
 
   const loadDrugInventory = useCallback(async () => {
-    setIsLoadingDrugInventory(true);
-
     try {
       const response = await fetch("/api/inventory?domain=pharmacy");
 
@@ -1570,7 +1567,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
                   />
                   <button
                     type="button"
-                    onClick={() => void loadDrugInventory()}
+                    onClick={() => { setIsLoadingDrugInventory(true); void loadDrugInventory(); }}
                     disabled={isLoadingDrugInventory}
                     className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   >
