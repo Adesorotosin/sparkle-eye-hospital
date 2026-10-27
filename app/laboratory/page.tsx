@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -1531,6 +1533,7 @@ export default function LaboratoryPage() {
         </header>
 
         <main className="mx-auto max-w-375 px-5 py-6 lg:px-8">
+        <PatientVisitRoutingQueue destination="LABORATORY" />
           {actionMessage && (
             <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
               {actionMessage}
