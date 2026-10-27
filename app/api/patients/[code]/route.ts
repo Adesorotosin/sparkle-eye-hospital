@@ -23,7 +23,6 @@ const PATIENT_UPDATE_ROLES = [
   "OPHTHALMOLOGIST",
   "DOCTOR",
   "NURSE",
-  "RECEPTIONIST",
   "PHARMACIST",
 ] as const;
 
