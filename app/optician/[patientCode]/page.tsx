@@ -62,13 +62,13 @@ export default function OpticianPatientPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
+      <header className="print:hidden border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <Link href="/optician" className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-violet-700"><ArrowLeft className="h-4 w-4" /> Back to prescriptions</Link>
-          <button onClick={() => { setLoading(true); void loadPrescription(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button>
+          <div className="flex gap-2"><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white"><span>Print prescription</span></button><button onClick={() => { setLoading(true); void loadPrescription(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button></div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8">
+      <main className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8 print:max-w-none print:px-0 print:py-0">
         {loading ? <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white p-12 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading spectacle prescription…</div> : error ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{error}</div> : patient ? <>
           <section className="rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex items-start gap-4"><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-6 w-6" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Spectacle prescription</p><h1 className="mt-1 text-2xl font-extrabold">{patient.fullName}</h1><p className="mt-2 text-sm text-slate-500">{patient.patientCode}{patient.age !== null ? ` · ${patient.age} years` : ""}{patient.gender ? ` · ${patient.gender}` : ""}{patient.phone ? ` · ${patient.phone}` : ""}</p></div></div>
