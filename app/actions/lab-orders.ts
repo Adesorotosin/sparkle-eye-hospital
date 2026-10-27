@@ -65,7 +65,6 @@ const LAB_ORDER_CREATE_ROLES: UserRole[] = [
   "IT_ADMIN",
   "OPHTHALMOLOGIST",
   "DOCTOR",
-  "RECEPTIONIST",
 ];
 
 const LAB_ORDER_VIEW_ROLES: UserRole[] = [
@@ -459,7 +458,7 @@ export async function createVisitingLabOrder(
   input: VisitingLabOrderInput
 ): Promise<LabOrderResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "LAB_SCIENTIST", "RECEPTIONIST"]);
+    const staff = await requireRole(["IT_ADMIN", "LAB_SCIENTIST"]);
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();
