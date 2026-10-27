@@ -47,6 +47,14 @@ export type OpticalOrder = {
 
   dispensingNotes?: string;
 
+  prescriptionDate: string | null;
+  prescriberName: string | null;
+  prescriberSignature: string | null;
+  rightSph: string; rightCyl: string; rightAxis: string; rightAdd: string; rightFinalVA: string; rightNearVA: string;
+  leftSph: string; leftCyl: string; leftAxis: string; leftAdd: string; leftFinalVA: string; leftNearVA: string;
+  lensFinish: string;
+  nearIPD: string;
+
   opticalCharge: number;
   invoiceId: string | null;
   chargeApprovalStatus: "not_submitted" | "pending" | "approved" | "rejected";
@@ -187,6 +195,23 @@ export async function getOpticianQueue(): Promise<{
         lens_material,
         lens_coating,
         dispensing_notes,
+        prescription_date,
+        prescriber_name,
+        prescriber_signature,
+        right_sph,
+        right_cyl,
+        right_axis,
+        right_add,
+        right_final_va,
+        right_near_va,
+        left_sph,
+        left_cyl,
+        left_axis,
+        left_add,
+        left_final_va,
+        left_near_va,
+        lens_finish,
+        near_ipd,
         optical_charge,
         invoice_id,
         charge_approval_status,
@@ -405,6 +430,24 @@ export async function getOpticianQueue(): Promise<{
               order.dispensing_notes ??
               "",
 
+            prescriptionDate: order.prescription_date ?? null,
+            prescriberName: order.prescriber_name ?? null,
+            prescriberSignature: order.prescriber_signature ?? null,
+            rightSph: order.right_sph ?? "",
+            rightCyl: order.right_cyl ?? "",
+            rightAxis: order.right_axis ?? "",
+            rightAdd: order.right_add ?? "",
+            rightFinalVA: order.right_final_va ?? "",
+            rightNearVA: order.right_near_va ?? "",
+            leftSph: order.left_sph ?? "",
+            leftCyl: order.left_cyl ?? "",
+            leftAxis: order.left_axis ?? "",
+            leftAdd: order.left_add ?? "",
+            leftFinalVA: order.left_final_va ?? "",
+            leftNearVA: order.left_near_va ?? "",
+            lensFinish: order.lens_finish ?? "",
+            nearIPD: order.near_ipd ?? "",
+
             opticalCharge:
               normalizeMoney(
                 order.optical_charge as string | number | null | undefined
@@ -472,9 +515,17 @@ export async function getOpticianQueue(): Promise<{
  *
  * Optometry → Doctor review → Optician
  */
+export type DoctorSpectaclePrescription = {
+  rightSph: string; rightCyl: string; rightAxis: string; rightAdd: string; rightFinalVA: string; rightNearVA: string;
+  leftSph: string; leftCyl: string; leftAxis: string; leftAdd: string; leftFinalVA: string; leftNearVA: string;
+  lensType: string; lensFinish: string; distanceIPD: string; nearIPD: string;
+  monocularIPDR: string; monocularIPDL: string; segmentHeightR: string; segmentHeightL: string;
+  notes: string; prescriptionDate: string;
+};
+
 export async function createOpticalOrder(
   patientCode: string,
-  instructions: { lensType?: string; refractionNotes?: string } = {}
+  instructions: { lensType?: string; refractionNotes?: string; prescription?: DoctorSpectaclePrescription } = {}
 ): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole([
@@ -522,46 +573,53 @@ export async function createOpticalOrder(
       };
     }
 
+    // Keep a completed Optometry encounter linked when available, but the
+    // doctor-authored spectacle prescription does not depend on that workflow.
     const {
       data: optometryEncounter,
       error: encounterError,
     } = await supabaseServer
       .from("encounters")
-      .select(`
-        id,
-        encounter_type,
-        status,
-        created_at
-      `)
-      .eq(
-        "patient_id",
-        patient.id
-      )
-      .eq(
-        "encounter_type",
-        "optometry"
-      )
-      .eq(
-        "status",
-        "completed"
-      )
-      .order("created_at", {
-        ascending: false,
-      })
+      .select("id, encounter_type, status, created_at")
+      .eq("patient_id", patient.id)
+      .eq("encounter_type", "optometry")
+      .eq("status", "completed")
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (encounterError) {
-      throw encounterError;
-    }
+    if (encounterError) throw encounterError;
 
-    if (!optometryEncounter) {
-      return {
-        success: false,
-        message:
-          "The patient does not have a completed Optometry assessment yet.",
-      };
-    }
+    const prescription = instructions.prescription;
+    const prescribedAt = prescription?.prescriptionDate || new Date().toISOString().slice(0, 10);
+    const prescribedBy = staff.name || "Authorised doctor";
+    const signature = "Electronically authorised by " + prescribedBy;
+    const prescriptionFields: Record<string, string | null> = {
+      prescription_date: prescribedAt,
+      prescriber_name: prescribedBy,
+      prescriber_signature: signature,
+      right_sph: prescription?.rightSph?.trim() || null,
+      right_cyl: prescription?.rightCyl?.trim() || null,
+      right_axis: prescription?.rightAxis?.trim() || null,
+      right_add: prescription?.rightAdd?.trim() || null,
+      right_final_va: prescription?.rightFinalVA?.trim() || null,
+      right_near_va: prescription?.rightNearVA?.trim() || null,
+      left_sph: prescription?.leftSph?.trim() || null,
+      left_cyl: prescription?.leftCyl?.trim() || null,
+      left_axis: prescription?.leftAxis?.trim() || null,
+      left_add: prescription?.leftAdd?.trim() || null,
+      left_final_va: prescription?.leftFinalVA?.trim() || null,
+      left_near_va: prescription?.leftNearVA?.trim() || null,
+      lens_type: prescription?.lensType?.trim() || instructions.lensType?.trim() || null,
+      lens_finish: prescription?.lensFinish?.trim() || null,
+      pd_binocular: prescription?.distanceIPD?.trim() || null,
+      near_ipd: prescription?.nearIPD?.trim() || null,
+      pd_od: prescription?.monocularIPDR?.trim() || null,
+      pd_os: prescription?.monocularIPDL?.trim() || null,
+      segment_height_od: prescription?.segmentHeightR?.trim() || null,
+      segment_height_os: prescription?.segmentHeightL?.trim() || null,
+      dispensing_notes: prescription?.notes?.trim() || instructions.refractionNotes?.trim() || null,
+    };
 
     const {
       data: existingOrder,
@@ -592,9 +650,7 @@ export async function createOpticalOrder(
     }
 
     if (existingOrder) {
-      const orderUpdates: Record<string, string> = {};
-      if (instructions.lensType?.trim()) orderUpdates.lens_type = instructions.lensType.trim();
-      if (instructions.refractionNotes?.trim()) orderUpdates.dispensing_notes = instructions.refractionNotes.trim();
+      const orderUpdates: Record<string, string | null> = { ...prescriptionFields };
       if (Object.keys(orderUpdates).length > 0) {
         const { error: updateOrderError } = await supabaseServer
           .from("optical_orders")
@@ -619,13 +675,12 @@ export async function createOpticalOrder(
           patient.id,
 
         optometry_encounter_id:
-          optometryEncounter.id,
+          optometryEncounter?.id ?? null,
 
         status:
           "referred",
 
-        lens_type: instructions.lensType?.trim() || null,
-        dispensing_notes: instructions.refractionNotes?.trim() || null,
+        ...prescriptionFields,
 
         referred_at:
           new Date().toISOString(),
@@ -647,7 +702,7 @@ export async function createOpticalOrder(
         destination: "RECEPTIONIST",
         handoff_type: "PROCEDURE",
         title: "Spectacle / optical request",
-        details: "Doctor-requested spectacles for " + patient.full_name + " (" + patient.patient_code + "). Lens type: " + (instructions.lensType?.trim() || "See spectacle prescription") + ". The Inventory module manages frame selection, optical lab production, readiness and collection. Reception should coordinate patient readiness and follow-up.",
+        details: "Doctor-authored spectacle prescription for " + patient.full_name + " (" + patient.patient_code + "). Lens type: " + (prescription?.lensType?.trim() || instructions.lensType?.trim() || "See spectacle prescription") + ". The Inventory module manages frame selection, optical lab production, readiness and collection. Reception should coordinate patient readiness and follow-up.",
         requested_by: staff.id,
       });
     if (receptionHandoffError) {
@@ -673,7 +728,8 @@ export async function createOpticalOrder(
           patientName:
             patient.full_name,
           optometryEncounterId:
-            optometryEncounter.id,
+            optometryEncounter?.id ?? null,
+          prescriberName: prescribedBy,
           opticalOrderId:
             createdOrder.id,
         }),
@@ -969,15 +1025,6 @@ export async function getOpticianPatient(
       throw encounterError;
     }
 
-    if (!optometryEncounter) {
-      return {
-        success: false,
-        patient: null,
-        message:
-          "No completed Optometry assessment was found for this patient.",
-      };
-    }
-
     const {
       data: order,
       error: orderError,
@@ -997,6 +1044,23 @@ export async function getOpticianPatient(
         lens_material,
         lens_coating,
         dispensing_notes,
+        prescription_date,
+        prescriber_name,
+        prescriber_signature,
+        right_sph,
+        right_cyl,
+        right_axis,
+        right_add,
+        right_final_va,
+        right_near_va,
+        left_sph,
+        left_cyl,
+        left_axis,
+        left_add,
+        left_final_va,
+        left_near_va,
+        lens_finish,
+        near_ipd,
         optical_charge,
         invoice_id,
         charge_approval_status,
@@ -1055,47 +1119,47 @@ export async function getOpticianPatient(
 
         optometry: {
           id:
-            optometryEncounter.id,
+            optometryEncounter?.id ?? null,
 
           visualAcuityOD:
-            optometryEncounter.visual_acuity_od ??
+            optometryEncounter?.visual_acuity_od ??
             "",
 
           visualAcuityOS:
-            optometryEncounter.visual_acuity_os ??
+            optometryEncounter?.visual_acuity_os ??
             "",
 
           visualAcuityOU:
-            optometryEncounter.visual_acuity_ou ??
+            optometryEncounter?.visual_acuity_ou ??
             "",
 
           withCorrection:
             Boolean(
-              optometryEncounter.with_correction
+              optometryEncounter?.with_correction
             ),
 
           refractionOD:
-            optometryEncounter.refraction_od ??
+            optometryEncounter?.refraction_od ??
             null,
 
           refractionOS:
-            optometryEncounter.refraction_os ??
+            optometryEncounter?.refraction_os ??
             null,
 
           slitLampOD:
-            optometryEncounter.slit_lamp_od ??
+            optometryEncounter?.slit_lamp_od ??
             "",
 
           slitLampOS:
-            optometryEncounter.slit_lamp_os ??
+            optometryEncounter?.slit_lamp_os ??
             "",
 
           diagnosis:
-            optometryEncounter.diagnosis ??
+            optometryEncounter?.diagnosis ??
             "",
 
           createdAt:
-            optometryEncounter.created_at,
+            optometryEncounter?.created_at ?? "",
         },
 
         opticalOrder: order
@@ -1145,6 +1209,24 @@ export async function getOpticianPatient(
               dispensingNotes:
                 order.dispensing_notes ??
                 "",
+
+              prescriptionDate: order.prescription_date ?? null,
+              prescriberName: order.prescriber_name ?? null,
+              prescriberSignature: order.prescriber_signature ?? null,
+              rightSph: order.right_sph ?? "",
+              rightCyl: order.right_cyl ?? "",
+              rightAxis: order.right_axis ?? "",
+              rightAdd: order.right_add ?? "",
+              rightFinalVA: order.right_final_va ?? "",
+              rightNearVA: order.right_near_va ?? "",
+              leftSph: order.left_sph ?? "",
+              leftCyl: order.left_cyl ?? "",
+              leftAxis: order.left_axis ?? "",
+              leftAdd: order.left_add ?? "",
+              leftFinalVA: order.left_final_va ?? "",
+              leftNearVA: order.left_near_va ?? "",
+              lensFinish: order.lens_finish ?? "",
+              nearIPD: order.near_ipd ?? "",
 
               opticalCharge:
                 normalizeMoney(
