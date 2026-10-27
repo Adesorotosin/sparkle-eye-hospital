@@ -21,7 +21,7 @@ const PATIENT_CREATE_ROLES = [
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole([...PATIENT_READ_ROLES]);
+    const staff = await requireRole([...PATIENT_READ_ROLES]);
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search")?.trim() || "";
@@ -59,14 +59,14 @@ export async function GET(request: NextRequest) {
       dateOfBirth: patient.date_of_birth ?? null,
       gender: patient.gender,
       phone: patient.phone,
-      allergies: patient.allergies,
+      allergies: staff.role === "RECEPTIONIST" ? null : patient.allergies,
       address: patient.address ?? null,
       nextOfKin: patient.next_of_kin ?? null,
       nextOfKinPhone: patient.next_of_kin_phone ?? null,
       status: patient.status,
       isWalkIn: patient.is_walk_in,
       lastVisitAt: patient.last_visit_at,
-      primaryComplaint: patient.primary_complaint ?? null,
+      primaryComplaint: staff.role === "RECEPTIONIST" ? null : patient.primary_complaint ?? null,
     }));
 
     return NextResponse.json({ patients });
