@@ -23,7 +23,7 @@ import { saveConsultationEncounter } from "@/app/actions/consultation";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinical-orders";
-import { createOpticalOrder } from "@/app/actions/optician";
+import { createOpticalOrder, type DoctorSpectaclePrescription } from "@/app/actions/optician";
 import { getOptometryPatient } from "@/app/actions/optometry";
 import { createClinicalHandoff } from "@/app/actions/clinical-handoffs";
 
@@ -335,6 +335,20 @@ export default function DoctorEncounterPage() {
   const [ocularExamOSRows, setOcularExamOSRows] = useState<EyeExamRows>(() => emptyEyeExam());
   const [refractionNotes, setRefractionNotes] = useState("");
   const [lensType, setLensType] = useState("");
+  const [lensFinish, setLensFinish] = useState("");
+  const [rightAdd, setRightAdd] = useState("");
+  const [rightFinalVA, setRightFinalVA] = useState("");
+  const [rightNearVA, setRightNearVA] = useState("");
+  const [leftAdd, setLeftAdd] = useState("");
+  const [leftFinalVA, setLeftFinalVA] = useState("");
+  const [leftNearVA, setLeftNearVA] = useState("");
+  const [distanceIPD, setDistanceIPD] = useState("");
+  const [nearIPD, setNearIPD] = useState("");
+  const [monocularIPDR, setMonocularIPDR] = useState("");
+  const [monocularIPDL, setMonocularIPDL] = useState("");
+  const [segmentHeightR, setSegmentHeightR] = useState("");
+  const [segmentHeightL, setSegmentHeightL] = useState("");
+  const [prescriptionDate, setPrescriptionDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [supplierWhatsApp, setSupplierWhatsApp] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [supplierContacts, setSupplierContacts] = useState<Array<{ name: string; phone: string }>>([]);
@@ -665,7 +679,15 @@ export default function DoctorEncounterPage() {
       }
 
       setEncounterId(saved.encounterId);
-      const response = await createOpticalOrder(patientCode, { lensType, refractionNotes });
+      const prescription: DoctorSpectaclePrescription = {
+          rightSph: refractionOD.sphere, rightCyl: refractionOD.cylinder, rightAxis: refractionOD.axis,
+          rightAdd, rightFinalVA: rightFinalVA || patient?.vitals?.visualAcuityOD || "", rightNearVA,
+          leftSph: refractionOS.sphere, leftCyl: refractionOS.cylinder, leftAxis: refractionOS.axis,
+          leftAdd, leftFinalVA: leftFinalVA || patient?.vitals?.visualAcuityOS || "", leftNearVA,
+          lensType, lensFinish, distanceIPD, nearIPD, monocularIPDR, monocularIPDL,
+          segmentHeightR, segmentHeightL, notes: refractionNotes, prescriptionDate,
+        };
+        const response = await createOpticalOrder(patientCode, { lensType, refractionNotes, prescription });
       if (!response.success) {
         setError(response.message);
         if (response.orderId) await refreshPatient();
@@ -1118,14 +1140,32 @@ export default function DoctorEncounterPage() {
           
 
 <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
-            <p className="mb-4 text-sm text-gray-500">Review the optometry result above where available, record the lens type and instructions, then send the order to the Optician. Supplier messages open in WhatsApp for staff review and manual sending.</p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Lens type" value={lensType} onChange={setLensType} rows={2} placeholder="e.g. single vision, bifocal or progressive, according to the prescription" />
-              <Field label="Refraction / lens notes" value={refractionNotes} onChange={setRefractionNotes} rows={2} placeholder="Document prescribed lens material, coatings or dispensing instructions." />
+            <p className="mb-4 text-sm text-gray-500">Complete the client-approved spectacle prescription here in the Doctor module. The doctor’s authorised prescription is sent to Optician for read-only review; Inventory handles frame selection, production and collection.</p>
+            <div className="mb-5 grid gap-4 md:grid-cols-3">
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Prescription date</span><input type="date" value={prescriptionDate} onChange={(e) => setPrescriptionDate(e.target.value)} className={inputClass} /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens type</span><select value={lensType} onChange={(e) => setLensType(e.target.value)} className={inputClass}><option value="">Select lens type</option><option>Single vision</option><option>Bifocal</option><option>Invisible bifocal</option><option>Progressive</option></select></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens finish</span><select value={lensFinish} onChange={(e) => setLensFinish(e.target.value)} className={inputClass}><option value="">Select lens finish</option><option>White</option><option>Photochromic</option><option>Blue coated</option></select></label>
             </div>
+            <div className="mb-5 overflow-x-auto rounded-xl border border-gray-200"><table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-600"><tr><th className="px-3 py-3">Eye</th><th className="px-3 py-3">SPH</th><th className="px-3 py-3">CYL</th><th className="px-3 py-3">Axis</th><th className="px-3 py-3">ADD</th><th className="px-3 py-3">Final VA</th><th className="px-3 py-3">Near VA</th></tr></thead>
+              <tbody>
+                <tr className="border-t"><th className="px-3 py-3">R (OD)</th><td className="px-2 py-2"><input aria-label="Right eye SPH" value={refractionOD.sphere} onChange={(e) => setRefractionOD(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye CYL" value={refractionOD.cylinder} onChange={(e) => setRefractionOD(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Axis" value={refractionOD.axis} onChange={(e) => setRefractionOD(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye ADD" value={rightAdd} onChange={(e) => setRightAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Final VA" value={rightFinalVA} onChange={(e) => setRightFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOD || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Near VA" value={rightNearVA} onChange={(e) => setRightNearVA(e.target.value)} className={inputClass} /></td></tr>
+                <tr className="border-t"><th className="px-3 py-3">L (OS)</th><td className="px-2 py-2"><input aria-label="Left eye SPH" value={refractionOS.sphere} onChange={(e) => setRefractionOS(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye CYL" value={refractionOS.cylinder} onChange={(e) => setRefractionOS(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Axis" value={refractionOS.axis} onChange={(e) => setRefractionOS(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye ADD" value={leftAdd} onChange={(e) => setLeftAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Final VA" value={leftFinalVA} onChange={(e) => setLeftFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOS || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Near VA" value={leftNearVA} onChange={(e) => setLeftNearVA(e.target.value)} className={inputClass} /></td></tr>
+              </tbody></table></div>
+            <div className="mb-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { label: "IPD (mm) — Distance", value: distanceIPD, set: setDistanceIPD },
+                { label: "IPD (mm) — Near", value: nearIPD, set: setNearIPD },
+                { label: "Monocular IPD (mm) — R", value: monocularIPDR, set: setMonocularIPDR },
+                { label: "Monocular IPD (mm) — L", value: monocularIPDL, set: setMonocularIPDL },
+                { label: "Segment height (mm) — R", value: segmentHeightR, set: setSegmentHeightR },
+                { label: "Segment height (mm) — L", value: segmentHeightL, set: setSegmentHeightL },
+              ].map((field) => <label key={field.label} className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">{field.label}</span><input value={field.value} onChange={(e) => field.set(e.target.value)} className={inputClass} /></label>)}
+            </div>
+            <div className="mb-4"><Field label="Notes" value={refractionNotes} onChange={setRefractionNotes} rows={3} placeholder="Prescription notes and instructions." /></div>
+            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Prescriber and signature are recorded from the authenticated doctor account when you send the prescription.</div>
             <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Send prescription to Optician"}</button>
-              {!optometryAssessmentCompleted && <p className="self-center text-xs text-amber-700">The Optometrist must complete the refraction assessment before an optical order can be created.</p>}
+              <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Authorise & send spectacle prescription"}</button>
             </div>
             <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
               <div>
@@ -1318,14 +1358,10 @@ export default function DoctorEncounterPage() {
                 <h3 className="mt-2 font-semibold">Investigation Room</h3>
                 <p className="mt-1 text-xs text-gray-500">Use the Investigation section above to send a named test.</p>
               </div>
-              <button onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {requesting === "optician" ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : <Hospital className="h-5 w-5 text-blue-600" />}
-                <h3 className="mt-2 font-semibold">Optician</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {optometryAssessmentCompleted
-                    ? "Review the optometry results above, then forward the patient to the Optician queue."
-                    : "Available after the Optometrist completes and sends the assessment to the doctor."}
-                </p>
+              <button onClick={() => document.getElementById("refraction-notes")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50">
+                <Hospital className="h-5 w-5 text-blue-600" />
+                <h3 className="mt-2 font-semibold">Spectacle prescription</h3>
+                <p className="mt-1 text-xs text-gray-500">Complete and authorise the client-approved spectacle prescription in this Doctor workspace.</p>
               </button>
             </div>
           </Section>
