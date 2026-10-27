@@ -173,6 +173,8 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
   const [isLoadingDrugInventory, setIsLoadingDrugInventory] =
     useState(false);
 
+  const [stockSearch, setStockSearch] = useState("");
+
   /*
    * --------------------------------------------------
    * LOAD PATIENT
@@ -854,45 +856,29 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
    * --------------------------------------------------
    */
 
-  const loadDrugInventory =
-    async () => {
-      setIsLoadingDrugInventory(
-        true
-      );
+  const loadDrugInventory = useCallback(async () => {
+    setIsLoadingDrugInventory(true);
 
-      try {
-        const response =
-          await fetch(
-            "/api/inventory?domain=pharmacy"
-          );
+    try {
+      const response = await fetch("/api/inventory?domain=pharmacy");
 
-        if (!response.ok) {
-          throw new Error(
-            "Failed to load drug inventory."
-          );
-        }
-
-        const {
-          items,
-        } =
-          await response.json();
-
-        setDrugInventory(
-          items || []
-        );
-      } catch (error) {
-        console.error(
-          "Inventory load error:",
-          error
-        );
-
-        setDrugInventory([]);
-      } finally {
-        setIsLoadingDrugInventory(
-          false
-        );
+      if (!response.ok) {
+        throw new Error("Failed to load drug stock availability.");
       }
-    };
+
+      const { items } = await response.json();
+      setDrugInventory(items || []);
+    } catch (error) {
+      console.error("Inventory load error:", error);
+      setDrugInventory([]);
+    } finally {
+      setIsLoadingDrugInventory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDrugInventory();
+  }, [loadDrugInventory]);
 
   /*
    * --------------------------------------------------
@@ -1566,6 +1552,70 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
               </strong>
 
             </div>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Stock Availability</h3>
+                  <p className="mt-1 text-xs text-slate-500">Read-only view of pharmacy stock. Dispensing remains subject to cashier payment.</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="search"
+                    value={stockSearch}
+                    onChange={(event) => setStockSearch(event.target.value)}
+                    placeholder="Search medication..."
+                    aria-label="Search pharmacy stock"
+                    className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void loadDrugInventory()}
+                    disabled={isLoadingDrugInventory}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {isLoadingDrugInventory ? "Refreshing…" : "Refresh"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                      <th className="py-2 pr-4">Medication</th>
+                      <th className="py-2 pr-4">Category</th>
+                      <th className="py-2 pr-4">Available</th>
+                      <th className="py-2 pr-4">Unit price</th>
+                      <th className="py-2">Stock status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {isLoadingDrugInventory && drugInventory.length === 0 ? (
+                      <tr><td colSpan={5} className="py-5 text-center text-slate-500">Loading pharmacy stock…</td></tr>
+                    ) : drugInventory.filter((drug) => drug.name.toLowerCase().includes(stockSearch.trim().toLowerCase())).length === 0 ? (
+                      <tr><td colSpan={5} className="py-5 text-center text-slate-500">{stockSearch.trim() ? "No stock items match your search." : "No stock items found."}</td></tr>
+                    ) : (
+                      drugInventory
+                        .filter((drug) => drug.name.toLowerCase().includes(stockSearch.trim().toLowerCase()))
+                        .map((drug) => (
+                          <tr key={drug.id}>
+                            <td className="py-3 pr-4 font-semibold text-slate-900">{drug.name}</td>
+                            <td className="py-3 pr-4 text-slate-600">{drug.category || "—"}</td>
+                            <td className="py-3 pr-4 font-bold text-slate-900">{drug.stock}</td>
+                            <td className="py-3 pr-4 text-slate-700">₦{Number(drug.price).toLocaleString()}</td>
+                            <td className="py-3">
+                              <span className={drug.stock > 0 ? "rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700" : "rounded-md bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700"}>
+                                {drug.stock > 0 ? "In stock" : "Out of stock"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             <div className="overflow-x-auto">
 
