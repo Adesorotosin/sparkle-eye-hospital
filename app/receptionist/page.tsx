@@ -1228,10 +1228,22 @@ export default function ReceptionistPage() {
       )}
 
       {showVisitingLabModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
-          <form onSubmit={handleRegisterVisitingLab} className="w-full max-w-2xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting laboratory request</h2><p className="mt-1 text-sm text-slate-500">Registers a walk-in patient, sends the test to Laboratory, and creates billing handoffs for Cashier and Reception.</p></div><button type="button" onClick={() => setShowVisitingLabModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
-            <div className="grid gap-3 sm:grid-cols-2">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-2 backdrop-blur-sm sm:items-center sm:p-4">
+          <form
+            onSubmit={handleRegisterVisitingLab}
+            className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-950">Register visiting laboratory request</h2>
+                <p className="mt-1 text-sm text-slate-500">Registers a walk-in patient, sends the test to Laboratory, and creates billing handoffs for Cashier and Reception.</p>
+              </div>
+              <button type="button" onClick={() => setShowVisitingLabModal(false)} aria-label="Close" className="shrink-0 rounded-lg p-2 hover:bg-slate-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+              <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Existing patient code (optional)<input value={visitingLabForm.patientCode} onChange={e=>setVisitingLabForm({...visitingLabForm,patientCode:e.target.value})} className={inputClass} placeholder="Use this to retry an order after patient registration" /><span className="mt-1 block font-normal text-slate-400">Leave blank to register a new visiting patient.</span></label>
               {!visitingLabForm.patientCode && <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingLabForm.fullName} onChange={e=>setVisitingLabForm({...visitingLabForm,fullName:e.target.value})} className={inputClass} /></label>}
               <label className="block text-xs font-bold text-slate-600">Referring centre / source *<input required value={visitingLabForm.sourceCenter} onChange={e=>setVisitingLabForm({...visitingLabForm,sourceCenter:e.target.value})} className={inputClass} /></label>
@@ -1245,8 +1257,12 @@ export default function ReceptionistPage() {
               <label className="block text-xs font-bold text-slate-600">Approved price (₦) *<input required type="number" min="0" step="0.01" value={visitingLabForm.price} onChange={e=>setVisitingLabForm({...visitingLabForm,price:e.target.value})} className={inputClass} /><span className="mt-1 block font-normal text-slate-400">If zero, the order is sent for Cashier pricing review; it is not treated as free.</span></label>
               <label className="block text-xs font-bold text-slate-600">Priority<select value={visitingLabForm.priority} onChange={e=>setVisitingLabForm({...visitingLabForm,priority:e.target.value as "NORMAL"|"URGENT"|"STAT"})} className={inputClass}><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="STAT">STAT</option></select></label>
               <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Clinical notes<textarea rows={2} value={visitingLabForm.clinicalNotes} onChange={e=>setVisitingLabForm({...visitingLabForm,clinicalNotes:e.target.value})} className={inputClass} /></label>
+              </div>
             </div>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingLabModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Laboratory"}</button></div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
+              <button type="button" onClick={() => setShowVisitingLabModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button>
+              <button disabled={savingVisitingRequest} className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Laboratory"}</button>
+            </div>
           </form>
         </div>
       )}
