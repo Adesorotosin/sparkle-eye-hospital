@@ -232,7 +232,6 @@ export async function createExternalDiagnosticOrder(input: {
   try {
     const staff = await requireRole([
       "IT_ADMIN",
-      "RECEPTIONIST",
       "NURSE",
       "DOCTOR",
       "OPHTHALMOLOGIST",
