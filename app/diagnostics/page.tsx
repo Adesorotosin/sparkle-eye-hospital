@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -297,6 +299,7 @@ export default function DiagnosticsPage() {
 
       {/* Main content */}
       <main className="p-4 md:p-6 lg:p-8">
+        <PatientVisitRoutingQueue destination="DIAGNOSTICS" />
         {externalFormOpen && (
           <form onSubmit={registerExternalPatient} className="mb-6 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
