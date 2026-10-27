@@ -31,7 +31,7 @@ type ProcedureRegistrationSummary = {
 
 export async function getProcedurePriceCatalog() {
   try {
-    await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
     const { data, error } = await supabaseServer
       .from("procedure_price_catalog")
       .select("id, code, name, category, price, active")
@@ -109,7 +109,7 @@ export type ProcedureRegistrationInput = {
 
 export async function registerProcedure(input: ProcedureRegistrationInput) {
   try {
-    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
     const patientCode = input.patientCode?.trim();
     const procedureCode = input.procedureCode?.trim();
 
@@ -207,7 +207,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
 
 export async function getRecentProcedures() {
   try {
-    await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
     const { data, error } = await supabaseServer
       .from("procedure_orders")
       .select("id, procedure_name, referral_type, order_reference, scheduled_date, price, status, created_at, patients!inner(patient_code, registration_number, full_name)")

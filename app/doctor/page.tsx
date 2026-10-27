@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -1267,6 +1269,7 @@ export default function DoctorDashboard() {
 
       {/* MAIN */}
       <main className="max-w-7xl mx-auto p-6 space-y-6">
+        <PatientVisitRoutingQueue destination="DOCTOR" />
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-purple-100 shadow-sm space-y-5">
           {/* DATE CONTROLS */}
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">

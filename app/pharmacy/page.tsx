@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import Image from "next/image";
 import React, {
   useCallback,
@@ -1074,6 +1076,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
           </header>
 
           <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+        <PatientVisitRoutingQueue destination="PHARMACY" />
             <div className="mx-auto max-w-7xl space-y-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>

@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import React, { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -287,6 +289,7 @@ function TriageVitalsContent() {
       </div>
 
       <main className="max-w-350 mx-auto p-6 md:p-8">
+        <PatientVisitRoutingQueue destination="TRIAGE" />
         {/* NO PATIENT */}
         {!patientId && (
           <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl p-4 text-sm font-semibold">

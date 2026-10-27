@@ -1,5 +1,7 @@
 "use client";
 
+import PatientVisitRoutingQueue from "@/components/PatientVisitRoutingQueue";
+
 import Image from "next/image";
 
 import React, {
@@ -300,6 +302,7 @@ export default function OptometryDashboard() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8">
+        <PatientVisitRoutingQueue destination="OPTOMETRY" />
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-2xl font-black text-slate-900">

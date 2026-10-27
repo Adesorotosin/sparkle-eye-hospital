@@ -17,6 +17,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { createPatientVisitRoute, type VisitDestination } from "@/app/actions/patient-visit-routing";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
 import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
 import { createLabOrder } from "@/app/actions/lab-orders";
@@ -141,6 +142,7 @@ export default function ReceptionistPage() {
   const [toast, setToast] = useState("");
 
   const [showPatientModal, setShowPatientModal] = useState(false);
+  const [visitDestination, setVisitDestination] = useState<VisitDestination>("TRIAGE");
   const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication" | "procedure">("general");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
@@ -349,9 +351,17 @@ export default function ReceptionistPage() {
       );
 
       await loadData();
-      if (registrationIntent === "medication") {
-        router.push(`/pharmacy?patientId=${encodeURIComponent(data.patient.patientId)}`);
-      } else if (registrationIntent === "procedure") {
+
+      // Route the arrival without creating clinical orders or bills at Reception.
+      const destination: VisitDestination = registrationIntent === "medication" ? "PHARMACY" : registrationIntent === "procedure" ? "DOCTOR" : visitDestination;
+      const routeResult = await createPatientVisitRoute({ patientCode: data.patient.patientId, destination });
+      if (!routeResult.success) {
+        setError(`Patient registered successfully (code: ${data.patient.patientId}), but routing failed: ${routeResult.message} Do not register the patient again.`);
+      } else {
+        notify(routeResult.message);
+      }
+
+      if (registrationIntent === "procedure") {
         setProcedureForm(current => ({ ...current, patientCode: data.patient.patientId, scheduledDate: date }));
         setShowProcedureModal(true);
       }
@@ -601,38 +611,13 @@ export default function ReceptionistPage() {
   async function handleSendToTriage(patient: Patient) {
     setTriageActionId(patient.patientId);
     setError("");
-
     try {
-      const response = await fetch(
-        `/api/patients/${encodeURIComponent(patient.patientId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: "waiting_triage",
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error || "Failed to send patient to triage."
-        );
-      }
-
+      const result = await createPatientVisitRoute({ patientCode: patient.patientId, destination: "TRIAGE" });
+      if (!result.success) throw new Error(result.message);
       notify(`${patient.fullName} sent to triage.`);
-
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to send patient to triage."
-      );
+      setError(err instanceof Error ? err.message : "Failed to send patient to triage.");
     } finally {
       setTriageActionId(null);
     }
@@ -1507,6 +1492,20 @@ export default function ReceptionistPage() {
                     <option>NHIA</option>
                     <option>Private Insurance</option>
                   </select>
+                </div>
+
+                {/* VISIT DESTINATION */}
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-slate-600">Visit destination *</label>
+                  <select required value={visitDestination} onChange={(event) => setVisitDestination(event.target.value as VisitDestination)} className={inputClass}>
+                    <option value="TRIAGE">Triage / first assessment</option>
+                    <option value="DOCTOR">Doctor review</option>
+                    <option value="PHARMACY">Pharmacy arrival queue</option>
+                    <option value="LABORATORY">Laboratory arrival queue</option>
+                    <option value="DIAGNOSTICS">Diagnostics / investigation review</option>
+                    <option value="OPTOMETRY">Optometry / refraction queue</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">This routes the patient arrival only. Clinical orders and billing remain with the receiving department.</p>
                 </div>
 
                 {/* ALLERGIES */}
