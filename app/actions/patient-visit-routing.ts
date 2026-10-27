@@ -39,7 +39,7 @@ const DESTINATION_ROLES: Record<VisitDestination, UserRole[]> = {
 };
 
 function isDestination(value: unknown): value is VisitDestination {
-  return typeof value === "string" && value in DESTINATION_ROLES;
+  return typeof value === "string" && Object.prototype.hasOwnProperty.call(DESTINATION_ROLES, value);
 }
 
 function toRoute(row: Record<string, unknown>): PatientVisitRoute {
@@ -180,8 +180,12 @@ export async function updatePatientVisitRoute(input: {
   status: "acknowledged" | "completed";
 }) {
   try {
-    if (!isDestination(input.destination) || !input.id?.trim()) {
-      return { success: false, message: "Choose a valid arrival request." };
+    if (
+      !isDestination(input.destination) ||
+      !input.id?.trim() ||
+      (input.status !== "acknowledged" && input.status !== "completed")
+    ) {
+      return { success: false, message: "Choose a valid arrival request and status." };
     }
     const staff = await requireRole(DESTINATION_ROLES[input.destination]);
     const handledAt = input.status === "completed" ? new Date().toISOString() : null;
