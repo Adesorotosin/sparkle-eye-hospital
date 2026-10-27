@@ -612,6 +612,8 @@ export async function createOpticalOrder(
       left_near_va: prescription?.leftNearVA?.trim() || null,
       lens_type: prescription?.lensType?.trim() || instructions.lensType?.trim() || null,
       lens_finish: prescription?.lensFinish?.trim() || null,
+      // Keep the legacy Inventory coating field in sync with the client form's lens finish.
+      lens_coating: prescription?.lensFinish?.trim() || null,
       pd_binocular: prescription?.distanceIPD?.trim() || null,
       near_ipd: prescription?.nearIPD?.trim() || null,
       pd_od: prescription?.monocularIPDR?.trim() || null,
