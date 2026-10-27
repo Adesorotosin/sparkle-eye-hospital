@@ -1487,18 +1487,7 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
 
               <div className="flex items-center gap-3">
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddMedicationError(null);
-                    setIsAddModalOpen(true);
-                    loadDrugInventory();
-                  }}
-                  className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Medication
-                </button>
+
 
                 <span
                   className={`px-3 py-1 rounded-md text-xs font-bold capitalize border ${
