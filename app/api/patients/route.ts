@@ -327,13 +327,17 @@ export async function POST(request: NextRequest) {
           ? nextOfKinPhone.trim()
           : undefined,
 
+      // Reception records the patient only. Department routing is stored
+      // separately and must not let Reception advance clinical status.
       status:
-        typeof status === "string"
-          ? (status as
-              | "waiting_triage"
-              | "in_consultation"
-              | "completed_today")
-          : undefined,
+        staff.role === "RECEPTIONIST"
+          ? "waiting_triage"
+          : typeof status === "string"
+            ? (status as
+                | "waiting_triage"
+                | "in_consultation"
+                | "completed_today")
+            : undefined,
 
       isWalkIn,
     });
