@@ -36,7 +36,7 @@ function TriageVitalsContent() {
   const [odPinhole, setOdPinhole] = useState("");
   const [osPinhole, setOsPinhole] = useState("");
 
-  // Visual acuity with the patient's glasses and near vision.
+  // Visual acuity with the patient&apos;s glasses and near vision.
   const [odGlasses, setOdGlasses] = useState("");
   const [osGlasses, setOsGlasses] = useState("");
   const [ouGlasses, setOuGlasses] = useState("");
@@ -493,7 +493,7 @@ function TriageVitalsContent() {
                 <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Visual Acuity With Glasses</h3>
-                    <p className="mt-1 text-[11px] text-slate-500">Record the measured distance vision while wearing the patient's glasses.</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Record the measured distance vision while wearing the patient&apos;s glasses.</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[

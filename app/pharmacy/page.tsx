@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import React, {
+  useCallback,
   useEffect,
-  useRef,
   useState,
   Suspense,
 } from "react";
@@ -22,10 +22,8 @@ import {
   Pill,
   Check,
   Syringe,
-  Plus,
   X,
   UserPlus,
-  Boxes,
   LogOut,
 } from "lucide-react";
 
@@ -62,6 +60,12 @@ interface DrugStockItem {
 
 function PharmacyContent() {
   const searchParams = useSearchParams();
+  const patientId = searchParams.get("patientId") || "";
+
+  return <PharmacyWorkspace key={patientId || "no-patient"} patientId={patientId} />;
+}
+
+function PharmacyWorkspace({ patientId }: { patientId: string }) {
   const router = useRouter();
 
   /*
@@ -69,8 +73,6 @@ function PharmacyContent() {
    * PATIENT / QUEUE STATE
    * --------------------------------------------------
    */
-
-  const patientId = searchParams.get("patientId") || "";
 
   const [patient, setPatient] =
     useState<PharmacyPatient | null>(null);
@@ -81,10 +83,10 @@ function PharmacyContent() {
   const [queueSearch, setQueueSearch] = useState("");
 
   const [isLoadingPatient, setIsLoadingPatient] =
-    useState(false);
+    useState(Boolean(patientId));
 
   const [isLoadingQueue, setIsLoadingQueue] =
-    useState(false);
+    useState(true);
 
   const [patientLoadError, setPatientLoadError] =
     useState<string | null>(null);
@@ -109,6 +111,8 @@ function PharmacyContent() {
 
   const [administeredDrugs, setAdministeredDrugs] =
     useState<Record<string, boolean>>({});
+
+  const [selectedPrescription, setSelectedPrescription] = useState("");
 
   /*
    * --------------------------------------------------
@@ -166,33 +170,9 @@ function PharmacyContent() {
     useState<DrugStockItem[]>([]);
 
   const [isLoadingDrugInventory, setIsLoadingDrugInventory] =
-    useState(false);
+    useState(true);
 
-  const [isAddDrugStockModalOpen, setIsAddDrugStockModalOpen] =
-    useState(false);
-
-  const [isSubmittingDrugStock, setIsSubmittingDrugStock] =
-    useState(false);
-
-  const [newDrugStock, setNewDrugStock] = useState({
-    name: "",
-    category: "Antibiotics",
-    stock: "",
-    reorderLevel: "",
-    price: "",
-  });
-
-  const [drugSuggestions, setDrugSuggestions] =
-    useState<string[]>([]);
-
-  const [showDrugSuggestions, setShowDrugSuggestions] =
-    useState(false);
-
-  const [isSearchingDrugs, setIsSearchingDrugs] =
-    useState(false);
-
-  const drugSearchTimer =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [stockSearch, setStockSearch] = useState("");
 
   /*
    * --------------------------------------------------
@@ -200,17 +180,10 @@ function PharmacyContent() {
    * --------------------------------------------------
    */
 
-  const loadPatient = async (code: string) => {
+  const loadPatient = useCallback(async (code: string) => {
     const normalizedCode = code.trim();
 
-    if (!normalizedCode) {
-      setPatient(null);
-      setPatientLoadError(null);
-      return;
-    }
-
-    setIsLoadingPatient(true);
-    setPatientLoadError(null);
+    if (!normalizedCode) return;
 
     try {
       const result =
@@ -226,6 +199,7 @@ function PharmacyContent() {
       }
 
       setPatient(result.patient);
+      setSelectedPrescription(result.patient.fullName);
     } catch (error) {
       console.error(
         "Load pharmacy patient error:",
@@ -242,7 +216,7 @@ function PharmacyContent() {
     } finally {
       setIsLoadingPatient(false);
     }
-  };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -250,9 +224,7 @@ function PharmacyContent() {
    * --------------------------------------------------
    */
 
-  const loadQueue = async () => {
-    setIsLoadingQueue(true);
-
+  const loadQueue = useCallback(async () => {
     try {
       const result =
         await getPharmacyQueue();
@@ -275,7 +247,7 @@ function PharmacyContent() {
     } finally {
       setIsLoadingQueue(false);
     }
-  };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -285,28 +257,11 @@ function PharmacyContent() {
 
   useEffect(() => {
     if (patientId) {
-      loadPatient(patientId);
-    } else {
-      setPatient(null);
-      setPatientLoadError(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPatient updates state after its async request resolves.
+      void loadPatient(patientId);
     }
-
-    loadQueue();
-  }, [patientId]);
-
-  /*
-   * --------------------------------------------------
-   * RESET UI WHEN PATIENT CHANGES
-   * --------------------------------------------------
-   */
-
-  useEffect(() => {
-    setDispenseSuccess(false);
-    setActionError(null);
-    setAffordabilityNotice(null);
-    setSelectedForDeferral({});
-    setAdministeredDrugs({});
-  }, [patientId]);
+    void loadQueue();
+  }, [patientId, loadPatient, loadQueue]);
 
   /*
    * --------------------------------------------------
@@ -357,17 +312,6 @@ function PharmacyContent() {
       }
     : null;
 
-  const [selectedPrescription, setSelectedPrescription] =
-    useState("");
-
-  useEffect(() => {
-    if (bannerPatient) {
-      setSelectedPrescription(
-        bannerPatient.name
-      );
-    }
-  }, [bannerPatient?.name]);
-
   /*
    * --------------------------------------------------
    * PHARMACY QUEUES
@@ -416,24 +360,6 @@ function PharmacyContent() {
   const pharmacyReviewOrders = pharmacyOrders.filter(
     (item) => item.status === "awaiting_pharmacy_review"
   );
-
-  /*
-   * Patients with the currently selected patient
-   * displayed as the unfulfilled/current patient.
-   *
-   * The old hardcoded Amina/Jamess/etc. entries
-   * have been removed.
-   */
-
-  const unfulfilledOrders = patient
-    ? [
-        {
-          id: patient.patientId,
-          name: patient.fullName,
-          time: "Current",
-        },
-      ]
-    : [];
 
   /*
    * --------------------------------------------------
@@ -925,279 +851,63 @@ function PharmacyContent() {
 
   /*
    * --------------------------------------------------
-   * DRUG SEARCH
-   * --------------------------------------------------
-   */
-
-  const handleDrugNameChange = (
-    value: string
-  ) => {
-    setNewDrugStock(
-      (previous) => ({
-        ...previous,
-        name: value,
-      })
-    );
-
-    setShowDrugSuggestions(true);
-
-    if (drugSearchTimer.current) {
-      clearTimeout(
-        drugSearchTimer.current
-      );
-    }
-
-    if (
-      value.trim().length < 2
-    ) {
-      setDrugSuggestions([]);
-      return;
-    }
-
-    drugSearchTimer.current =
-      setTimeout(
-        async () => {
-          setIsSearchingDrugs(
-            true
-          );
-
-          try {
-            const response =
-              await fetch(
-                `/api/drug-search?q=${encodeURIComponent(
-                  value
-                )}`
-              );
-
-            if (!response.ok) {
-              throw new Error(
-                "Drug search failed."
-              );
-            }
-
-            const data =
-              await response.json();
-
-            setDrugSuggestions(
-              data.suggestions || []
-            );
-          } catch (error) {
-            console.error(
-              "Drug search error:",
-              error
-            );
-
-            setDrugSuggestions([]);
-          } finally {
-            setIsSearchingDrugs(
-              false
-            );
-          }
-        },
-        300
-      );
-  };
-
-  /*
-   * --------------------------------------------------
    * INVENTORY
    * --------------------------------------------------
    */
 
-  const loadDrugInventory =
-    async () => {
-      setIsLoadingDrugInventory(
-        true
-      );
+  const loadDrugInventory = useCallback(async () => {
+    try {
+      const response = await fetch("/api/inventory?domain=pharmacy");
 
+      if (!response.ok) {
+        throw new Error("Failed to load drug stock availability.");
+      }
+
+      const { items } = await response.json();
+      setDrugInventory(items || []);
+    } catch (error) {
+      console.error("Inventory load error:", error);
+      setDrugInventory([]);
+    } finally {
+      setIsLoadingDrugInventory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const fetchInitialDrugInventory = async () => {
       try {
-        const response =
-          await fetch(
-            "/api/inventory?domain=pharmacy"
-          );
+        const response = await fetch("/api/inventory?domain=pharmacy");
 
         if (!response.ok) {
-          throw new Error(
-            "Failed to load drug inventory."
-          );
+          throw new Error("Failed to load drug stock availability.");
         }
 
-        const {
-          items,
-        } =
-          await response.json();
+        const { items } = await response.json();
 
-        setDrugInventory(
-          items || []
-        );
+        if (isCurrent) {
+          setDrugInventory(items || []);
+        }
       } catch (error) {
-        console.error(
-          "Inventory load error:",
-          error
-        );
+        console.error("Inventory load error:", error);
 
-        setDrugInventory([]);
+        if (isCurrent) {
+          setDrugInventory([]);
+        }
       } finally {
-        setIsLoadingDrugInventory(
-          false
-        );
+        if (isCurrent) {
+          setIsLoadingDrugInventory(false);
+        }
       }
     };
 
-  const handleAddDrugStock =
-    async (
-      e: React.FormEvent
-    ) => {
-      e.preventDefault();
+    void fetchInitialDrugInventory();
 
-      if (
-        !newDrugStock.name.trim() ||
-        !newDrugStock.stock ||
-        !newDrugStock.price
-      ) {
-        return;
-      }
-
-      const stock =
-        Number(
-          newDrugStock.stock
-        );
-
-      const reorderLevel =
-        newDrugStock.reorderLevel
-          ? Number(
-              newDrugStock.reorderLevel
-            )
-          : 5;
-
-      const price =
-        Number(
-          newDrugStock.price
-        );
-
-      if (
-        !Number.isFinite(stock) ||
-        stock < 0
-      ) {
-        alert(
-          "Please enter a valid stock quantity."
-        );
-        return;
-      }
-
-      if (
-        !Number.isFinite(
-          reorderLevel
-        ) ||
-        reorderLevel < 0
-      ) {
-        alert(
-          "Please enter a valid reorder level."
-        );
-        return;
-      }
-
-      if (
-        !Number.isFinite(price) ||
-        price < 0
-      ) {
-        alert(
-          "Please enter a valid price."
-        );
-        return;
-      }
-
-      setIsSubmittingDrugStock(
-        true
-      );
-
-      try {
-        const response =
-          await fetch(
-            "/api/inventory",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-              body: JSON.stringify({
-                name:
-                  newDrugStock.name.trim(),
-
-                category:
-                  newDrugStock.category,
-
-                stock,
-
-                reorderLevel,
-
-                price,
-
-                domain:
-                  "pharmacy",
-              }),
-            }
-          );
-
-        if (!response.ok) {
-          const body =
-            await response
-              .json()
-              .catch(
-                () => ({})
-              );
-
-          throw new Error(
-            body.error ||
-              "Failed to add drug."
-          );
-        }
-
-        const {
-          item,
-        } =
-          await response.json();
-
-        setDrugInventory(
-          (previous) => [
-            item,
-            ...previous,
-          ]
-        );
-
-        setNewDrugStock({
-          name: "",
-          category:
-            "Antibiotics",
-          stock: "",
-          reorderLevel: "",
-          price: "",
-        });
-
-        setDrugSuggestions([]);
-        setShowDrugSuggestions(false);
-
-        setIsAddDrugStockModalOpen(
-          false
-        );
-      } catch (error) {
-        console.error(
-          "Add drug stock error:",
-          error
-        );
-
-        alert(
-          error instanceof Error
-            ? error.message
-            : "Failed to add drug."
-        );
-      } finally {
-        setIsSubmittingDrugStock(
-          false
-        );
-      }
+    return () => {
+      isCurrent = false;
     };
+  }, []);
 
   /*
    * --------------------------------------------------
@@ -1220,7 +930,7 @@ function PharmacyContent() {
       if (typeof window !== "undefined") {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = "/";
+        router.push("/");
       }
     }
   };
@@ -1792,18 +1502,7 @@ function PharmacyContent() {
 
               <div className="flex items-center gap-3">
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddMedicationError(null);
-                    setIsAddModalOpen(true);
-                    loadDrugInventory();
-                  }}
-                  className="px-3.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Medication
-                </button>
+
 
                 <span
                   className={`px-3 py-1 rounded-md text-xs font-bold capitalize border ${
@@ -1882,6 +1581,70 @@ function PharmacyContent() {
               </strong>
 
             </div>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Stock Availability</h3>
+                  <p className="mt-1 text-xs text-slate-500">Read-only view of pharmacy stock. Dispensing remains subject to cashier payment.</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="search"
+                    value={stockSearch}
+                    onChange={(event) => setStockSearch(event.target.value)}
+                    placeholder="Search medication..."
+                    aria-label="Search pharmacy stock"
+                    className="min-w-0 rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setIsLoadingDrugInventory(true); void loadDrugInventory(); }}
+                    disabled={isLoadingDrugInventory}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {isLoadingDrugInventory ? "Refreshing…" : "Refresh"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                      <th className="py-2 pr-4">Medication</th>
+                      <th className="py-2 pr-4">Category</th>
+                      <th className="py-2 pr-4">Available</th>
+                      <th className="py-2 pr-4">Unit price</th>
+                      <th className="py-2">Stock status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {isLoadingDrugInventory && drugInventory.length === 0 ? (
+                      <tr><td colSpan={5} className="py-5 text-center text-slate-500">Loading pharmacy stock…</td></tr>
+                    ) : drugInventory.filter((drug) => drug.name.toLowerCase().includes(stockSearch.trim().toLowerCase())).length === 0 ? (
+                      <tr><td colSpan={5} className="py-5 text-center text-slate-500">{stockSearch.trim() ? "No stock items match your search." : "No stock items found."}</td></tr>
+                    ) : (
+                      drugInventory
+                        .filter((drug) => drug.name.toLowerCase().includes(stockSearch.trim().toLowerCase()))
+                        .map((drug) => (
+                          <tr key={drug.id}>
+                            <td className="py-3 pr-4 font-semibold text-slate-900">{drug.name}</td>
+                            <td className="py-3 pr-4 text-slate-600">{drug.category || "—"}</td>
+                            <td className="py-3 pr-4 font-bold text-slate-900">{drug.stock}</td>
+                            <td className="py-3 pr-4 text-slate-700">₦{Number(drug.price).toLocaleString()}</td>
+                            <td className="py-3">
+                              <span className={drug.stock > 0 ? "rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700" : "rounded-md bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700"}>
+                                {drug.stock > 0 ? "In stock" : "Out of stock"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
 
             <div className="overflow-x-auto">
 
@@ -2104,7 +1867,7 @@ function PharmacyContent() {
 
                 <p className="text-[11px] text-sky-800 font-medium mt-0.5">
                   Medication added here is saved
-                  to the patient's real prescription
+                  to the patient&apos;s real prescription
                   record and added to billing.
                   Dispensing deducts pharmacy stock.
                 </p>
@@ -2654,489 +2417,6 @@ function PharmacyContent() {
 
         </div>
       )}
-
-    </div>
-  );
-}
-
-/*
- * --------------------------------------------------
- * DRUG INVENTORY MODAL
- * --------------------------------------------------
- */
-
-function DrugInventoryModal({
-  drugInventory,
-  isLoading,
-  onClose,
-}: {
-  drugInventory: DrugStockItem[];
-  isLoading: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl max-h-[85vh] overflow-y-auto">
-
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-
-          <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
-            <Boxes className="w-4 h-4 text-purple-600" />
-            Drug Stock & Inventory
-          </h3>
-
-          <div className="flex items-center gap-3">
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-          </div>
-
-        </div>
-
-        {isLoading ? (
-          <p className="text-xs text-slate-400 py-6 text-center">
-            Loading drug stock...
-          </p>
-        ) : drugInventory.length ===
-          0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">
-            No drugs in stock yet.
-          </p>
-        ) : (
-          <table className="w-full text-xs mt-4">
-
-            <thead>
-
-              <tr className="text-left text-slate-400 uppercase text-[10px] border-b border-slate-100">
-
-                <th className="py-2">
-                  Drug
-                </th>
-
-                <th className="py-2">
-                  Category
-                </th>
-
-                <th className="py-2">
-                  Stock
-                </th>
-
-                <th className="py-2">
-                  Price
-                </th>
-
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {drugInventory.map(
-                (drug) => (
-                  <tr
-                    key={drug.id}
-                    className="border-b border-slate-50"
-                  >
-
-                    <td className="py-2.5 font-bold text-slate-900">
-
-                      {drug.name}
-
-                      <span className="block text-[10px] font-medium text-slate-400">
-                        {drug.id}
-                      </span>
-
-                    </td>
-
-                    <td className="py-2.5 text-slate-600">
-                      {drug.category}
-                    </td>
-
-                    <td className="py-2.5">
-
-                      <span
-                        className={
-                          drug.stock <=
-                          drug.reorderLevel
-                            ? "font-bold text-rose-600"
-                            : "font-bold text-slate-800"
-                        }
-                      >
-                        {drug.stock}
-                      </span>
-
-                      {drug.stock <=
-                        drug.reorderLevel && (
-                        <span className="ml-1.5 text-[9px] font-bold uppercase text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
-                          Low
-                        </span>
-                      )}
-
-                    </td>
-
-                    <td className="py-2.5 font-bold text-slate-900">
-                      ₦
-                      {Number(
-                        drug.price
-                      ).toLocaleString()}
-                    </td>
-
-                  </tr>
-                )
-              )}
-
-            </tbody>
-
-          </table>
-        )}
-
-      </div>
-
-    </div>
-  );
-}
-
-/*
- * --------------------------------------------------
- * ADD DRUG STOCK MODAL
- * --------------------------------------------------
- */
-
-function AddDrugStockModal({
-  newDrugStock,
-  setNewDrugStock,
-  drugSuggestions,
-  showDrugSuggestions,
-  setShowDrugSuggestions,
-  isSearchingDrugs,
-  isSubmitting,
-  onDrugNameChange,
-  onSubmit,
-  onClose,
-}: {
-  newDrugStock: {
-    name: string;
-    category: string;
-    stock: string;
-    reorderLevel: string;
-    price: string;
-  };
-
-  setNewDrugStock: React.Dispatch<
-    React.SetStateAction<{
-      name: string;
-      category: string;
-      stock: string;
-      reorderLevel: string;
-      price: string;
-    }>
-  >;
-
-  drugSuggestions: string[];
-  showDrugSuggestions: boolean;
-  setShowDrugSuggestions: React.Dispatch<
-    React.SetStateAction<boolean>
-  >;
-
-  isSearchingDrugs: boolean;
-  isSubmitting: boolean;
-
-  onDrugNameChange: (
-    value: string
-  ) => void;
-
-  onSubmit: (
-    e: React.FormEvent
-  ) => void;
-
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[60] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-
-          <h3 className="font-extrabold text-slate-900 flex items-center gap-2">
-            <Plus className="w-4 h-4 text-purple-600" />
-            Add New Drug to Stock
-          </h3>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-slate-400"
-          >
-            <X className="w-4 h-4" />
-          </button>
-
-        </div>
-
-        <form
-          onSubmit={onSubmit}
-          className="space-y-4 text-xs pt-4"
-        >
-
-          <div className="relative">
-
-            <label className="block text-slate-600 font-bold mb-1">
-              Drug Name
-            </label>
-
-            <input
-              type="text"
-              required
-              autoComplete="off"
-              placeholder="Start typing e.g. Ciprofloxacin..."
-              value={
-                newDrugStock.name
-              }
-              onChange={(e) =>
-                onDrugNameChange(
-                  e.target.value
-                )
-              }
-              onFocus={() =>
-                setShowDrugSuggestions(
-                  true
-                )
-              }
-              onBlur={() =>
-                setTimeout(
-                  () =>
-                    setShowDrugSuggestions(
-                      false
-                    ),
-                  150
-                )
-              }
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-            />
-
-            {showDrugSuggestions &&
-              (isSearchingDrugs ||
-                drugSuggestions.length >
-                  0) && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-
-                  {isSearchingDrugs ? (
-                    <p className="px-3 py-2 text-slate-400">
-                      Searching...
-                    </p>
-                  ) : (
-                    drugSuggestions.map(
-                      (
-                        suggestion
-                      ) => (
-                        <button
-                          key={
-                            suggestion
-                          }
-                          type="button"
-                          onMouseDown={(
-                            e
-                          ) => {
-                            e.preventDefault();
-
-                            setNewDrugStock(
-                              (
-                                previous
-                              ) => ({
-                                ...previous,
-                                name: suggestion,
-                              })
-                            );
-
-                            setShowDrugSuggestions(
-                              false
-                            );
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-purple-50 text-slate-700 border-b border-slate-50"
-                        >
-                          {
-                            suggestion
-                          }
-                        </button>
-                      )
-                    )
-                  )}
-
-                </div>
-              )}
-
-            <p className="mt-1 text-[10px] text-slate-400">
-              Suggestions from the NIH
-              RxTerms drug database.
-            </p>
-
-          </div>
-
-          <div>
-
-            <label className="block text-slate-600 font-bold mb-1">
-              Category
-            </label>
-
-            <select
-              value={
-                newDrugStock.category
-              }
-              onChange={(e) =>
-                setNewDrugStock(
-                  (previous) => ({
-                    ...previous,
-                    category:
-                      e.target.value,
-                  })
-                )
-              }
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-            >
-
-              <option>
-                Antibiotics
-              </option>
-
-              <option>
-                Analgesics
-              </option>
-
-              <option>
-                Ophthalmic Drops
-              </option>
-
-              <option>
-                Antihistamines
-              </option>
-
-              <option>
-                Other
-              </option>
-
-            </select>
-
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-
-            <div>
-
-              <label className="block text-slate-600 font-bold mb-1">
-                Stock Qty
-              </label>
-
-              <input
-                type="number"
-                required
-                min="0"
-                value={
-                  newDrugStock.stock
-                }
-                onChange={(e) =>
-                  setNewDrugStock(
-                    (previous) => ({
-                      ...previous,
-                      stock:
-                        e.target.value,
-                    })
-                  )
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-              />
-
-            </div>
-
-            <div>
-
-              <label className="block text-slate-600 font-bold mb-1">
-                Reorder At
-              </label>
-
-              <input
-                type="number"
-                min="0"
-                value={
-                  newDrugStock.reorderLevel
-                }
-                onChange={(e) =>
-                  setNewDrugStock(
-                    (previous) => ({
-                      ...previous,
-                      reorderLevel:
-                        e.target.value,
-                    })
-                  )
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-              />
-
-            </div>
-
-            <div>
-
-              <label className="block text-slate-600 font-bold mb-1">
-                Price (₦)
-              </label>
-
-              <input
-                type="number"
-                required
-                min="0"
-                step="0.01"
-                value={
-                  newDrugStock.price
-                }
-                onChange={(e) =>
-                  setNewDrugStock(
-                    (previous) => ({
-                      ...previous,
-                      price:
-                        e.target.value,
-                    })
-                  )
-                }
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"
-              />
-
-            </div>
-
-          </div>
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-200 rounded-xl font-bold"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              disabled={
-                isSubmitting
-              }
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white rounded-xl font-bold"
-            >
-              {isSubmitting
-                ? "Saving..."
-                : "Add to Stock"}
-            </button>
-
-          </div>
-
-        </form>
-
-      </div>
 
     </div>
   );

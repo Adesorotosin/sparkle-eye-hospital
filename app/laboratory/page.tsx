@@ -10,7 +10,6 @@ import {
   receiveLabSample,
   requestLabRecollection,
   saveLabResult,
-  startLabProcessing,
   verifyLabResult,
 } from "@/app/actions/lab-orders";
 
@@ -387,7 +386,7 @@ export default function LaboratoryPage() {
     useState<Priority | "ALL">("ALL");
 
   const [sampleType, setSampleType] = useState("");
-  const [sampleId, setSampleId] = useState("");
+  const [, setSampleId] = useState("");
   const [collectionNotes, setCollectionNotes] =
     useState("");
 
@@ -459,6 +458,7 @@ export default function LaboratoryPage() {
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.every((id) => typeof id === "string")) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate the user's locally saved seen-request IDs.
           setSeenRequestIds(parsed);
         }
       }
@@ -731,35 +731,6 @@ export default function LaboratoryPage() {
         error instanceof Error
           ? error.message
           : "Failed to receive sample."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function beginProcessing() {
-    if (!selectedOrder) return;
-
-    setIsSubmitting(true);
-    setActionMessage("");
-
-    try {
-      const response = await startLabProcessing({
-        labOrderId: selectedOrder.id,
-        processingNotes:
-          processingNotes.trim() || undefined,
-      });
-
-      setActionMessage(response.message);
-
-      if (response.success) {
-        await refreshOrders();
-      }
-    } catch (error) {
-      setActionMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to start processing."
       );
     } finally {
       setIsSubmitting(false);

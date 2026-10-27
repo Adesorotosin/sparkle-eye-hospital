@@ -46,7 +46,7 @@ function buildAppointmentDate(date: string, time: string) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function toAppointment(row: any) {
+function toAppointment(row: Record<string, unknown>) {
   return {
     id: row.id,
     patientName: row.patient_name,

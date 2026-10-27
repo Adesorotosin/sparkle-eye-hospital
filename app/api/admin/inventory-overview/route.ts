@@ -41,10 +41,13 @@ export async function GET() {
       .sort((a, b) => Number(a.stock) - Number(b.stock))
       .slice(0, 6);
 
-    const movements = (movementsResult.data ?? []).map((row: any) => ({
-      ...row,
-      item: Array.isArray(row.item) ? row.item[0] ?? null : row.item ?? null,
-    }));
+    const movements = (movementsResult.data ?? []).map((rawRow: unknown) => {
+      const row = rawRow as Record<string, unknown>;
+      return {
+        ...row,
+        item: Array.isArray(row.item) ? row.item[0] ?? null : row.item ?? null,
+      };
+    });
 
     return NextResponse.json({
       summary: {

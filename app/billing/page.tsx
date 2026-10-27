@@ -153,7 +153,9 @@ function BillingContent() {
     };
   }, [router]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadBillingPatient updates state after its async request resolves.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadBillingPatient updates state after its async request resolves.
     loadBillingPatient();
   }, [patientCodeFromUrl]);
 

@@ -379,13 +379,14 @@ export async function getLabQueue() {
     return {
       success: true,
 
-      orders: (data ?? []).map((row: any) => {
+      orders: (data ?? []).map((rawRow: unknown) => {
+  const row = rawRow as Record<string, unknown>;
   const patient = Array.isArray(row.patients)
-    ? row.patients[0]
-    : row.patients;
+    ? (row.patients[0] as Record<string, unknown> | undefined)
+    : (row.patients as Record<string, unknown> | null);
 
   const samples = Array.isArray(row.lab_samples)
-    ? row.lab_samples
+    ? (row.lab_samples as Record<string, unknown>[])
     : [];
 
   const latestSample =
@@ -583,7 +584,7 @@ export async function getLabOrderDetails(
       samples: samplesResponse.data ?? [],
 
       results: (resultsResponse.data ?? []).map(
-        (result: any) => ({
+        (result: Record<string, unknown>) => ({
           id: result.id,
           labOrderId:
             result.lab_order_id,
@@ -609,7 +610,7 @@ export async function getLabOrderDetails(
       ) as LabResultRecord[],
 
       events: (eventsResponse.data ?? []).map(
-        (event: any) => ({
+        (event: Record<string, unknown>) => ({
           id: event.id,
           eventType:
             event.event_type,

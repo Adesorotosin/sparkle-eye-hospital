@@ -707,7 +707,7 @@ export default function ReceptionistPage() {
                     "sparkle_staff_token"
                   );
 
-                  window.location.href = "/";
+                  router.push("/");
                 }
               }}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
@@ -778,7 +778,7 @@ export default function ReceptionistPage() {
               </span>
               <span>
                 <span className="block text-sm font-extrabold">Register procedure</span>
-                <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor's review.</span>
+                <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor&apos;s review.</span>
               </span>
             </button>
 
@@ -1154,7 +1154,7 @@ export default function ReceptionistPage() {
 
             <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
-                Register the procedure here only after the doctor has reviewed the patient and approved it. Reception selects the approved procedure, and the fixed catalogue price is added to the patient's bill.
+                Register the procedure here only after the doctor has reviewed the patient and approved it. Reception selects the approved procedure, and the fixed catalogue price is added to the patient&apos;s bill.
               </div>
 
               <label className="block">
@@ -1189,12 +1189,12 @@ export default function ReceptionistPage() {
               <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
                 <p className="text-xs font-bold text-purple-700">Fixed procedure price</p>
                 <p className="mt-1 text-2xl font-extrabold text-purple-950">₦{(procedurePrices.find((item) => item.code === procedureForm.procedureCode)?.price ?? 0).toLocaleString("en-NG")}</p>
-                <p className="mt-1 text-[11px] text-purple-700">This amount is applied automatically to the patient's bill. Only an administrator can change the catalogue price.</p>
+                <p className="mt-1 text-[11px] text-purple-700">This amount is applied automatically to the patient&apos;s bill. Only an administrator can change the catalogue price.</p>
               </div>
 
               <label className="block">
                 <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
-                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Optional scheduling details or notes from the doctor's review" />
+                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Optional scheduling details or notes from the doctor&apos;s review" />
               </label>
             </div>
 

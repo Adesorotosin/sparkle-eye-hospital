@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, Glasses, Loader2, RefreshCw } from "lucide-react";
@@ -40,9 +40,7 @@ export default function OpticianPatientPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadPrescription() {
-    setLoading(true);
-    setError("");
+  const loadPrescription = useCallback(async () => {
     try {
       const result = await getOpticianPatient(patientCode);
       if (!result.success || !result.patient) throw new Error(result.message || "No spectacle prescription is available.");
@@ -53,9 +51,10 @@ export default function OpticianPatientPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [patientCode]);
 
-  useEffect(() => { if (patientCode) void loadPrescription(); }, [patientCode]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPrescription updates state after its async request resolves.
+  useEffect(() => { if (patientCode) void loadPrescription(); }, [loadPrescription]);
 
   const od = prescriptionValues(patient?.optometry.refractionOD);
   const os = prescriptionValues(patient?.optometry.refractionOS);
@@ -66,7 +65,7 @@ export default function OpticianPatientPage() {
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <Link href="/optician" className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-violet-700"><ArrowLeft className="h-4 w-4" /> Back to prescriptions</Link>
-          <button onClick={() => void loadPrescription()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button>
+          <button onClick={() => { setLoading(true); void loadPrescription(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button>
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8">

@@ -16,7 +16,6 @@ import {
   Pause,
   Play,
   Activity,
-  Award,
   Bed,
   CheckSquare
 } from "lucide-react";

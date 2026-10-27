@@ -33,19 +33,25 @@ export async function getDiagnosticQueue() {
 
     return {
       success: true,
-      orders: (data ?? []).map((row: any) => ({
-        id: row.id,
-        patientId: row.patients.patient_code,
-        patientName: row.patients.full_name,
-        testName: row.name,
-        price: Number(row.price ?? 0),
-        status: row.status,
-        findings: row.findings ?? "",
-        interpretation: row.interpretation ?? "",
-        referralSource: row.referral_source ?? null,
-        externalReferral: Boolean(row.external_referral),
-        createdAt: row.created_at,
-      })) as DiagnosticQueueItem[],
+      orders: (data ?? []).map((rawRow: unknown) => {
+        const row = rawRow as Record<string, unknown>;
+        const patient = row.patients as
+          | { patient_code?: string | null; full_name?: string | null }
+          | null;
+        return {
+          id: row.id,
+          patientId: patient?.patient_code ?? "",
+          patientName: patient?.full_name ?? "",
+          testName: row.name,
+          price: Number(row.price ?? 0),
+          status: row.status,
+          findings: row.findings ?? "",
+          interpretation: row.interpretation ?? "",
+          referralSource: row.referral_source ?? null,
+          externalReferral: Boolean(row.external_referral),
+          createdAt: row.created_at,
+        } as DiagnosticQueueItem;
+      }),
     };
   } catch (error) {
     console.error("Diagnostic queue error:", error);

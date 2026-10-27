@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import SessionLockScreen from "@/components/SessionLockModal";
 
 interface IdleTimerProps {
   children: React.ReactNode;
-  timeoutMinutes?: number; // Default: 5 minutes
+  timeoutMinutes?: number;
 }
 
 export default function IdleTimer({
@@ -13,53 +13,50 @@ export default function IdleTimer({
   timeoutMinutes = 5,
 }: IdleTimerProps) {
   const [isLocked, setIsLocked] = useState(false);
-
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timeoutMs = timeoutMinutes * 60 * 1000;
 
   const resetTimer = useCallback(() => {
-    // If screen is already locked, don't auto-unlock on movement
     if (isLocked) return;
 
-    // Reset inactivity timer
-    if ((window as any).idleTimer) {
-      clearTimeout((window as any).idleTimer);
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
     }
 
-    (window as any).idleTimer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       setIsLocked(true);
     }, timeoutMs);
   }, [isLocked, timeoutMs]);
 
   useEffect(() => {
-    // Listen to common user activity events
     const events = [
       "mousemove",
       "keydown",
       "mousedown",
       "touchstart",
       "scroll",
-    ];
+    ] as const;
 
     events.forEach((event) => {
       window.addEventListener(event, resetTimer);
     });
 
-    // Start initial timer on mount
     resetTimer();
 
     return () => {
       events.forEach((event) => {
         window.removeEventListener(event, resetTimer);
       });
-      if ((window as any).idleTimer) {
-        clearTimeout((window as any).idleTimer);
+
+      if (timerRef.current !== null) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
   }, [resetTimer]);
 
   const handleUnlock = () => {
     setIsLocked(false);
-    resetTimer();
   };
 
   return (

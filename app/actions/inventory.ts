@@ -106,11 +106,14 @@ export async function getInventoryData() {
       return { success: false as const, message: "Unable to load inventory. Confirm the shared inventory migration has been applied.", role: null, items: [] as InventoryItemRecord[], suppliers: [] as InventorySupplierRecord[], movements: [] as InventoryMovementRecord[] };
     }
 
-    const movements = (movementsResult.data ?? []).map((row: any) => ({
-      ...row,
-      item: Array.isArray(row.item) ? row.item[0] ?? null : row.item ?? null,
-      supplier: Array.isArray(row.supplier) ? row.supplier[0] ?? null : row.supplier ?? null,
-    }));
+    const movements = (movementsResult.data ?? []).map((rawRow: unknown) => {
+      const row = rawRow as Record<string, unknown>;
+      return {
+        ...row,
+        item: Array.isArray(row.item) ? row.item[0] ?? null : row.item ?? null,
+        supplier: Array.isArray(row.supplier) ? row.supplier[0] ?? null : row.supplier ?? null,
+      };
+    });
 
     return {
       success: true as const,

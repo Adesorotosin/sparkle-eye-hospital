@@ -308,7 +308,7 @@ export async function addActivityLog(
 /**
  * Converts a database vitals row into the application's TriageVitals shape.
  */
-function mapVitals(row: any): TriageVitals {
+function mapVitals(row: Record<string, unknown>): TriageVitals {
   const visualAcuityOD = row.visual_acuity_od ?? "";
   const visualAcuityOS = row.visual_acuity_os ?? "";
 
@@ -433,7 +433,7 @@ function mapVitals(row: any): TriageVitals {
       row.recorded_at ??
       row.created_at ??
       new Date().toISOString(),
-  };
+  } as TriageVitals;
 }
 
 /**
@@ -597,18 +597,18 @@ export async function getPatientRecord(
 
   const laboratoryResults: LaboratoryResult[] = (
     laboratoryOrdersRes.data ?? []
-  ).flatMap((order: any) => {
+  ).flatMap((order: Record<string, unknown>) => {
     const results = Array.isArray(order.lab_results)
       ? order.lab_results
       : [];
 
     return results
       .filter(
-        (result: any) =>
+        (result: Record<string, unknown>) =>
           Boolean(result.verified_at)
       )
       .map(
-        (result: any) => ({
+        (result: Record<string, unknown>) => ({
           id: result.id,
 
           labOrderId:
@@ -647,7 +647,7 @@ export async function getPatientRecord(
           createdAt:
             result.created_at ??
             order.created_at,
-        })
+        } as LaboratoryResult)
       );
   });
 
@@ -689,7 +689,7 @@ export async function getPatientRecord(
 
   const items: LineItem[] = (
     invoiceRow?.invoice_items ?? []
-  ).map((item: any) => ({
+  ).map((item: Record<string, unknown>) => ({
     id: item.id,
 
     category:
@@ -709,7 +709,7 @@ export async function getPatientRecord(
     totalPrice: Number(
       item.total_price ?? 0
     ),
-  }));
+  } as LineItem));
 
   const invoice: PatientInvoice = {
     invoiceNo:

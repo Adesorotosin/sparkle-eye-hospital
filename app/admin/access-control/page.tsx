@@ -539,18 +539,23 @@ export default function AccessControlPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- loadStaff updates state after its async request resolves.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadStaff updates state after its async request resolves.
     void loadStaff();
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the editable permission draft with the selected staff record.
   useEffect(() => {
     if (selectedStaff) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable permission draft when the selected staff member changes.
       setDraftPermissions(
         getPermissionsForStaff(
           selectedStaff
         )
       );
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the editable permission draft when no staff member is selected.
       setDraftPermissions({});
     }
   }, [selectedStaff]);
@@ -1692,7 +1697,7 @@ export default function AccessControlPage() {
 
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
               <p className="text-xs leading-5 text-amber-800">
-                For security, the staff member's existing sessions will be signed out after the password changes. This helps prevent access through an old session.
+                For security, the staff member&apos;s existing sessions will be signed out after the password changes. This helps prevent access through an old session.
               </p>
             </div>
 

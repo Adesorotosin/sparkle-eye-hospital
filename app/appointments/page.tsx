@@ -178,10 +178,12 @@ export default function ResourceCalendar() {
   }, [currentDate, viewMode]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadDayAppointments updates state after its async request resolves.
     void loadDayAppointments();
   }, [loadDayAppointments]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadRangeAppointments updates state after its async request resolves.
     void loadRangeAppointments();
   }, [loadRangeAppointments]);
 

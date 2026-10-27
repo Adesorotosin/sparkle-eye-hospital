@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -28,6 +28,7 @@ export default function AdminSidebar({
   setCollapsed,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -50,7 +51,7 @@ export default function AdminSidebar({
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     localStorage.removeItem("sparkle_staff_token");
-    window.location.href = "/";
+    router.push("/");
   };
 
   return (
@@ -146,9 +147,12 @@ export default function AdminSidebar({
           }`}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            <img
+            <Image
               src="https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=100&auto=format&fit=crop&q=80"
               alt="Dr. Alabi Benson"
+              width={32}
+              height={32}
+              unoptimized
               className="w-8 h-8 rounded-full object-cover border border-slate-700 shrink-0"
             />
             {!collapsed && (

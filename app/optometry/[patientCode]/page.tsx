@@ -1,6 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import React, {
+  useCallback,
   useEffect,
   useState,
   useTransition,
@@ -180,9 +182,7 @@ export default function OptometryExaminationPage() {
 
 
 
-  async function loadPatient() {
-    setLoading(true);
-    setError("");
+  const loadPatient = useCallback(async () => {
 
     try {
       const result =
@@ -328,13 +328,14 @@ export default function OptometryExaminationPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [patientCode]);
 
   useEffect(() => {
     if (patientCode) {
-      loadPatient();
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPatient updates state after its async request resolves.
+      void loadPatient();
     }
-  }, [patientCode]);
+  }, [loadPatient]);
 
   function updateRefraction(
     eye: "OD" | "OS",
@@ -477,9 +478,11 @@ export default function OptometryExaminationPage() {
             </button>
 
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
-              <img
+              <Image
                 src="/Logo.png"
                 alt="Sparkle Eye Specialist Hospital"
+                width={40}
+                height={40}
                 className="h-full w-full object-contain"
               />
             </div>
@@ -702,7 +705,7 @@ export default function OptometryExaminationPage() {
                 </span>
 
                 <span className="block text-xs text-slate-500">
-                  Visual acuity was measured with the patient's current correction.
+                  Visual acuity was measured with the patient&apos;s current correction.
                 </span>
               </span>
             </label>

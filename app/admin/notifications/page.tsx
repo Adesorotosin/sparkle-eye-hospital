@@ -182,7 +182,9 @@ export default function NotificationsAlertCenterPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCurrentUser updates state after its async request resolves.
     loadCurrentUser();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadNotifications updates state after its async request resolves.
     loadNotifications();
   }, []);
 

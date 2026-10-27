@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Calendar,
   Phone,
   Camera,
   Lock,
@@ -15,7 +14,7 @@ import {
 
 export default function RegisterPatientPage() {
   const router = useRouter();
-  const [activeStep, setActiveStep] = useState(1);
+  const [activeStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 

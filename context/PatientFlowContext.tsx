@@ -106,40 +106,36 @@ export const PatientFlowProvider = ({
   const [activePatientCode, setActivePatientCode] =
     useState(DEFAULT_PATIENT_CODE);
 
-  const [patient, setPatient] =
+  const [storedPatient, setStoredPatient] =
     useState<PatientRecord>(
       emptyPatientFor(DEFAULT_PATIENT_CODE)
     );
+  const [loadedPatientCode, setLoadedPatientCode] =
+    useState<string | null>(null);
 
-  const [isLoading, setIsLoading] =
-    useState(true);
+  const isValidPatientCode =
+    Boolean(activePatientCode) &&
+    activePatientCode !== "undefined" &&
+    activePatientCode !== "null";
+
+  const patient =
+    loadedPatientCode === activePatientCode
+      ? storedPatient
+      : emptyPatientFor(activePatientCode);
+  const isLoading =
+    isValidPatientCode && loadedPatientCode !== activePatientCode;
 
   useEffect(() => {
     let cancelled = false;
 
-    setIsLoading(true);
-    setPatient(
-      emptyPatientFor(activePatientCode)
-    );
+    if (!isValidPatientCode) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function loadPatient() {
       try {
-        // Skip fetch if activePatientCode is missing
-        // or is the literal string "undefined"/"null".
-        if (
-          !activePatientCode ||
-          activePatientCode === "undefined" ||
-          activePatientCode === "null"
-        ) {
-          if (!cancelled) {
-            setPatient(
-              emptyPatientFor(activePatientCode)
-            );
-          }
-
-          return;
-        }
-
         const res = await fetch(
           `/api/patients/${encodeURIComponent(
             activePatientCode
@@ -147,53 +143,42 @@ export const PatientFlowProvider = ({
         );
 
         if (!res.ok) {
-          if (!cancelled) {
-            setPatient(
-              emptyPatientFor(activePatientCode)
-            );
-          }
-
           console.warn(
             `Patient API returned status ${res.status} for code: ${activePatientCode}`
           );
 
+          if (!cancelled) {
+            setStoredPatient(emptyPatientFor(activePatientCode));
+          }
           return;
         }
 
         const data = await res.json();
 
         if (!cancelled) {
-          setPatient(
-            data.patient ??
-              emptyPatientFor(
-                activePatientCode
-              )
+          setStoredPatient(
+            data.patient ?? emptyPatientFor(activePatientCode)
           );
         }
       } catch (err) {
         if (!cancelled) {
-          setPatient(
-            emptyPatientFor(activePatientCode)
-          );
+          setStoredPatient(emptyPatientFor(activePatientCode));
         }
 
-        console.error(
-          "Error loading patient record:",
-          err
-        );
+        console.error("Error loading patient record:", err);
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setLoadedPatientCode(activePatientCode);
         }
       }
     }
 
-    loadPatient();
+    void loadPatient();
 
     return () => {
       cancelled = true;
     };
-  }, [activePatientCode]);
+  }, [activePatientCode, isValidPatientCode]);
 
   const updateVitals = async (
     vitals: TriageVitals
@@ -213,7 +198,7 @@ export const PatientFlowProvider = ({
       const { patient: updated } =
         await res.json();
 
-      setPatient(updated);
+      setStoredPatient(updated);
     }
   };
 
@@ -235,7 +220,7 @@ export const PatientFlowProvider = ({
       const { patient: updated } =
         await res.json();
 
-      setPatient(updated);
+      setStoredPatient(updated);
     }
   };
 
@@ -260,7 +245,7 @@ export const PatientFlowProvider = ({
       const { patient: updated } =
         await res.json();
 
-      setPatient(updated);
+      setStoredPatient(updated);
     }
   };
 
@@ -278,7 +263,7 @@ export const PatientFlowProvider = ({
       const { patient: updated } =
         await res.json();
 
-      setPatient(updated);
+      setStoredPatient(updated);
     }
   };
 
@@ -310,7 +295,7 @@ export const PatientFlowProvider = ({
       body.success &&
       body.patient
     ) {
-      setPatient(body.patient);
+      setStoredPatient(body.patient);
     }
 
     return Boolean(body.success);
@@ -343,7 +328,7 @@ export const PatientFlowProvider = ({
       body.success &&
       body.patient
     ) {
-      setPatient(body.patient);
+      setStoredPatient(body.patient);
     }
 
     return {

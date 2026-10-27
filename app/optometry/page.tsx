@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import React, {
   useCallback,
   useEffect,
@@ -56,8 +58,6 @@ export default function OptometryDashboard() {
 
   const loadQueue = useCallback(
     async () => {
-      setLoading(true);
-      setFeedback("");
 
       try {
         const result =
@@ -91,7 +91,8 @@ export default function OptometryDashboard() {
   );
 
   useEffect(() => {
-    loadQueue();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadQueue updates state after its async request resolves.
+    void loadQueue();
   }, [loadQueue]);
 
   const waiting = patients.filter(
@@ -251,7 +252,7 @@ export default function OptometryDashboard() {
         "sparkle_staff_token"
       );
 
-      window.location.href = "/";
+      router.push("/");
     }
   }
 

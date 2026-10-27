@@ -16,6 +16,56 @@ type NotificationCategory =
   | "Finance"
   | "Security";
 
+type NotificationDbRow = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  created_at: string;
+  triggered_by?: string | null;
+  target?: string | null;
+  category?: string | null;
+};
+
+type NotificationFeedItem = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  triggeredBy?: string | null;
+  target?: string | null;
+  category?: string | null;
+  createdAt?: string | null;
+};
+
+type InventoryAlertRow = {
+  id: string;
+  name: string;
+  stock: number | string;
+  reorder_level: number | string;
+  sku?: string | null;
+  domain?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type UnpaidInvoiceRow = {
+  id: string;
+  invoice_no?: string | null;
+  grand_total?: number | string | null;
+  created_at: string;
+  patients?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+};
+
+type RiskyLoginRow = {
+  id: string;
+  action?: string | null;
+  username_attempted?: string | null;
+  ip_address?: string | null;
+  created_at: string;
+};
+
 const ALLOWED_TYPES: NotificationType[] = [
   "Emergency",
   "Announcement",
@@ -64,7 +114,7 @@ function timeAgo(dateStr?: string | null) {
 }
 
 function normalizeNotification(
-  notification: any
+  notification: NotificationDbRow
 ) {
   return {
     id: notification.id,
@@ -196,18 +246,18 @@ export async function GET() {
       );
     }
 
-    const derived: any[] = [];
+    const derived: NotificationFeedItem[] = [];
 
     // ----------------------------------------------------------
     // 1. LOW STOCK
     // ----------------------------------------------------------
     inventory
       .filter(
-        (item: any) =>
+        (item: InventoryAlertRow) =>
           Number(item.stock) <=
           Number(item.reorder_level)
       )
-      .forEach((item: any) => {
+      .forEach((item: InventoryAlertRow) => {
         derived.push({
           id: `stock-${item.id}`,
           type: "Finance",
@@ -233,10 +283,11 @@ export async function GET() {
     // ----------------------------------------------------------
     // 2. UNPAID INVOICES
     // ----------------------------------------------------------
-    unpaidInvoices.forEach((invoice: any) => {
-      const patientName =
-        invoice.patients?.full_name ??
-        "a patient";
+    unpaidInvoices.forEach((invoice: UnpaidInvoiceRow) => {
+      const patient = Array.isArray(invoice.patients)
+        ? invoice.patients[0]
+        : invoice.patients;
+      const patientName = patient?.full_name ?? "a patient";
 
       derived.push({
         id: `invoice-${invoice.id}`,
@@ -257,7 +308,7 @@ export async function GET() {
     // ----------------------------------------------------------
     // 3. RISKY SECURITY EVENTS
     // ----------------------------------------------------------
-    riskyLogins.forEach((log: any) => {
+    riskyLogins.forEach((log: RiskyLoginRow) => {
       derived.push({
         id: `login-${log.id}`,
         type: "Emergency",
@@ -278,7 +329,7 @@ export async function GET() {
     // 4. MANUAL NOTIFICATIONS
     // ----------------------------------------------------------
     const manualMapped = manual.map(
-      (notification: any) =>
+      (notification: NotificationDbRow) =>
         normalizeNotification(notification)
     );
 

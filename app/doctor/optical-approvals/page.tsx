@@ -49,6 +49,7 @@ export default function OpticalChargeApprovalsPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadApprovals updates state after its async request resolves.
     void loadApprovals();
   }, [loadApprovals]);
 
@@ -87,7 +88,7 @@ export default function OpticalChargeApprovalsPage() {
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-600">Doctor Review</p>
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Optical Charge Approvals</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Set the final optical charge after reviewing the eyewear details. Only the Doctor-approved amount can be added to the patient's invoice; the Cashier records payment.
+              Set the final optical charge after reviewing the eyewear details. Only the Doctor-approved amount can be added to the patient&apos;s invoice; the Cashier records payment.
             </p>
           </div>
           <button type="button" onClick={() => void loadApprovals()} disabled={loading || isPending} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
@@ -122,7 +123,7 @@ export default function OpticalChargeApprovalsPage() {
                     <p className="text-xs font-medium text-violet-600">Current charge (editable)</p>
                     <p className="mt-1 text-xl font-bold text-violet-900">{formatCurrency(item.opticalCharge)}</p>
                     <label className="mt-3 block text-left">
-                      <span className="text-xs font-medium text-violet-700">Doctor's final charge (₦)</span>
+                      <span className="text-xs font-medium text-violet-700">Doctor&apos;s final charge (₦)</span>
                       <input type="number" min="0.01" step="0.01" value={charges[item.id] ?? ""} onChange={(event) => setCharges((current) => ({ ...current, [item.id]: event.target.value }))} className="mt-1 h-10 w-full rounded-lg border border-violet-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" placeholder="Enter final amount" />
                     </label>
                   </div>

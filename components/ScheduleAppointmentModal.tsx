@@ -43,6 +43,7 @@ export default function ScheduleAppointmentModal({
       .toISOString()
       .slice(0, 10);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form defaults when the modal opens.
     setDate(localDate);
     setError("");
     setSubmitting(false);

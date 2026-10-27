@@ -8,7 +8,6 @@ import {
   Trash2,
   FileText,
   CheckCircle2,
-  AlertTriangle,
   X,
   ShieldCheck,
 } from "lucide-react";

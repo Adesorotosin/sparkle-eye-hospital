@@ -28,6 +28,63 @@ interface Patient {
   status: "Waiting for Triage" | "In Consultation" | "Completed Today";
 }
 
+interface ApiPatient {
+  patientId: string;
+  fullName: string;
+  isWalkIn?: boolean;
+  age?: number | null;
+  gender?: string | null;
+  phone?: string | null;
+  lastVisitAt?: string | null;
+  status?: string | null;
+}
+
+interface ActivityLog {
+  id: string;
+  action: string;
+  timestamp: string;
+  details?: string | null;
+  user?: string | null;
+}
+
+interface PatientsResponse {
+  patients: ApiPatient[];
+}
+
+interface ActivityLogsResponse {
+  logs: ActivityLog[];
+}
+
+const STATUS_TO_DISPLAY: Record<string, Patient["status"]> = {
+  waiting_triage: "Waiting for Triage",
+  in_consultation: "In Consultation",
+  completed_today: "Completed Today",
+};
+
+const STATUS_TO_DB: Record<Patient["status"], string> = {
+  "Waiting for Triage": "waiting_triage",
+  "In Consultation": "in_consultation",
+  "Completed Today": "completed_today",
+};
+
+function mapApiPatient(p: ApiPatient): Patient {
+  return {
+    id: p.patientId,
+    name: p.fullName,
+    isWalkIn: p.isWalkIn,
+    ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
+    phone: p.phone || "—",
+    lastVisit: p.lastVisitAt
+      ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
+          month: "short",
+          day: "2-digit",
+          year: "numeric",
+        })
+      : "—",
+    status: STATUS_TO_DISPLAY[p.status ?? ""] || "Waiting for Triage",
+  };
+}
+
 export default function PatientDirectoryPage() {
   // --- STATES ---
   const [globalSearch, setGlobalSearch] = useState("");
@@ -46,7 +103,7 @@ export default function PatientDirectoryPage() {
   const [notifications, setNotifications] = useState<
     { id: string; title: string; desc: string; time: string; unread: boolean }[]
   >([]);
-
+  const [activityLogs, setActivityLogs] = useState<{ text: string; time: string }[]>([]);
   // Active Selected Patient for Modals
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
@@ -54,79 +111,69 @@ export default function PatientDirectoryPage() {
   // array of "SESH-2026-xxx" ids disconnected from every other page)
   const [patients, setPatients] = useState<Patient[]>([]);
 
-  const STATUS_TO_DISPLAY: Record<string, Patient["status"]> = {
-    waiting_triage: "Waiting for Triage",
-    in_consultation: "In Consultation",
-    completed_today: "Completed Today",
-  };
-  const STATUS_TO_DB: Record<Patient["status"], string> = {
-    "Waiting for Triage": "waiting_triage",
-    "In Consultation": "in_consultation",
-    "Completed Today": "completed_today",
-  };
-
-  function mapApiPatient(p: any): Patient {
-    return {
-      id: p.patientId,
-      name: p.fullName,
-      isWalkIn: p.isWalkIn,
-      ageSex: `${p.age ?? "—"} Y / ${(p.gender || "—").charAt(0)}`,
-      phone: p.phone || "—",
-      lastVisit: p.lastVisitAt
-        ? new Date(p.lastVisitAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          })
-        : "—",
-      status: STATUS_TO_DISPLAY[p.status] || "Waiting for Triage",
-    };
-  }
-
-  const loadPatients = async () => {
-    setIsLoadingPatients(true);
-    try {
-      const res = await fetch("/api/patients");
-      if (!res.ok) throw new Error("Failed to load patients");
-      const { patients: fetched } = await res.json();
-      setPatients(fetched.map(mapApiPatient));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoadingPatients(false);
-    }
-  };
-
-  const loadActivity = async () => {
-    try {
-      const res = await fetch("/api/activity-logs?limit=10");
-      if (!res.ok) throw new Error("Failed to load activity");
-      const { logs } = await res.json();
-
-      setActivityLogs(
-        logs.map((log: any) => ({
-          text: log.action,
-          time: new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        }))
-      );
-
-      setNotifications(
-        logs.slice(0, 6).map((log: any, idx: number) => ({
-          id: log.id,
-          title: log.action,
-          desc: log.details || `Logged by ${log.user}`,
-          time: new Date(log.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          unread: idx < 2,
-        }))
-      );
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   useEffect(() => {
-    loadPatients();
-    loadActivity();
+    let cancelled = false;
+
+    const fetchPatients = async () => {
+      try {
+        const res = await fetch("/api/patients", { cache: "no-store" });
+        if (!res.ok) throw new Error("Failed to load patients");
+
+        const data = (await res.json()) as PatientsResponse;
+        if (!cancelled) {
+          setPatients(data.patients.map(mapApiPatient));
+        }
+      } catch (err) {
+        if (!cancelled) console.error(err);
+      } finally {
+        if (!cancelled) setIsLoadingPatients(false);
+      }
+    };
+
+    const fetchActivity = async () => {
+      try {
+        const res = await fetch("/api/activity-logs?limit=10", {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("Failed to load activity");
+
+        const data = (await res.json()) as ActivityLogsResponse;
+        const { logs } = data;
+        if (cancelled) return;
+
+        setActivityLogs(
+          logs.map((log) => ({
+            text: log.action,
+            time: new Date(log.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          }))
+        );
+
+        setNotifications(
+          logs.slice(0, 6).map((log, idx) => ({
+            id: log.id,
+            title: log.action,
+            desc: log.details || `Logged by ${log.user || "Unknown user"}`,
+            time: new Date(log.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            unread: idx < 2,
+          }))
+        );
+      } catch (err) {
+        if (!cancelled) console.error(err);
+      }
+    };
+
+    void fetchPatients();
+    void fetchActivity();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Form State for Adding / Editing Patient
@@ -139,7 +186,7 @@ export default function PatientDirectoryPage() {
     status: "Waiting for Triage" as Patient["status"],
   });
 
-  const [activityLogs, setActivityLogs] = useState<{ text: string; time: string }[]>([]);
+
 
   // --- FILTERED DATA COMPUTATION ---
   const filteredPatients = useMemo(() => {
@@ -679,7 +726,7 @@ export default function PatientDirectoryPage() {
           <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
               <h3 className="font-bold text-xs text-slate-900 tracking-tight">
-                Today's Triage Summary
+                Today&apos;s Triage Summary
               </h3>
 
               <div className="grid grid-cols-2 gap-4 text-center">

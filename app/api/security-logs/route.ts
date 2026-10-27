@@ -5,6 +5,25 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
+type SecurityLogRow = {
+  id: string;
+  created_at: string;
+  username_attempted?: string | null;
+  staff?: { name?: string | null; staff_id?: string | null; role?: string | null } | null;
+  action: string;
+  ip_address?: string | null;
+  device?: string | null;
+  risk_level?: string | null;
+};
+
+type SecurityAlertRow = {
+  id: string;
+  action: string;
+  username_attempted?: string | null;
+  created_at: string;
+  risk_level?: string | null;
+};
+
 function roleColorFor(
   role: string | null
 ) {
@@ -99,7 +118,7 @@ export async function GET(
 
     let logs = (
       data ?? []
-    ).map((row: any) => ({
+    ).map((row: SecurityLogRow) => ({
       id: row.id,
 
       timestamp:
@@ -143,7 +162,7 @@ export async function GET(
           log.action
             .toLowerCase()
             .includes(search) ||
-          log.user
+          (log.user ?? "")
             .toLowerCase()
             .includes(search)
       );
@@ -181,7 +200,7 @@ export async function GET(
 
     const alerts = (
       alertRows ?? []
-    ).map((row: any) => ({
+    ).map((row: SecurityAlertRow) => ({
       id: row.id,
 
       title: `${row.action} — ${row.username_attempted}`,
