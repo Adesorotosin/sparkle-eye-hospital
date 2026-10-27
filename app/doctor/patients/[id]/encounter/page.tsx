@@ -1358,14 +1358,10 @@ export default function DoctorEncounterPage() {
                 <h3 className="mt-2 font-semibold">Investigation Room</h3>
                 <p className="mt-1 text-xs text-gray-500">Use the Investigation section above to send a named test.</p>
               </div>
-              <button onClick={referOptician} disabled={isPending || requesting === "optician" || !optometryAssessmentCompleted} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
-                {requesting === "optician" ? <Loader2 className="h-5 w-5 animate-spin text-blue-600" /> : <Hospital className="h-5 w-5 text-blue-600" />}
-                <h3 className="mt-2 font-semibold">Optician</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {optometryAssessmentCompleted
-                    ? "Review the optometry results above, then forward the patient to the Optician queue."
-                    : "Available after the Optometrist completes and sends the assessment to the doctor."}
-                </p>
+              <button onClick={() => document.getElementById("refraction-notes")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="rounded-2xl border p-4 text-left hover:border-blue-300 hover:bg-blue-50">
+                <Hospital className="h-5 w-5 text-blue-600" />
+                <h3 className="mt-2 font-semibold">Spectacle prescription</h3>
+                <p className="mt-1 text-xs text-gray-500">Complete and authorise the client-approved spectacle prescription in this Doctor workspace.</p>
               </button>
             </div>
           </Section>
