@@ -198,7 +198,7 @@ export async function registerVisitingOptometryPatient(input: {
   visitType: "external_referral" | "self_presenting";
 }): Promise<OptometryActionResponse & { patientCode?: string }> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST", "RECEPTIONIST"]);
+    const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
     const fullName = input.fullName?.trim();
     if (!fullName) return { success: false, message: "Patient full name is required." };
 
