@@ -22,6 +22,7 @@ import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
 import { createLabOrder } from "@/app/actions/lab-orders";
 import { registerVisitingOptometryPatient } from "@/app/actions/optometry";
 import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
+import { createPatientVisitRoute, type VisitDestination } from "@/app/actions/patient-visit-routing";
 
 type Patient = {
   id: string;
@@ -142,6 +143,7 @@ export default function ReceptionistPage() {
 
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication" | "procedure">("general");
+  const [visitDestination, setVisitDestination] = useState<VisitDestination>("TRIAGE");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
@@ -316,7 +318,7 @@ export default function ReceptionistPage() {
           coveragePlan: patientForm.coveragePlan,
           allergies: patientForm.allergies,
           isWalkIn: patientForm.isWalkIn,
-          status: registrationIntent === "medication" || registrationIntent === "procedure" ? "in_consultation" : "waiting_triage",
+          status: "waiting_triage",
         }),
       });
 
@@ -349,11 +351,17 @@ export default function ReceptionistPage() {
       );
 
       await loadData();
-      if (registrationIntent === "medication") {
-        router.push(`/pharmacy?patientId=${encodeURIComponent(data.patient.patientId)}`);
-      } else if (registrationIntent === "procedure") {
-        setProcedureForm(current => ({ ...current, patientCode: data.patient.patientId, scheduledDate: date }));
-        setShowProcedureModal(true);
+
+      // Routing is an arrival notification only. Reception never opens or
+      // creates work inside another department's module.
+      const routeResult = await createPatientVisitRoute({
+        patientCode: data.patient.patientId,
+        destination: visitDestination,
+      });
+      if (!routeResult.success) {
+        setError(`Patient registered successfully (code: ${data.patient.patientId}), but routing failed: ${routeResult.message} Do not register the patient again.`);
+      } else {
+        notify(routeResult.message);
       }
     } catch (err) {
       setError(
@@ -746,82 +754,38 @@ export default function ReceptionistPage() {
         {/* RECEPTION ACTIONS */}
         <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5">
-            <h2 className="font-extrabold text-slate-950">Reception actions</h2>
+            <h2 className="font-extrabold text-slate-950">Patient registration & routing</h2>
             <p className="mt-1 text-xs font-medium text-slate-500">
-              Start the patient journey from one place.
+              Reception creates the patient record and sends an arrival notice to the selected queue. Clinical orders and care remain with the receiving department.
             </p>
           </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              onClick={() => { setRegistrationIntent("general"); setShowPatientModal(true); }}
-              className="flex min-h-20 items-center gap-3 rounded-xl bg-purple-600 p-4 text-left text-white transition hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15">
-                <UserPlus className="h-5 w-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-extrabold">Register patient</span>
-                <span className="mt-1 block text-xs font-medium text-purple-100">Create a new patient record.</span>
-              </span>
-            </button>
-
-            <button
-              onClick={() => {
-                setProcedureForm((current) => ({ ...current, scheduledDate: date }));
-                setShowProcedureModal(true);
-              }}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4 text-left text-purple-800 transition hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-purple-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white">
-                <FilePlus2 className="h-5 w-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-extrabold">Register procedure</span>
-                <span className="mt-1 block text-xs font-medium text-purple-700">Register an in-house procedure after the doctor&apos;s review.</span>
-              </span>
-            </button>
-
-            <button
-              onClick={() => { setRegistrationIntent("procedure"); setShowPatientModal(true); }}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-4 text-left text-fuchsia-900 transition hover:bg-fuchsia-100 focus:outline-none focus:ring-2 focus:ring-fuchsia-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting procedure patient</span><span className="mt-1 block text-xs font-medium text-fuchsia-800">Register the walk-in first, then open procedure registration and billing.</span></span>
-            </button>
-
-            <button
-              onClick={() => { setRegistrationIntent("medication"); setShowPatientModal(true); }}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left text-emerald-900 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><UserPlus className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting medication patient</span><span className="mt-1 block text-xs font-medium text-emerald-800">Register a walk-in and open the Pharmacy workspace for that patient.</span></span>
-            </button>
-
-            <button
-              onClick={() => setShowVisitingInvestigationModal(true)}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-900 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting investigation</span><span className="mt-1 block text-xs font-medium text-amber-800">Register an outside patient for a test and send it to the investigation queue and Cashier.</span></span>
-            </button>
-
-            <button
-              onClick={() => setShowVisitingLabModal(true)}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-left text-sky-900 transition hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting laboratory patient</span><span className="mt-1 block text-xs font-medium text-sky-800">Register an outside patient directly into the Laboratory queue.</span></span>
-            </button>
-
-            <button
-              onClick={() => setShowVisitingRefractionModal(true)}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-left text-blue-900 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting glasses / refraction</span><span className="mt-1 block text-xs font-medium text-blue-800">Register an outside patient directly into the Optometry queue.</span></span>
-            </button>
-
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {([
+              { destination: "TRIAGE" as VisitDestination, title: "Register patient", detail: "General walk-in or first assessment.", color: "purple" },
+              { destination: "DOCTOR" as VisitDestination, title: "Visiting procedure patient", detail: "Send for clinical review before any procedure is ordered.", color: "fuchsia" },
+              { destination: "PHARMACY" as VisitDestination, title: "Visiting medication patient", detail: "Notify Pharmacy of arrival; no prescription is created here.", color: "emerald" },
+              { destination: "DIAGNOSTICS" as VisitDestination, title: "Visiting investigation", detail: "Notify Diagnostics for review; no test order or bill is created here.", color: "amber" },
+              { destination: "LABORATORY" as VisitDestination, title: "Visiting laboratory patient", detail: "Notify Laboratory of arrival; lab staff follow their approved order workflow.", color: "sky" },
+              { destination: "OPTOMETRY" as VisitDestination, title: "Visiting glasses / refraction", detail: "Notify Optometry of arrival; the optometrist handles assessment.", color: "blue" },
+            ]).map((item) => (
+              <button
+                key={item.destination}
+                onClick={() => {
+                  setVisitDestination(item.destination);
+                  setRegistrationIntent("general");
+                  setShowPatientModal(true);
+                }}
+                className="flex min-h-20 items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                  <UserPlus className="h-5 w-5" />
+                </span>
+                <span>
+                  <span className="block text-sm font-extrabold text-slate-900">{item.title}</span>
+                  <span className="mt-1 block text-xs font-medium text-slate-500">{item.detail}</span>
+                </span>
+              </button>
+            ))}
             <button
               onClick={() => {
                 setAppointmentForm((current) => ({
@@ -831,14 +795,14 @@ export default function ReceptionistPage() {
                 }));
                 setShowAppointmentModal(true);
               }}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              className="flex min-h-20 items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
                 <CalendarDays className="h-5 w-5" />
               </span>
               <span>
                 <span className="block text-sm font-extrabold text-slate-900">Book appointment</span>
-                <span className="mt-1 block text-xs font-medium text-slate-500">Schedule a patient visit.</span>
+                <span className="mt-1 block text-xs font-medium text-slate-500">Schedule a patient visit without opening a clinical module.</span>
               </span>
             </button>
           </div>
@@ -1507,6 +1471,27 @@ export default function ReceptionistPage() {
                     <option>NHIA</option>
                     <option>Private Insurance</option>
                   </select>
+                </div>
+
+                {/* VISIT DESTINATION */}
+                <div className="md:col-span-2">
+                  <label className="mb-1.5 block text-xs font-bold text-slate-600">
+                    Visit destination *
+                  </label>
+                  <select
+                    required
+                    value={visitDestination}
+                    onChange={(event) => setVisitDestination(event.target.value as VisitDestination)}
+                    className={inputClass}
+                  >
+                    <option value="TRIAGE">Triage / first assessment</option>
+                    <option value="DOCTOR">Doctor review</option>
+                    <option value="PHARMACY">Pharmacy arrival queue</option>
+                    <option value="LABORATORY">Laboratory arrival queue</option>
+                    <option value="DIAGNOSTICS">Diagnostics / investigation review</option>
+                    <option value="OPTOMETRY">Optometry / refraction queue</option>
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">This only routes the arrival. It does not create a prescription, clinical order, procedure, or bill.</p>
                 </div>
 
                 {/* ALLERGIES */}
