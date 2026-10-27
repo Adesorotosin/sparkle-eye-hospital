@@ -17,11 +17,6 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
-import { createExternalDiagnosticOrder } from "@/app/actions/clinical-orders";
-import { createLabOrder } from "@/app/actions/lab-orders";
-import { registerVisitingOptometryPatient } from "@/app/actions/optometry";
-import ClinicalHandoffInbox from "@/components/ClinicalHandoffInbox";
 import { createPatientVisitRoute, type VisitDestination } from "@/app/actions/patient-visit-routing";
 
 type Patient = {
@@ -57,19 +52,6 @@ type DoctorOption = {
   name: string;
   role: string;
   title?: string | null;
-};
-
-type ProcedureRegistration = {
-  id: string;
-  procedureName: string;
-  referralType: string;
-  orderReference: string;
-  scheduledDate?: string | null;
-  price: number;
-  status: string;
-  patientCode: string;
-  registrationNumber?: string | null;
-  patientName: string;
 };
 
 const inputClass =
@@ -142,27 +124,8 @@ export default function ReceptionistPage() {
   const [toast, setToast] = useState("");
 
   const [showPatientModal, setShowPatientModal] = useState(false);
-  const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication" | "procedure">("general");
   const [visitDestination, setVisitDestination] = useState<VisitDestination>("TRIAGE");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-  const [showProcedureModal, setShowProcedureModal] = useState(false);
-  const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
-  const [showVisitingRefractionModal, setShowVisitingRefractionModal] = useState(false);
-  const [showVisitingLabModal, setShowVisitingLabModal] = useState(false);
-  const [savingVisitingRequest, setSavingVisitingRequest] = useState(false);
-  const [visitingInvestigationForm, setVisitingInvestigationForm] = useState({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
-  const [visitingRefractionForm, setVisitingRefractionForm] = useState({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" as "self_presenting" | "external_referral" });
-  const [visitingLabForm, setVisitingLabForm] = useState({ patientCode: "", fullName: "", age: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL" as "NORMAL" | "URGENT" | "STAT", clinicalNotes: "" });
-  const [savingProcedure, setSavingProcedure] = useState(false);
-  const [procedures, setProcedures] = useState<ProcedureRegistration[]>([]);
-  const [procedurePrices, setProcedurePrices] = useState<Array<{ id: string; code: string; name: string; category: string; price: number; active: boolean }>>([]);
-  const [procedureForm, setProcedureForm] = useState({
-    patientCode: "",
-    procedureCode: "refraction",
-    scheduledDate: todayIso(),
-    notes: "",
-  });
-
   const [patientForm, setPatientForm] = useState({
     fullName: "",
     phone: "",
@@ -237,12 +200,6 @@ export default function ReceptionistPage() {
 
       setAppointments(appointmentData.appointments ?? []);
       setPatients(patientData.patients ?? []);
-      const [procedureData, priceCatalog] = await Promise.all([
-        getRecentProcedures(),
-        getProcedurePriceCatalog(),
-      ]);
-      setProcedures(procedureData.procedures ?? []);
-      setProcedurePrices((priceCatalog.procedures ?? []).filter((item) => item.active));
     } catch (err) {
       setError(
         err instanceof Error
@@ -374,149 +331,6 @@ export default function ReceptionistPage() {
     }
   }
 
-  async function handleRegisterProcedure(event: FormEvent) {
-    event.preventDefault();
-    setSavingProcedure(true);
-    setError("");
-
-    try {
-      const result = await registerProcedure({
-        patientCode: procedureForm.patientCode,
-        procedureCode: procedureForm.procedureCode,
-        scheduledDate: procedureForm.scheduledDate || undefined,
-        notes: procedureForm.notes,
-      });
-
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-
-      setShowProcedureModal(false);
-      setProcedureForm({
-        patientCode: "",
-        procedureCode: "refraction",
-        scheduledDate: date,
-        notes: "",
-      });
-      notify(result.message);
-      const refreshed = await getRecentProcedures();
-      setProcedures(refreshed.procedures ?? []);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not register procedure.");
-    } finally {
-      setSavingProcedure(false);
-    }
-  }
-
-  async function handleRegisterVisitingInvestigation(event: FormEvent) {
-    event.preventDefault();
-    setSavingVisitingRequest(true);
-    setError("");
-    try {
-      const result = await createExternalDiagnosticOrder({
-        fullName: visitingInvestigationForm.fullName,
-        age: visitingInvestigationForm.age ? Number(visitingInvestigationForm.age) : undefined,
-        gender: visitingInvestigationForm.gender || undefined,
-        phone: visitingInvestigationForm.phone || undefined,
-        referringCenter: visitingInvestigationForm.referringCenter,
-        testName: visitingInvestigationForm.testName,
-        price: Number(visitingInvestigationForm.price),
-      });
-      if (!result.success) throw new Error(result.message);
-      setShowVisitingInvestigationModal(false);
-      setVisitingInvestigationForm({ fullName: "", age: "", gender: "", phone: "", referringCenter: "Self-presenting / walk-in", testName: "", price: "0" });
-      notify(result.message);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to register the visiting investigation.");
-    } finally {
-      setSavingVisitingRequest(false);
-    }
-  }
-
-  async function handleRegisterVisitingLab(event: FormEvent) {
-    event.preventDefault();
-    setSavingVisitingRequest(true);
-    setError("");
-    try {
-      let patientCode = visitingLabForm.patientCode.trim();
-      if (!patientCode) {
-        const patientResponse = await fetch("/api/patients", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fullName: visitingLabForm.fullName,
-            phone: visitingLabForm.contactPhone,
-            dateOfBirth: visitingLabForm.dateOfBirth || undefined,
-            age: visitingLabForm.age || undefined,
-            gender: visitingLabForm.sex,
-            coveragePlan: "Self-Pay",
-            allergies: "",
-            isWalkIn: true,
-            status: "in_consultation",
-          }),
-        });
-        const patientData = await patientResponse.json();
-        if (!patientResponse.ok || !patientData?.patient?.patientId) {
-          throw new Error(patientData?.error || "Unable to register the visiting laboratory patient.");
-        }
-        patientCode = String(patientData.patient.patientId);
-      }
-      const order = await createLabOrder({
-        patientCode,
-        testCode: visitingLabForm.testCode,
-        testName: visitingLabForm.testName,
-        specimenType: visitingLabForm.specimenType,
-        price: Number(visitingLabForm.price),
-        priority: visitingLabForm.priority,
-        clinicalNotes: [`Visiting patient — source: ${visitingLabForm.sourceCenter}`, visitingLabForm.clinicalNotes].filter(Boolean).join("\n"),
-      });
-      if (!order.success) {
-        if (order.id) {
-          setError(`Patient ${patientCode} is registered and lab order ${order.id} was created, but a downstream step failed: ${order.message} Do not submit the order again; ask Cashier or the administrator to resolve the existing order.`);
-          await loadData();
-          return;
-        }
-        throw new Error(`Patient ${patientCode} was registered, but no lab order was created: ${order.message}. Do not register the patient again; use the existing patient code to retry.`);
-      }
-      setShowVisitingLabModal(false);
-      setVisitingLabForm({ patientCode: "", fullName: "", age: "", sourceCenter: "Self-presenting / walk-in", contactPhone: "", sex: "", dateOfBirth: "", testCode: "", testName: "", specimenType: "Blood", price: "0", priority: "NORMAL", clinicalNotes: "" });
-      notify(`Visiting laboratory patient registered (${patientCode}). ${order.message}`);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to register the visiting laboratory request.");
-    } finally {
-      setSavingVisitingRequest(false);
-    }
-  }
-
-  async function handleRegisterVisitingRefraction(event: FormEvent) {
-    event.preventDefault();
-    setSavingVisitingRequest(true);
-    setError("");
-    try {
-      const result = await registerVisitingOptometryPatient({
-        fullName: visitingRefractionForm.fullName,
-        age: visitingRefractionForm.age ? Number(visitingRefractionForm.age) : undefined,
-        dateOfBirth: visitingRefractionForm.dateOfBirth || undefined,
-        gender: visitingRefractionForm.gender || undefined,
-        phone: visitingRefractionForm.phone || undefined,
-        address: visitingRefractionForm.address || undefined,
-        visitType: visitingRefractionForm.visitType,
-      });
-      if (!result.success) throw new Error(result.message);
-      setShowVisitingRefractionModal(false);
-      setVisitingRefractionForm({ fullName: "", age: "", dateOfBirth: "", gender: "", phone: "", address: "", visitType: "self_presenting" });
-      notify(result.patientCode ? `Visiting refraction registered. Patient code: ${result.patientCode}. The patient is now in the Optometry queue.` : result.message);
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to register the visiting refraction.");
-    } finally {
-      setSavingVisitingRequest(false);
-    }
-  }
-
   async function handleBookAppointment(event: FormEvent) {
     event.preventDefault();
 
@@ -609,38 +423,16 @@ export default function ReceptionistPage() {
   async function handleSendToTriage(patient: Patient) {
     setTriageActionId(patient.patientId);
     setError("");
-
     try {
-      const response = await fetch(
-        `/api/patients/${encodeURIComponent(patient.patientId)}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status: "waiting_triage",
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.error || "Failed to send patient to triage."
-        );
-      }
-
-      notify(`${patient.fullName} sent to triage.`);
-
+      const result = await createPatientVisitRoute({
+        patientCode: patient.patientId,
+        destination: "TRIAGE",
+      });
+      if (!result.success) throw new Error(result.message);
+      notify(result.message);
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to send patient to triage."
-      );
+      setError(err instanceof Error ? err.message : "Failed to route patient to triage.");
     } finally {
       setTriageActionId(null);
     }
@@ -728,7 +520,6 @@ export default function ReceptionistPage() {
       </header>
 
       <main className="mx-auto max-w-[1500px] space-y-6 p-6 md:p-8">
-        <ClinicalHandoffInbox destination="RECEPTIONIST" />
         {/* ERROR */}
         {error && (
           <div className="flex items-start justify-between gap-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -772,7 +563,6 @@ export default function ReceptionistPage() {
                 key={item.destination}
                 onClick={() => {
                   setVisitDestination(item.destination);
-                  setRegistrationIntent("general");
                   setShowPatientModal(true);
                 }}
                 className="flex min-h-20 items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-purple-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-200"
@@ -1070,184 +860,7 @@ export default function ReceptionistPage() {
           </div>
         </section>
 
-        {/* RECENT PROCEDURES */}
-        <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-5">
-            <div>
-              <h2 className="font-extrabold text-slate-950">Recent procedure registrations</h2>
-              <p className="mt-1 text-xs text-slate-500">Procedures registered by reception. The cashier handles payment; clinical staff confirm readiness and perform the procedure.</p>
-            </div>
-            <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">{procedures.length} recent</span>
-          </div>
-          {procedures.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-400">No procedures registered yet.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {procedures.map((procedure) => (
-                <div key={procedure.id} className="flex flex-wrap items-center justify-between gap-3 p-4 sm:px-5">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{procedure.procedureName}</p>
-                    <p className="mt-1 text-xs text-slate-500">{procedure.patientName} · Reg. No. {procedure.registrationNumber || procedure.patientCode}</p>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      {procedure.referralType === "doctor_order" ? "Doctor's order" : "External referral"} · Ref: {procedure.orderReference}
-                      {procedure.scheduledDate ? ` · Date: ${procedure.scheduledDate}` : ""}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-extrabold text-slate-900">₦{procedure.price.toLocaleString()}</p>
-                    <span className="mt-1 inline-block rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold capitalize text-amber-700">{procedure.status.replace(/_/g, " ")}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
       </main>
-
-      {/* REGISTER PROCEDURE MODAL */}
-      {showProcedureModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
-          <form onSubmit={handleRegisterProcedure} className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
-              <div>
-                <h2 className="font-extrabold text-slate-950">Register a procedure</h2>
-                <p className="mt-1 text-xs text-slate-500">Register an in-house procedure after the doctor has reviewed and approved it.</p>
-              </div>
-              <button type="button" onClick={() => setShowProcedureModal(false)} className="rounded-xl p-2 hover:bg-slate-100" aria-label="Close procedure form"><X className="h-5 w-5" /></button>
-            </div>
-
-            <div className="space-y-4 overflow-y-auto p-5 sm:p-6">
-              <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
-                Register the procedure here only after the doctor has reviewed the patient and approved it. Reception selects the approved procedure, and the fixed catalogue price is added to the patient&apos;s bill.
-              </div>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Patient *</span>
-                <select required value={procedureForm.patientCode} onChange={(event) => setProcedureForm({ ...procedureForm, patientCode: event.target.value })} className={inputClass}>
-                  <option value="">Select a patient</option>
-                  {patients.map((patient) => (
-                    <option key={patient.patientId} value={patient.patientId}>
-                      {patient.fullName} · {patient.registrationNumber || patient.patientId}
-                    </option>
-                  ))}
-                </select>
-                <span className="mt-1 block text-[11px] text-slate-400">Can’t find the patient? Search for them on the receptionist page first.</span>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure *</span>
-                <select required value={procedureForm.procedureCode} onChange={(event) => setProcedureForm({ ...procedureForm, procedureCode: event.target.value })} className={inputClass}>
-                  {procedurePrices.length === 0 && <option value="">No active procedures available</option>}
-                  {procedurePrices.map((item) => (
-                    <option key={item.code} value={item.code}>{item.name} — ₦{item.price.toLocaleString("en-NG")}</option>
-                  ))}
-                </select>
-                <span className="mt-1 block text-[11px] text-slate-400">Prices are fixed by the administrator and cannot be changed at reception.</span>
-              </label>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Procedure date</span>
-                <input type="date" value={procedureForm.scheduledDate} onChange={(event) => setProcedureForm({ ...procedureForm, scheduledDate: event.target.value })} className={inputClass} />
-              </label>
-
-              <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
-                <p className="text-xs font-bold text-purple-700">Fixed procedure price</p>
-                <p className="mt-1 text-2xl font-extrabold text-purple-950">₦{(procedurePrices.find((item) => item.code === procedureForm.procedureCode)?.price ?? 0).toLocaleString("en-NG")}</p>
-                <p className="mt-1 text-[11px] text-purple-700">This amount is applied automatically to the patient&apos;s bill. Only an administrator can change the catalogue price.</p>
-              </div>
-
-              <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-600">Additional notes (optional)</span>
-                <textarea rows={3} value={procedureForm.notes} onChange={(event) => setProcedureForm({ ...procedureForm, notes: event.target.value })} className={inputClass} placeholder="Optional scheduling details or notes from the doctor&apos;s review" />
-              </label>
-            </div>
-
-            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
-              <button type="button" onClick={() => setShowProcedureModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold hover:bg-slate-50">Cancel</button>
-              <button disabled={savingProcedure} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-extrabold text-white hover:bg-purple-700 disabled:opacity-50">
-                {savingProcedure && <Loader2 className="h-4 w-4 animate-spin" />}
-                {savingProcedure ? "Registering..." : "Register and send bill to cashier"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showVisitingInvestigationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
-          <form onSubmit={handleRegisterVisitingInvestigation} className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting investigation</h2><p className="mt-1 text-sm text-slate-500">For patients who arrive for an investigation without going through the normal hospital registration route.</p></div><button type="button" onClick={() => setShowVisitingInvestigationModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingInvestigationForm.fullName} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, fullName: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingInvestigationForm.age} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, age: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingInvestigationForm.gender} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, gender: e.target.value })} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
-              <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingInvestigationForm.phone} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, phone: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Referring centre / source *<input required value={visitingInvestigationForm.referringCenter} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, referringCenter: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Investigation / test *<input required value={visitingInvestigationForm.testName} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, testName: e.target.value })} placeholder="Enter the investigation requested" className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Approved price (₦) *<input required type="number" min="0" step="0.01" value={visitingInvestigationForm.price} onChange={(e) => setVisitingInvestigationForm({ ...visitingInvestigationForm, price: e.target.value })} className={inputClass} /><span className="mt-1 block font-normal text-slate-400">If price is not configured, Cashier will need to review it before payment.</span></label>
-            </div>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingInvestigationModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send request"}</button></div>
-          </form>
-        </div>
-      )}
-
-      {showVisitingLabModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/40 p-2 backdrop-blur-sm sm:items-center sm:p-4">
-          <form
-            onSubmit={handleRegisterVisitingLab}
-            className="my-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]"
-          >
-            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4">
-              <div>
-                <h2 className="text-lg font-extrabold text-slate-950">Register visiting laboratory request</h2>
-                <p className="mt-1 text-sm text-slate-500">Registers a walk-in patient, sends the test to Laboratory, and creates billing handoffs for Cashier and Reception.</p>
-              </div>
-              <button type="button" onClick={() => setShowVisitingLabModal(false)} aria-label="Close" className="shrink-0 rounded-lg p-2 hover:bg-slate-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
-              <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Existing patient code (optional)<input value={visitingLabForm.patientCode} onChange={e=>setVisitingLabForm({...visitingLabForm,patientCode:e.target.value})} className={inputClass} placeholder="Use this to retry an order after patient registration" /><span className="mt-1 block font-normal text-slate-400">Leave blank to register a new visiting patient.</span></label>
-              {!visitingLabForm.patientCode && <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingLabForm.fullName} onChange={e=>setVisitingLabForm({...visitingLabForm,fullName:e.target.value})} className={inputClass} /></label>}
-              <label className="block text-xs font-bold text-slate-600">Referring centre / source *<input required value={visitingLabForm.sourceCenter} onChange={e=>setVisitingLabForm({...visitingLabForm,sourceCenter:e.target.value})} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingLabForm.contactPhone} onChange={e=>setVisitingLabForm({...visitingLabForm,contactPhone:e.target.value})} className={inputClass} /></label>
-              {!visitingLabForm.patientCode && <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingLabForm.age} onChange={e=>setVisitingLabForm({...visitingLabForm,age:e.target.value})} className={inputClass} /></label>}
-              <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingLabForm.sex} onChange={e=>setVisitingLabForm({...visitingLabForm,sex:e.target.value})} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
-              <label className="block text-xs font-bold text-slate-600">Date of birth<input type="date" value={visitingLabForm.dateOfBirth} onChange={e=>setVisitingLabForm({...visitingLabForm,dateOfBirth:e.target.value})} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Test code *<input required value={visitingLabForm.testCode} onChange={e=>setVisitingLabForm({...visitingLabForm,testCode:e.target.value})} className={inputClass} placeholder="e.g. FBS" /></label>
-              <label className="block text-xs font-bold text-slate-600">Test name *<input required value={visitingLabForm.testName} onChange={e=>setVisitingLabForm({...visitingLabForm,testName:e.target.value})} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Specimen type *<input required value={visitingLabForm.specimenType} onChange={e=>setVisitingLabForm({...visitingLabForm,specimenType:e.target.value})} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Approved price (₦) *<input required type="number" min="0" step="0.01" value={visitingLabForm.price} onChange={e=>setVisitingLabForm({...visitingLabForm,price:e.target.value})} className={inputClass} /><span className="mt-1 block font-normal text-slate-400">If zero, the order is sent for Cashier pricing review; it is not treated as free.</span></label>
-              <label className="block text-xs font-bold text-slate-600">Priority<select value={visitingLabForm.priority} onChange={e=>setVisitingLabForm({...visitingLabForm,priority:e.target.value as "NORMAL"|"URGENT"|"STAT"})} className={inputClass}><option value="NORMAL">Normal</option><option value="URGENT">Urgent</option><option value="STAT">STAT</option></select></label>
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Clinical notes<textarea rows={2} value={visitingLabForm.clinicalNotes} onChange={e=>setVisitingLabForm({...visitingLabForm,clinicalNotes:e.target.value})} className={inputClass} /></label>
-              </div>
-            </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
-              <button type="button" onClick={() => setShowVisitingLabModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button>
-              <button disabled={savingVisitingRequest} className="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Laboratory"}</button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {showVisitingRefractionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:p-4">
-          <form onSubmit={handleRegisterVisitingRefraction} className="w-full max-w-xl space-y-4 rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-extrabold text-slate-950">Register visiting refraction</h2><p className="mt-1 text-sm text-slate-500">Register a patient who has arrived for glasses. The patient is sent directly to the Optometry queue for refraction.</p></div><button type="button" onClick={() => setShowVisitingRefractionModal(false)} aria-label="Close" className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button></div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Patient full name *<input required value={visitingRefractionForm.fullName} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, fullName: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Date of birth<input type="date" value={visitingRefractionForm.dateOfBirth} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, dateOfBirth: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Age<input type="number" min="0" max="150" value={visitingRefractionForm.age} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, age: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600">Sex<select value={visitingRefractionForm.gender} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, gender: e.target.value })} className={inputClass}><option value="">Not specified</option><option value="Female">Female</option><option value="Male">Male</option><option value="Other">Other</option></select></label>
-              <label className="block text-xs font-bold text-slate-600">Phone<input value={visitingRefractionForm.phone} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, phone: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Address<input value={visitingRefractionForm.address} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, address: e.target.value })} className={inputClass} /></label>
-              <label className="block text-xs font-bold text-slate-600 sm:col-span-2">Visit type<select value={visitingRefractionForm.visitType} onChange={(e) => setVisitingRefractionForm({ ...visitingRefractionForm, visitType: e.target.value as "self_presenting" | "external_referral" })} className={inputClass}><option value="self_presenting">Self-presenting</option><option value="external_referral">External referral</option></select></label>
-            </div>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setShowVisitingRefractionModal(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold">Cancel</button><button disabled={savingVisitingRequest} className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-extrabold text-white disabled:opacity-50">{savingVisitingRequest ? "Registering…" : "Register and send to Optometry"}</button></div>
-          </form>
-        </div>
-      )}
 
       {/* REGISTER PATIENT MODAL */}
       {showPatientModal && (
