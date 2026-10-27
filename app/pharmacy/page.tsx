@@ -874,8 +874,40 @@ function PharmacyWorkspace({ patientId }: { patientId: string }) {
   }, []);
 
   useEffect(() => {
-    void loadDrugInventory();
-  }, [loadDrugInventory]);
+    let isCurrent = true;
+
+    const fetchInitialDrugInventory = async () => {
+      try {
+        const response = await fetch("/api/inventory?domain=pharmacy");
+
+        if (!response.ok) {
+          throw new Error("Failed to load drug stock availability.");
+        }
+
+        const { items } = await response.json();
+
+        if (isCurrent) {
+          setDrugInventory(items || []);
+        }
+      } catch (error) {
+        console.error("Inventory load error:", error);
+
+        if (isCurrent) {
+          setDrugInventory([]);
+        }
+      } finally {
+        if (isCurrent) {
+          setIsLoadingDrugInventory(false);
+        }
+      }
+    };
+
+    void fetchInitialDrugInventory();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   /*
    * --------------------------------------------------
