@@ -308,7 +308,7 @@ function BillingContent() {
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-white/10 border border-white/20">
               <Image
-                src="/logo.png"
+                src="/Logo.png"
                 alt="Sparkle Eye Specialist Hospital Logo"
                 width={40}
                 height={40}
@@ -380,7 +380,7 @@ function BillingContent() {
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white/10 border border-white/20">
             <Image
-              src="/logo.png"
+              src="/Logo.png"
               alt="Sparkle Eye Specialist Hospital Logo"
               width={40}
               height={40}
