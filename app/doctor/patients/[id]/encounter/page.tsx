@@ -864,8 +864,8 @@ export default function DoctorEncounterPage() {
               ["iop", "IOP"],
               ["diagnosis", "Diagnosis"],
               ["treatment", "Treatment / plan"],
-              ["refraction-notes", "Refraction result and lens instructions"],
               ["investigation", "Investigation"],
+              ["refraction-notes", "Refraction result and lens instructions"],
               ["procedure-request", "Procedure request"],
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
@@ -1139,62 +1139,6 @@ export default function DoctorEncounterPage() {
 
           
 
-<Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
-            <p className="mb-4 text-sm text-gray-500">Complete the client-approved spectacle prescription here in the Doctor module. The doctor’s authorised prescription is sent to Optician for read-only review; Inventory handles frame selection, production and collection.</p>
-            <div className="mb-5 grid gap-4 md:grid-cols-3">
-              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Prescription date</span><input type="date" value={prescriptionDate} onChange={(e) => setPrescriptionDate(e.target.value)} className={inputClass} /></label>
-              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens type</span><select value={lensType} onChange={(e) => setLensType(e.target.value)} className={inputClass}><option value="">Select lens type</option><option>Single vision</option><option>Bifocal</option><option>Invisible bifocal</option><option>Progressive</option></select></label>
-              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens finish</span><select value={lensFinish} onChange={(e) => setLensFinish(e.target.value)} className={inputClass}><option value="">Select lens finish</option><option>White</option><option>Photochromic</option><option>Blue coated</option></select></label>
-            </div>
-            <div className="mb-5 overflow-x-auto rounded-xl border border-gray-200"><table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-gray-50 text-xs text-gray-600"><tr><th className="px-3 py-3">Eye</th><th className="px-3 py-3">SPH</th><th className="px-3 py-3">CYL</th><th className="px-3 py-3">Axis</th><th className="px-3 py-3">ADD</th><th className="px-3 py-3">Final VA</th><th className="px-3 py-3">Near VA</th></tr></thead>
-              <tbody>
-                <tr className="border-t"><th className="px-3 py-3">R (OD)</th><td className="px-2 py-2"><input aria-label="Right eye SPH" value={refractionOD.sphere} onChange={(e) => setRefractionOD(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye CYL" value={refractionOD.cylinder} onChange={(e) => setRefractionOD(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Axis" value={refractionOD.axis} onChange={(e) => setRefractionOD(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye ADD" value={rightAdd} onChange={(e) => setRightAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Final VA" value={rightFinalVA} onChange={(e) => setRightFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOD || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Near VA" value={rightNearVA} onChange={(e) => setRightNearVA(e.target.value)} className={inputClass} /></td></tr>
-                <tr className="border-t"><th className="px-3 py-3">L (OS)</th><td className="px-2 py-2"><input aria-label="Left eye SPH" value={refractionOS.sphere} onChange={(e) => setRefractionOS(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye CYL" value={refractionOS.cylinder} onChange={(e) => setRefractionOS(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Axis" value={refractionOS.axis} onChange={(e) => setRefractionOS(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye ADD" value={leftAdd} onChange={(e) => setLeftAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Final VA" value={leftFinalVA} onChange={(e) => setLeftFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOS || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Near VA" value={leftNearVA} onChange={(e) => setLeftNearVA(e.target.value)} className={inputClass} /></td></tr>
-              </tbody></table></div>
-            <div className="mb-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[
-                { label: "IPD (mm) — Distance", value: distanceIPD, set: setDistanceIPD },
-                { label: "IPD (mm) — Near", value: nearIPD, set: setNearIPD },
-                { label: "Monocular IPD (mm) — R", value: monocularIPDR, set: setMonocularIPDR },
-                { label: "Monocular IPD (mm) — L", value: monocularIPDL, set: setMonocularIPDL },
-                { label: "Segment height (mm) — R", value: segmentHeightR, set: setSegmentHeightR },
-                { label: "Segment height (mm) — L", value: segmentHeightL, set: setSegmentHeightL },
-              ].map((field) => <label key={field.label} className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">{field.label}</span><input value={field.value} onChange={(e) => field.set(e.target.value)} className={inputClass} /></label>)}
-            </div>
-            <div className="mb-4"><Field label="Notes" value={refractionNotes} onChange={setRefractionNotes} rows={3} placeholder="Prescription notes and instructions." /></div>
-            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Prescriber and signature are recorded from the authenticated doctor account when you send the prescription.</div>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Authorise & send spectacle prescription"}</button>
-            </div>
-            <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
-              <div>
-                <label htmlFor="saved-supplier" className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</label>
-                <select id="saved-supplier" value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass + " min-h-11"}>
-                  <option value="">Enter a new supplier below</option>
-                  {supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label htmlFor="supplier-name" className="mb-2 block text-sm font-medium text-gray-700">Supplier name</label>
-                  <input id="supplier-name" type="text" autoComplete="organization" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. Preferred lens supplier" className={inputClass + " h-11"} />
-                </div>
-                <div>
-                  <label htmlFor="supplier-whatsapp" className="mb-2 block text-sm font-medium text-gray-700">Supplier WhatsApp number (include country code)</label>
-                  <input id="supplier-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={supplierWhatsApp} onChange={(event) => setSupplierWhatsApp(event.target.value)} placeholder="e.g. 2348012345678" className={inputClass + " h-11"} />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={saveSupplierContact} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button>
-                <button type="button" onClick={sendSupplierWhatsApp} className="min-h-11 rounded-xl border border-green-300 bg-white px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
-              </div>
-              <p className="text-xs text-gray-600">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
-            </div>
-          </Section>
-
-          
-
 <Section id="investigation" title="Investigation" icon={<TestTube2 className="h-5 w-5" />}>
             <div className="space-y-6">
               <div>
@@ -1314,6 +1258,60 @@ export default function DoctorEncounterPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </Section>
+
+          <Section id="refraction-notes" title="Refraction result and lens instructions" icon={<ClipboardList className="h-5 w-5" />}>
+            <p className="mb-4 text-sm text-gray-500">Complete the client-approved spectacle prescription here in the Doctor module. The doctor’s authorised prescription is sent to Optician for read-only review; Inventory handles frame selection, production and collection.</p>
+            <div className="mb-5 grid gap-4 md:grid-cols-3">
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Prescription date</span><input type="date" value={prescriptionDate} onChange={(e) => setPrescriptionDate(e.target.value)} className={inputClass} /></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens type</span><select value={lensType} onChange={(e) => setLensType(e.target.value)} className={inputClass}><option value="">Select lens type</option><option>Single vision</option><option>Bifocal</option><option>Invisible bifocal</option><option>Progressive</option></select></label>
+              <label className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">Lens finish</span><select value={lensFinish} onChange={(e) => setLensFinish(e.target.value)} className={inputClass}><option value="">Select lens finish</option><option>White</option><option>Photochromic</option><option>Blue coated</option></select></label>
+            </div>
+            <div className="mb-5 overflow-x-auto rounded-xl border border-gray-200"><table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-600"><tr><th className="px-3 py-3">Eye</th><th className="px-3 py-3">SPH</th><th className="px-3 py-3">CYL</th><th className="px-3 py-3">Axis</th><th className="px-3 py-3">ADD</th><th className="px-3 py-3">Final VA</th><th className="px-3 py-3">Near VA</th></tr></thead>
+              <tbody>
+                <tr className="border-t"><th className="px-3 py-3">R (OD)</th><td className="px-2 py-2"><input aria-label="Right eye SPH" value={refractionOD.sphere} onChange={(e) => setRefractionOD(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye CYL" value={refractionOD.cylinder} onChange={(e) => setRefractionOD(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Axis" value={refractionOD.axis} onChange={(e) => setRefractionOD(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye ADD" value={rightAdd} onChange={(e) => setRightAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Final VA" value={rightFinalVA} onChange={(e) => setRightFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOD || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Right eye Near VA" value={rightNearVA} onChange={(e) => setRightNearVA(e.target.value)} className={inputClass} /></td></tr>
+                <tr className="border-t"><th className="px-3 py-3">L (OS)</th><td className="px-2 py-2"><input aria-label="Left eye SPH" value={refractionOS.sphere} onChange={(e) => setRefractionOS(v => ({ ...v, sphere: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye CYL" value={refractionOS.cylinder} onChange={(e) => setRefractionOS(v => ({ ...v, cylinder: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Axis" value={refractionOS.axis} onChange={(e) => setRefractionOS(v => ({ ...v, axis: e.target.value }))} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye ADD" value={leftAdd} onChange={(e) => setLeftAdd(e.target.value)} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Final VA" value={leftFinalVA} onChange={(e) => setLeftFinalVA(e.target.value)} placeholder={patient?.vitals?.visualAcuityOS || ""} className={inputClass} /></td><td className="px-2 py-2"><input aria-label="Left eye Near VA" value={leftNearVA} onChange={(e) => setLeftNearVA(e.target.value)} className={inputClass} /></td></tr>
+              </tbody></table></div>
+            <div className="mb-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[
+                { label: "IPD (mm) — Distance", value: distanceIPD, set: setDistanceIPD },
+                { label: "IPD (mm) — Near", value: nearIPD, set: setNearIPD },
+                { label: "Monocular IPD (mm) — R", value: monocularIPDR, set: setMonocularIPDR },
+                { label: "Monocular IPD (mm) — L", value: monocularIPDL, set: setMonocularIPDL },
+                { label: "Segment height (mm) — R", value: segmentHeightR, set: setSegmentHeightR },
+                { label: "Segment height (mm) — L", value: segmentHeightL, set: setSegmentHeightL },
+              ].map((field) => <label key={field.label} className="block"><span className="mb-1.5 block text-sm font-medium text-gray-700">{field.label}</span><input value={field.value} onChange={(e) => field.set(e.target.value)} className={inputClass} /></label>)}
+            </div>
+            <div className="mb-4"><Field label="Notes" value={refractionNotes} onChange={setRefractionNotes} rows={3} placeholder="Prescription notes and instructions." /></div>
+            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">Prescriber and signature are recorded from the authenticated doctor account when you send the prescription.</div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button type="button" onClick={referOptician} disabled={isPending || requesting === "optician"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50"><Send className="h-4 w-4" />{requesting === "optician" ? "Sending..." : "Authorise & send spectacle prescription"}</button>
+            </div>
+            <div className="mt-5 space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div>
+                <label htmlFor="saved-supplier" className="mb-2 block text-sm font-medium text-gray-700">Choose a saved supplier</label>
+                <select id="saved-supplier" value={supplierContacts.some((contact) => contact.phone === supplierWhatsApp) ? supplierWhatsApp : ""} onChange={(event) => { const contact = supplierContacts.find((item) => item.phone === event.target.value); setSupplierWhatsApp(contact?.phone ?? ""); setSupplierName(contact?.name ?? ""); }} className={inputClass + " min-h-11"}>
+                  <option value="">Enter a new supplier below</option>
+                  {supplierContacts.map((contact) => <option key={contact.phone} value={contact.phone}>{contact.name} (+{contact.phone})</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="supplier-name" className="mb-2 block text-sm font-medium text-gray-700">Supplier name</label>
+                  <input id="supplier-name" type="text" autoComplete="organization" value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. Preferred lens supplier" className={inputClass + " h-11"} />
+                </div>
+                <div>
+                  <label htmlFor="supplier-whatsapp" className="mb-2 block text-sm font-medium text-gray-700">Supplier WhatsApp number (include country code)</label>
+                  <input id="supplier-whatsapp" type="tel" inputMode="tel" autoComplete="tel" value={supplierWhatsApp} onChange={(event) => setSupplierWhatsApp(event.target.value)} placeholder="e.g. 2348012345678" className={inputClass + " h-11"} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={saveSupplierContact} className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save supplier</button>
+                <button type="button" onClick={sendSupplierWhatsApp} className="min-h-11 rounded-xl border border-green-300 bg-white px-4 py-2.5 text-sm font-semibold text-green-800 hover:bg-green-50">Prepare supplier WhatsApp</button>
+              </div>
+              <p className="text-xs text-gray-600">Saved supplier shortcuts stay in this browser only. WhatsApp opens with a prepared message; staff must review it and press Send.</p>
             </div>
           </Section>
 

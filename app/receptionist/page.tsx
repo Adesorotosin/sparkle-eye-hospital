@@ -143,7 +143,7 @@ export default function ReceptionistPage() {
 
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [visitDestination, setVisitDestination] = useState<VisitDestination>("TRIAGE");
-  const [registrationIntent, setRegistrationIntent] = useState<"general" | "medication" | "procedure">("general");
+  const [registrationIntent, setRegistrationIntent] = useState<"general" | "procedure">("general");
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showProcedureModal, setShowProcedureModal] = useState(false);
   const [showVisitingInvestigationModal, setShowVisitingInvestigationModal] = useState(false);
@@ -318,7 +318,7 @@ export default function ReceptionistPage() {
           coveragePlan: patientForm.coveragePlan,
           allergies: patientForm.allergies,
           isWalkIn: patientForm.isWalkIn,
-          status: registrationIntent === "medication" || registrationIntent === "procedure" ? "in_consultation" : "waiting_triage",
+          status: registrationIntent === "procedure" ? "in_consultation" : "waiting_triage",
         }),
       });
 
@@ -353,7 +353,7 @@ export default function ReceptionistPage() {
       await loadData();
 
       // Route the arrival without creating clinical orders or bills at Reception.
-      const destination: VisitDestination = registrationIntent === "medication" ? "PHARMACY" : registrationIntent === "procedure" ? "DOCTOR" : visitDestination;
+      const destination: VisitDestination = registrationIntent === "procedure" ? "DOCTOR" : visitDestination;
       const routeResult = await createPatientVisitRoute({ patientCode: data.patient.patientId, destination });
       if (!routeResult.success) {
         setError(`Patient registered successfully (code: ${data.patient.patientId}), but routing failed: ${routeResult.message} Do not register the patient again.`);
@@ -773,14 +773,6 @@ export default function ReceptionistPage() {
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><FilePlus2 className="h-5 w-5" /></span>
               <span><span className="block text-sm font-extrabold">Visiting procedure patient</span><span className="mt-1 block text-xs font-medium text-fuchsia-800">Register the walk-in first, then open procedure registration and billing.</span></span>
-            </button>
-
-            <button
-              onClick={() => { setRegistrationIntent("medication"); setShowPatientModal(true); }}
-              className="flex min-h-20 items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left text-emerald-900 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white"><UserPlus className="h-5 w-5" /></span>
-              <span><span className="block text-sm font-extrabold">Visiting medication patient</span><span className="mt-1 block text-xs font-medium text-emerald-800">Register a walk-in and open the Pharmacy workspace for that patient.</span></span>
             </button>
 
             <button
