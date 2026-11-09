@@ -69,7 +69,7 @@ export async function GET(
         ?.toLowerCase();
 
     const requestedLimit = Number(
-      searchParams.get("limit") ?? 200
+      searchParams.get("limit") ?? 500
     );
 
     const limit =
@@ -78,7 +78,7 @@ export async function GET(
             Math.max(requestedLimit, 1),
             500
           )
-        : 200;
+        : 500;
 
     let query = supabaseServer
       .from("activity_logs")
