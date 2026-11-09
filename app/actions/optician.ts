@@ -78,27 +78,10 @@ export type OpticianActionResponse = {
 
 export type SaveOpticalOrderInput = {
   orderId: string;
-
-  pdBinocular: string;
-  pdOD: string;
-  pdOS: string;
-
-  segmentHeightOD: string;
-  segmentHeightOS: string;
-
   frameSelection: string;
-  lensType: string;
   lensMaterial: string;
-  lensCoating: string;
-
-  dispensingNotes?: string;
-
   /**
    * Total optical charge for the complete eyewear order.
-   *
-   * Optional here so the existing Optician page can continue
-   * saving measurements while the billing field is introduced.
-   *
    * Mark Ready for Dispense will require a value greater than 0.
    */
   opticalCharge?: number | string;
@@ -1402,75 +1385,13 @@ export async function saveOpticalOrder(
       };
     }
 
-    const updatePayload: Record<
-      string,
-      unknown
-    > = {
-      pd_binocular:
-        emptyToNull(
-          input.pdBinocular
-        ),
-
-      pd_od:
-        emptyToNull(
-          input.pdOD
-        ),
-
-      pd_os:
-        emptyToNull(
-          input.pdOS
-        ),
-
-      segment_height_od:
-        emptyToNull(
-          input.segmentHeightOD
-        ),
-
-      segment_height_os:
-        emptyToNull(
-          input.segmentHeightOS
-        ),
-
-      frame_selection:
-        emptyToNull(
-          input.frameSelection
-        ),
-
-      lens_type:
-        emptyToNull(
-          input.lensType
-        ),
-
-      lens_material:
-        emptyToNull(
-          input.lensMaterial
-        ),
-
-      lens_coating:
-        emptyToNull(
-          input.lensCoating
-        ),
-
-      dispensing_notes:
-        emptyToNull(
-          input.dispensingNotes
-        ),
-
-      status:
-        order.status ===
-        "referred"
-          ? "measurements"
-          : order.status,
-
-      measurements_started_at:
-        order.measurements_started_at ??
-        now,
-
-      recorded_by:
-        staff.id,
-
-      updated_at:
-        now,
+    const updatePayload: Record<string, unknown> = {
+      frame_selection: emptyToNull(input.frameSelection),
+      lens_material: emptyToNull(input.lensMaterial),
+      status: order.status === "referred" ? "measurements" : order.status,
+      measurements_started_at: order.measurements_started_at ?? now,
+      recorded_by: staff.id,
+      updated_at: now,
     };
 
     const normalizedCharge = numericOpticalCharge !== null
@@ -1484,9 +1405,7 @@ export async function saveOpticalOrder(
     const chargeRelevantDetailsChanged =
       normalizedCharge !== normalizeMoney(order.optical_charge) ||
       emptyToNull(input.frameSelection) !== (order.frame_selection ?? null) ||
-      emptyToNull(input.lensType) !== (order.lens_type ?? null) ||
-      emptyToNull(input.lensMaterial) !== (order.lens_material ?? null) ||
-      emptyToNull(input.lensCoating) !== (order.lens_coating ?? null);
+      emptyToNull(input.lensMaterial) !== (order.lens_material ?? null);
 
     if (
       chargeRelevantDetailsChanged &&
