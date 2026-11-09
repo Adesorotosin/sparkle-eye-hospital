@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ClipboardList, Glasses, LogOut, RefreshCw } from "lucide-react";
+import Image from "next/image";
+import { ClipboardList, LogOut, RefreshCw } from "lucide-react";
 import { getOpticianQueue, type OpticalOrder } from "@/app/actions/optician";
 
 export default function OpticianDashboard() {
@@ -39,7 +40,7 @@ export default function OpticianDashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3"><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-5 w-5" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Sparkle Eye Specialist Hospital</p><h1 className="text-xl font-extrabold">Spectacle prescriptions</h1><p className="text-xs text-slate-500">Review the prescription sent by the doctor. Glasses production is managed by Inventory.</p></div></div>
+          <div className="flex items-center gap-3"><Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital logo" width={52} height={52} priority className="h-13 w-13 shrink-0 object-contain" /><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700">Sparkle Eye Specialist Hospital</p><h1 className="text-xl font-extrabold">Spectacle prescriptions</h1><p className="text-xs text-slate-500">Review the prescription sent by the doctor. Glasses production is managed by Inventory.</p></div></div>
           <div className="flex gap-2"><button onClick={() => { setLoading(true); void loadOrders(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button><button onClick={() => void logout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><LogOut className="h-4 w-4" /> Sign out</button></div>
         </div>
       </header>

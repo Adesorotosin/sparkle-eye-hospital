@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Glasses, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import { getOpticianPatient } from "@/app/actions/optician";
 
 type PatientRecord = NonNullable<Awaited<ReturnType<typeof getOpticianPatient>>["patient"]>;
@@ -64,14 +65,14 @@ export default function OpticianPatientPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <header className="print:hidden border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <Link href="/optician" className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-violet-700"><ArrowLeft className="h-4 w-4" /> Back to prescriptions</Link>
+          <div className="flex items-center gap-3"><Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital logo" width={44} height={44} priority className="h-11 w-11 shrink-0 object-contain" /><Link href="/optician" className="inline-flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-violet-700"><ArrowLeft className="h-4 w-4" /> Back to prescriptions</Link></div>
           <div className="flex gap-2"><button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-xs font-bold text-white"><span>Print prescription</span></button><button onClick={() => { setLoading(true); void loadPrescription(); }} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Refresh</button></div>
         </div>
       </header>
       <main className="mx-auto max-w-5xl space-y-6 px-5 py-8 sm:px-8 print:max-w-none print:px-0 print:py-0">
         {loading ? <div className="flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white p-12 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading spectacle prescription…</div> : error ? <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800">{error}</div> : patient ? <>
           <section className="rounded-2xl border border-slate-200 bg-white p-6">
-            <div className="flex items-start gap-4"><span className="rounded-xl bg-violet-100 p-3 text-violet-700"><Glasses className="h-6 w-6" /></span><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700 print:text-black">SPARKLE EYE SPECIALIST HOSPITAL</p><p className="mt-1 text-sm font-extrabold tracking-wide text-slate-900">SPECTACLE PRESCRIPTION</p><h1 className="mt-2 text-2xl font-extrabold">{patient.fullName}</h1><p className="mt-2 text-sm text-slate-500">{patient.patientCode}{patient.age !== null ? ` · ${patient.age} years` : ""}{patient.gender ? ` · ${patient.gender}` : ""}{patient.phone ? ` · ${patient.phone}` : ""}</p></div></div>
+            <div className="flex items-start gap-4"><Image src="/Logo.png" alt="Sparkle Eye Specialist Hospital logo" width={64} height={64} priority className="h-16 w-16 shrink-0 object-contain" /><div><p className="text-xs font-bold uppercase tracking-wider text-violet-700 print:text-black">SPARKLE EYE SPECIALIST HOSPITAL</p><p className="mt-1 text-sm font-extrabold tracking-wide text-slate-900">SPECTACLE PRESCRIPTION</p><h1 className="mt-2 text-2xl font-extrabold">{patient.fullName}</h1><p className="mt-2 text-sm text-slate-500">{patient.patientCode}{patient.age !== null ? ` · ${patient.age} years` : ""}{patient.gender ? ` · ${patient.gender}` : ""}{patient.phone ? ` · ${patient.phone}` : ""}</p></div></div>
             <p className="mt-5 rounded-xl bg-violet-50 p-3 text-sm text-violet-900">This workspace is read-only. Frame selection, lens production, fitting, readiness and collection are managed by the Inventory module.</p>
           </section>
           <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
