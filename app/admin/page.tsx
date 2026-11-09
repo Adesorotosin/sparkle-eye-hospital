@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Activity, ArrowUpRight, CalendarDays, ClipboardList, Settings2, Users, Wallet } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import InventoryOverview from "@/components/admin/InventoryOverview";
 
 interface AdminStats {
@@ -24,7 +25,7 @@ function StatCard({ label, value, hint, icon: Icon }: {
   label: string;
   value: string;
   hint: string;
-  icon: typeof Wallet;
+  icon: LucideIcon;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
