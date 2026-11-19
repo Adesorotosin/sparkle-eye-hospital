@@ -39,16 +39,24 @@ export default function ProcedurePricesPage() {
   const loadPrices = useCallback(async () => {
     setLoading(true);
     setError("");
-    const result = await getProcedurePriceCatalog();
-    if (!result.success) {
-      setError(result.message || "Could not load the procedure price catalogue.");
-      setItems([]);
-      setDrafts({});
-    } else {
+    try {
+      const result = await getProcedurePriceCatalog();
+      if (!result.success) {
+        setError(result.message || "Could not load the procedure price catalogue.");
+        setItems([]);
+        setDrafts({});
+        return;
+      }
       setItems(result.procedures);
       setDrafts(Object.fromEntries(result.procedures.map(item => [item.id, { price: String(item.price), active: item.active }])));
+    } catch (err) {
+      console.error("Procedure price page could not load the catalogue:", err);
+      setError(err instanceof Error ? err.message : "Could not load the procedure price catalogue. Please refresh and try again.");
+      setItems([]);
+      setDrafts({});
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {

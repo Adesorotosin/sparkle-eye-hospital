@@ -31,7 +31,7 @@ type ProcedureRegistrationSummary = {
 
 export async function getProcedurePriceCatalog() {
   try {
-    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
     const { data, error } = await supabaseServer
       .from("procedure_price_catalog")
       .select("id, code, name, category, price, active")
@@ -63,7 +63,7 @@ export async function getProcedurePriceCatalog() {
   }
 }
 
-export const PROCEDURE_PRICE_CATEGORIES = [
+const PROCEDURE_PRICE_CATEGORIES = [
   "Clinical procedures",
   "Diagnostic eye test",
   "OCT imaging",
@@ -159,7 +159,7 @@ export type ProcedureRegistrationInput = {
 
 export async function registerProcedure(input: ProcedureRegistrationInput) {
   try {
-    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
     const patientCode = input.patientCode?.trim();
     const procedureCode = input.procedureCode?.trim();
 

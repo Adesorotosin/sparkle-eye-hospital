@@ -87,6 +87,7 @@ function todayIso() {
 
 function formatTime(value: string) {
   return new Date(value).toLocaleTimeString("en-NG", {
+    timeZone: "Africa/Lagos",
     hour: "numeric",
     minute: "2-digit",
   });
@@ -126,7 +127,7 @@ function calculateAge(dateOfBirth: string) {
 export default function ReceptionistPage() {
   const router = useRouter();
 
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState("");
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<DoctorOption[]>([]);
@@ -160,7 +161,7 @@ export default function ReceptionistPage() {
   const [procedureForm, setProcedureForm] = useState({
     patientCode: "",
     procedureCode: "refraction",
-    scheduledDate: todayIso(),
+    scheduledDate: "",
     notes: "",
   });
 
@@ -182,7 +183,7 @@ export default function ReceptionistPage() {
     patientName: "",
     patientId: "",
     doctorStaffId: "",
-    date: todayIso(),
+    date: "",
     startTime: "09:00",
     endTime: "09:30",
     notes: "",
@@ -256,6 +257,11 @@ export default function ReceptionistPage() {
   }, [date, search]);
 
   useEffect(() => {
+    if (!date) {
+      setDate(todayIso());
+      return;
+    }
+
     const timer = window.setTimeout(
       () => {
         void loadData();
@@ -1400,7 +1406,7 @@ export default function ReceptionistPage() {
 
                   <input
                     type="date"
-                    max={todayIso()}
+                    max={date || undefined}
                     value={patientForm.dateOfBirth}
                     onChange={(event) => {
                       const dateOfBirth = event.target.value;
