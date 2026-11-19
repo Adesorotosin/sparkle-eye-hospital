@@ -1005,7 +1005,12 @@ export default function ReceptionistPage() {
                 </p>
               </div>
 
-              <Search className="h-5 w-5 text-slate-400" />
+              <div className="flex items-center gap-2">
+                <Link href="/receptionist/patient-records" className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-blue-800">
+                  <Search className="h-3.5 w-3.5" /> Advanced clinical search
+                </Link>
+                <Search className="h-5 w-5 text-slate-400" />
+              </div>
             </div>
 
             <div className="p-5">
