@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createPatientVisitRoute, type VisitDestination } from "@/app/actions/patient-visit-routing";
 import { getProcedurePriceCatalog, getRecentProcedures, registerProcedure } from "@/app/actions/procedures";
@@ -1051,6 +1052,12 @@ export default function ReceptionistPage() {
                         </div>
 
                         <div className="flex shrink-0 flex-col gap-1.5">
+                          <Link
+                            href={`/receptionist/ehr/${encodeURIComponent(patient.patientId)}`}
+                            className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-center text-[10px] font-extrabold text-blue-700 hover:bg-blue-100"
+                          >
+                            EHR
+                          </Link>
                           <button
                             onClick={() =>
                               openAppointmentForPatient(patient)

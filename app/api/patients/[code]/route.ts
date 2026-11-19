@@ -15,6 +15,7 @@ const PATIENT_READ_ROLES = [
   "LAB_SCIENTIST",
   "OPTOMETRIST",
   "OPTICIAN",
+  "RECEPTIONIST",
 ] as const;
 
 const PATIENT_UPDATE_ROLES = [

@@ -63,6 +63,56 @@ export async function getProcedurePriceCatalog() {
   }
 }
 
+export const PROCEDURE_PRICE_CATEGORIES = [
+  "Clinical procedures",
+  "Diagnostic eye test",
+  "OCT imaging",
+  "Pharmacy drugs",
+] as const;
+
+export async function createProcedurePrice(input: {
+  name: string;
+  category: string;
+  price: number;
+}) {
+  try {
+    const staff = await requireRole(["IT_ADMIN"]);
+    const name = input.name?.trim();
+    const category = input.category?.trim();
+    const price = Number(input.price);
+    if (!name || name.length > 120) return { success: false, message: "Enter an item name (maximum 120 characters)." };
+    if (!(PROCEDURE_PRICE_CATEGORIES as readonly string[]).includes(category)) return { success: false, message: "Choose one of the supported price categories." };
+    if (!Number.isFinite(price) || price < 0) return { success: false, message: "Enter a valid non-negative price." };
+
+    const slug = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "item";
+    const code = `custom-${slug}-${crypto.randomUUID().slice(0, 8)}`;
+    const { data, error } = await supabaseServer
+      .from("procedure_price_catalog")
+      .insert({ code, name, category, price, active: true })
+      .select("id, code, name, category, price, active")
+      .single();
+    if (error) throw error;
+
+    await logActivity({
+      module: "Admin",
+      category: "ADMIN",
+      action: `Procedure price item created: ${name}`,
+      performedBy: staff.name,
+      staffId: staff.id,
+      details: JSON.stringify({ code, category, price }),
+      financialAmount: price,
+    });
+    revalidatePath("/admin/procedure-prices");
+    revalidatePath("/receptionist");
+    return { success: true, message: `${name} added to ${category}.`, procedure: data as ProcedurePrice };
+  } catch (error) {
+    console.error("Creating procedure price item failed:", error);
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") return { success: false, message: "Please sign in again to continue." };
+    if (error instanceof Error && error.message === "FORBIDDEN") return { success: false, message: "Only an administrator can add procedure price items." };
+    return { success: false, message: "Could not add this price item. Check whether the item already exists and try again." };
+  }
+}
+
 export async function updateProcedurePrice(input: {
   id: string;
   price: number;
