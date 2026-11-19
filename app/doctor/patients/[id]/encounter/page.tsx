@@ -820,7 +820,9 @@ export default function DoctorEncounterPage() {
       setMessage(result.message);
       setDiscountValue("");
       setDiscountReason("");
-      await loadPatient();
+      const refreshed = await fetch(`/api/patients/${encodeURIComponent(patient.patientId)}`, { cache: "no-store" });
+      const refreshedData = await refreshed.json();
+      if (refreshed.ok && refreshedData?.patient) setPatient(refreshedData.patient as Patient);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to apply the discount.");
     } finally {
