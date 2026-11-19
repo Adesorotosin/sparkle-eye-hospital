@@ -231,7 +231,7 @@ export async function applyBillingDiscount(input: {
   adminPin?: string;
 }): Promise<BillingActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
 
     const {
       patientCode,
@@ -282,7 +282,7 @@ export async function applyBillingDiscount(input: {
       .from("invoices")
       .select("*")
       .eq("patient_id", patient.id)
-      .neq("status", "cancelled")
+      .in("status", ["draft", "pending"])
       .order("created_at", {
         ascending: false,
       })
@@ -374,7 +374,7 @@ export async function applyBillingDiscount(input: {
       .update({
         discount_amount: discountAmount,
         discount_reason: reason.trim(),
-        approved_by_pin: "AUTHORIZED",
+        approved_by_pin: staff.staffId || staff.id,
       })
       .eq("id", invoice.id);
 
@@ -459,7 +459,7 @@ export async function applyBillingDiscount(input: {
         return {
           success: false,
           message:
-            "Only an authorized billing administrator can apply discounts.",
+            "Only an authorized doctor or administrator can apply discounts.",
         };
       }
     }
