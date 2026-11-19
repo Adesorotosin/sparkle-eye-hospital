@@ -257,7 +257,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
 
 export async function getRecentProcedures() {
   try {
-    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
     const { data, error } = await supabaseServer
       .from("procedure_orders")
       .select("id, procedure_name, referral_type, order_reference, scheduled_date, price, status, created_at, patients!inner(patient_code, registration_number, full_name)")
