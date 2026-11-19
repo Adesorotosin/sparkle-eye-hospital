@@ -13,15 +13,19 @@ export async function GET(request: NextRequest) {
     }
 
     const pattern = `%${term}%`;
+    const scope = request.nextUrl.searchParams.get("scope") ?? "all";
+    if (!["all", "diagnosis", "symptoms"].includes(scope)) {
+      return NextResponse.json({ error: "Invalid clinical search scope." }, { status: 400 });
+    }
     const [nameRes, codeRes, phoneRes, regRes, diagnosisRes, complaintRes, historyRes, triageRes] = await Promise.all([
-      supabaseServer.from("patients").select("id").ilike("full_name", pattern).limit(100),
-      supabaseServer.from("patients").select("id").ilike("patient_code", pattern).limit(100),
-      supabaseServer.from("patients").select("id").ilike("phone", pattern).limit(100),
-      supabaseServer.from("patients").select("id").ilike("registration_number", pattern).limit(100),
-      supabaseServer.from("encounters").select("patient_id, diagnosis").ilike("diagnosis", pattern).limit(200),
-      supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("presenting_complaint", pattern).limit(200),
-      supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("history_of_presenting_complaint", pattern).limit(200),
-      supabaseServer.from("vitals").select("patient_id, primary_complaint").ilike("primary_complaint", pattern).limit(200),
+      scope === "all" ? supabaseServer.from("patients").select("id").ilike("full_name", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
+      scope === "all" ? supabaseServer.from("patients").select("id").ilike("patient_code", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
+      scope === "all" ? supabaseServer.from("patients").select("id").ilike("phone", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
+      scope === "all" ? supabaseServer.from("patients").select("id").ilike("registration_number", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
+      scope !== "symptoms" ? supabaseServer.from("encounters").select("patient_id, diagnosis").ilike("diagnosis", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("history_of_presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      scope !== "diagnosis" ? supabaseServer.from("vitals").select("patient_id, primary_complaint").ilike("primary_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
     const failures = [nameRes, codeRes, phoneRes, regRes, diagnosisRes, complaintRes, historyRes, triageRes].filter(result => result.error);
     if (failures.length) throw failures[0].error;
