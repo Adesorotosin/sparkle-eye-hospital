@@ -40,6 +40,7 @@ type Patient = {
   nextOfKinPhone?: string | null;
   status?: string | null;
   isWalkIn?: boolean;
+  matchReasons?: string[];
 };
 
 type Appointment = {
@@ -133,6 +134,7 @@ export default function ReceptionistPage() {
   const [doctors, setDoctors] = useState<DoctorOption[]>([]);
   const [doctorLoadError, setDoctorLoadError] = useState("");
   const [search, setSearch] = useState("");
+  const [searchMode, setSearchMode] = useState<"patient" | "clinical">("patient");
 
   const [loading, setLoading] = useState(true);
   const [savingPatient, setSavingPatient] = useState(false);
@@ -198,7 +200,9 @@ export default function ReceptionistPage() {
         fetch(`/api/appointments?date=${encodeURIComponent(date)}`, {
           cache: "no-store",
         }),
-        fetch(`/api/patients?search=${encodeURIComponent(search)}`, {
+        fetch(searchMode === "clinical"
+          ? `/api/patients/clinical-search?q=${encodeURIComponent(search)}`
+          : `/api/patients?search=${encodeURIComponent(search)}`, {
           cache: "no-store",
         }),
         fetch("/api/doctors", { cache: "no-store" }),
@@ -254,7 +258,7 @@ export default function ReceptionistPage() {
     } finally {
       setLoading(false);
     }
-  }, [date, search]);
+  }, [date, search, searchMode]);
 
   useEffect(() => {
     if (!date) {
@@ -997,7 +1001,7 @@ export default function ReceptionistPage() {
                 </h2>
 
                 <p className="mt-1 text-xs font-medium text-slate-400">
-                  Find an existing patient by registration number, code, name or phone.
+                  Search patient identity or find previous patients by symptoms, presenting complaints and recorded diagnoses.
                 </p>
               </div>
 
@@ -1005,6 +1009,10 @@ export default function ReceptionistPage() {
             </div>
 
             <div className="p-5">
+              <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Patient search type">
+                <button type="button" onClick={() => setSearchMode("patient")} className={`rounded-full px-3 py-2 text-xs font-bold transition ${searchMode === "patient" ? "bg-slate-900 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>Patient details</button>
+                <button type="button" onClick={() => setSearchMode("clinical")} className={`rounded-full px-3 py-2 text-xs font-bold transition ${searchMode === "clinical" ? "bg-blue-700 text-white" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>Symptoms & diagnosis</button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
@@ -1013,10 +1021,11 @@ export default function ReceptionistPage() {
                   onChange={(event) =>
                     setSearch(event.target.value)
                   }
-                  placeholder="Search patient..."
+                  placeholder={searchMode === "clinical" ? "e.g. blurred vision, eye pain, cataract..." : "Search by name, registration number, code or phone..."}
                   className={`${inputClass} pl-9`}
                 />
               </div>
+              <p className="mt-2 text-[11px] leading-5 text-slate-400">{searchMode === "clinical" ? "Matches recorded diagnoses, presenting complaints, clinical history and triage complaints. Search is based on documented text, not an AI diagnosis." : "Search by patient name, registration number, patient code or phone number."}</p>
 
               <div className="mt-4 max-h-[430px] space-y-2 overflow-y-auto">
                 {patients.length === 0 ? (
@@ -1041,6 +1050,7 @@ export default function ReceptionistPage() {
                           <p className="mt-1 text-[10px] font-medium text-slate-400">
                             Patient code: {patient.patientId}
                           </p>
+                          {searchMode === "clinical" && patient.matchReasons?.length ? <p className="mt-2 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[10px] font-semibold text-blue-700">Matched in: {patient.matchReasons.join(", ")}</p> : null}
 
                           <p className="mt-1 text-[11px] text-slate-400">
                             {patient.phone || "No phone"} ·{" "}
