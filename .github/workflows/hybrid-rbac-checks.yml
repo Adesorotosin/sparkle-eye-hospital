@@ -23,3 +23,43 @@ jobs:
       - name: Lint
         run: npm run lint
         continue-on-error: true
+
+  schema-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sparkle_eye_rbac_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sparkle_eye_rbac_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: sparkle_eye_rbac_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Create Supabase role names
+        run: psql -v ON_ERROR_STOP=1 -c "CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;"
+      - name: Apply fresh schema
+        run: psql -v ON_ERROR_STOP=1 -f supabase/schema.sql
+      - name: Verify custom role schema and RLS
+        run: |
+          psql -v ON_ERROR_STOP=1 -c "SELECT custom_role_id FROM public.staff LIMIT 0"
+          psql -v ON_ERROR_STOP=1 -c "SELECT id, base_role, permissions FROM public.custom_roles LIMIT 0"
+          psql -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.custom_roles'::regclass) THEN RAISE EXCEPTION 'custom_roles RLS is not enabled'; END IF; END \$\$;"
+      - name: Verify migrations are idempotent on the fresh schema
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261125214000_hybrid_role_based_access.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261125215000_disallow_it_admin_custom_role_base.sql
