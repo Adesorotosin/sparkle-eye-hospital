@@ -912,6 +912,7 @@ export default function AccessControlPage() {
               </p>
             </div>
 
+            <a href="/admin/roles" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] text-sm font-semibold text-[#334155] hover:bg-slate-50">Manage Custom Roles</a>
             <a
               href="/admin/access-control/new"
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold shadow-sm transition-colors"
