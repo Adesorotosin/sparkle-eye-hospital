@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 /* ============================================================
    TYPES
@@ -215,6 +215,7 @@ export async function createLabOrder(input: {
       "DOCTOR",
       "OPTOMETRIST",
     ]);
+    await requirePermission("clinical.diagnostics.order");
 
     const patientId = clean(input.patientId);
     const testCode = clean(input.testCode);
@@ -338,6 +339,7 @@ export async function createLabOrder(input: {
 export async function getLabQueue() {
   try {
     await requireRole([...LAB_CLINICAL_VIEW_ROLES]);
+    await requirePermission("clinical.results.view");
 
     const { data, error } = await supabaseServer
       .from("lab_orders")
@@ -459,6 +461,7 @@ export async function getLabOrderDetails(
 ) {
   try {
     await requireRole([...LAB_CLINICAL_VIEW_ROLES]);
+    await requirePermission("clinical.results.view");
 
     if (!clean(id)) {
       return {
@@ -661,6 +664,7 @@ export async function collectLabSample(input: {
     const staff = await requireRole([
       ...LAB_STAFF_ROLES,
     ]);
+    await requirePermission("clinical.results.update");
 
     const labOrderId = clean(input.labOrderId);
 
@@ -764,6 +768,7 @@ export async function receiveLabSample(input: {
     const staff = await requireRole([
       ...LAB_STAFF_ROLES,
     ]);
+    await requirePermission("clinical.results.update");
 
     const labOrderId = clean(input.labOrderId);
     const sampleId = clean(input.sampleId);
@@ -900,6 +905,7 @@ export async function startLabProcessing(input: {
     const staff = await requireRole([
       ...LAB_STAFF_ROLES,
     ]);
+    await requirePermission("clinical.results.update");
 
     const labOrderId = clean(input.labOrderId);
     const sampleId = clean(input.sampleId);
@@ -1004,6 +1010,7 @@ export async function saveLabResult(input: {
     const staff = await requireRole([
       ...LAB_STAFF_ROLES,
     ]);
+    await requirePermission("clinical.results.update");
 
     const labOrderId = clean(input.labOrderId);
     const sampleId = clean(input.sampleId);
@@ -1192,6 +1199,7 @@ export async function verifyLabResult(input: {
     const staff = await requireRole([
       ...LAB_STAFF_ROLES,
     ]);
+    await requirePermission("clinical.results.update");
 
     const labOrderId = clean(input.labOrderId);
     const resultId = clean(input.resultId);
@@ -1338,6 +1346,7 @@ export async function getPatientLabResults(
     await requireRole([
       ...LAB_CLINICAL_VIEW_ROLES,
     ]);
+    await requirePermission("clinical.results.view");
 
     const cleanPatientId =
       clean(patientId);
@@ -1422,6 +1431,7 @@ export async function getLabHistory(input?: {
     await requireRole([
       ...LAB_CLINICAL_VIEW_ROLES,
     ]);
+    await requirePermission("clinical.results.view");
 
     const limit = Math.min(
       Math.max(
