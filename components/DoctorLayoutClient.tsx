@@ -41,7 +41,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
         return response.json();
       })
       .then((data) => {
-        if (active) setPermissions(data?.user?.permissions ?? {});
+        if (active) setPermissions(data?.staff?.permissions ?? {});
       })
       .catch(() => {
         if (active) setPermissions({});
