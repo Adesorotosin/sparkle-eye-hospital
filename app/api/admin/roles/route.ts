@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/activity-log";
 import { PERMISSION_CATALOG, PERMISSION_KEYS } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,11 @@ export async function POST(request: Request) {
     if (error) {
       if (error.code === "23505") return json({ error: "A custom role with that name already exists." }, 409);
       throw error;
+    }
+    try {
+      await logActivity({ module: "Admin", category: "ADMIN", action: `Custom role created: ${data.name} (${data.base_role})`, performedBy: actor.name, staffId: actor.id });
+    } catch (logError) {
+      console.warn("Custom role creation audit log failed:", logError);
     }
     return json({ role: data }, 201);
   } catch (error) {
