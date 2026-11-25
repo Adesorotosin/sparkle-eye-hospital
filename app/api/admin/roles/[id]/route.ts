@@ -16,12 +16,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const actor = await requireRole(["IT_ADMIN"]);
     const { id } = await params;
     const body = await request.json();
+    const hasChanges = body.name !== undefined || body.description !== undefined || body.permissions !== undefined || body.isActive !== undefined;
+    if (!hasChanges) return json({ error: "No changes supplied." }, 400);
     const updates: Record<string, unknown> = { updated_by: actor.id, updated_at: new Date().toISOString() };
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim() || body.name.trim().length > 80) return json({ error: "Role name must be 1–80 characters." }, 400);
-      updates.name = body.name.trim(); updates.slug = slugify(body.name);
+      const slug = slugify(body.name);
+      if (!slug) return json({ error: "Role name must contain letters or numbers." }, 400);
+      updates.name = body.name.trim(); updates.slug = slug;
     }
-    if (body.description !== undefined) updates.description = typeof body.description === "string" ? body.description.trim() : null;
+    if (body.description !== undefined) {
+      if (body.description !== null && (typeof body.description !== "string" || body.description.trim().length > 500)) return json({ error: "Description must be 500 characters or fewer." }, 400);
+      updates.description = typeof body.description === "string" ? body.description.trim() || null : null;
+    }
     if (body.permissions !== undefined) {
       if (!validPermissions(body.permissions)) return json({ error: "Permissions contain unsupported keys or invalid values." }, 400);
       updates.permissions = body.permissions;
