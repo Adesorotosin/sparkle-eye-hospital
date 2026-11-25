@@ -6,7 +6,7 @@ import Link from "next/link";
 type Role = { id: string; name: string; slug: string; description: string | null; base_role: string; permissions: Record<string, boolean>; is_active: boolean };
 type Permission = { key: string; label: string; group: string };
 const BASE_ROLES = [
-  ["DOCTOR","Doctor"],["OPHTHALMOLOGIST","Ophthalmologist"],["NURSE","Nurse"],
+  ["HOSPITAL_ADMIN","Hospital Administrator"],["DOCTOR","Doctor"],["OPHTHALMOLOGIST","Ophthalmologist"],["NURSE","Nurse"],
   ["RECEPTIONIST","Receptionist"],["CASHIER","Cashier"],["PHARMACIST","Pharmacist"],
   ["OPTOMETRIST","Optometrist"],["OPTICIAN","Optician"],["LAB_SCIENTIST","Laboratory Staff"],["INVENTORY_MANAGER","Inventory Manager"]
 ];
