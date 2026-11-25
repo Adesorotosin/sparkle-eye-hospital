@@ -2,6 +2,7 @@
 
 export const ROLE_REDIRECT_MAP: Record<string, string> = {
   IT_ADMIN: "/admin",
+  HOSPITAL_ADMIN: "/admin",
   OPHTHALMOLOGIST: "/doctor",
   DOCTOR: "/doctor",
   NURSE: "/nurse",
@@ -18,6 +19,7 @@ export const ROLE_REDIRECT_MAP: Record<string, string> = {
 
 export type UserRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
