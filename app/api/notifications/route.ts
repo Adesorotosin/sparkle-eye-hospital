@@ -1,7 +1,7 @@
 // app/api/notifications/route.ts
 
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 type NotificationType =
@@ -139,7 +139,7 @@ function normalizeNotification(
 // ------------------------------------------------------------
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("notifications.manage");
 
     const [
       manualRes,
