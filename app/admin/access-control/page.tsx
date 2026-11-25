@@ -353,18 +353,46 @@ function getFacilitiesText(
   return facilities || "Not assigned";
 }
 
-function getPermissionsForStaff(
+function getInheritedPermissions(
   staff: StaffMember | null,
-  customRoles: CustomRoleOption[] = []
+  customRoles: CustomRoleOption[] = [],
+  customRoleId?: string | null
 ) {
-  if (!staff) {
-    return {};
-  }
-
-  const customRole = customRoles.find((role) => role.id === staff.custom_role_id && role.is_active);
+  if (!staff) return {};
+  const selectedRoleId = customRoleId === undefined ? staff.custom_role_id : customRoleId;
+  const customRole = customRoles.find((role) => role.id === selectedRoleId && role.is_active);
+  const customPermissions = customRole?.permissions ?? {};
+  const canonicalToLegacy: Record<string, string> = {
+    "patients.view": "view_patient_records",
+    "clinical.notes.update": "edit_clinical_notes",
+    "clinical.diagnostics.order": "order_diagnostics",
+    "clinical.results.view": "view_lab_results",
+    "clinical.prescriptions.create": "issue_prescriptions",
+    "pharmacy.dispense": "pharmacy_dispensing_approval",
+    "billing.refund": "approve_refunds",
+    "staff.manage": "user_account_management",
+    "audit.view": "audit_log_access",
+    "settings.manage": "system_configuration",
+  };
+  const legacyFromCustom = Object.fromEntries(
+    Object.entries(canonicalToLegacy)
+      .filter(([canonical]) => Object.prototype.hasOwnProperty.call(customPermissions, canonical))
+      .map(([canonical, legacy]) => [legacy, customPermissions[canonical]])
+  );
   return {
     ...(DEFAULT_PERMISSIONS[staff.role] ?? {}),
-    ...(customRole?.permissions ?? {}),
+    ...legacyFromCustom,
+  };
+}
+
+function getPermissionsForStaff(
+  staff: StaffMember | null,
+  customRoles: CustomRoleOption[] = [],
+  customRoleId?: string | null
+) {
+  if (!staff) return {};
+  return {
+    ...getInheritedPermissions(staff, customRoles, customRoleId),
     ...(staff.permissions ?? {}),
   };
 }
@@ -608,7 +636,11 @@ export default function AccessControlPage() {
               "application/json",
           },
           body: JSON.stringify({
-            permissions: draftPermissions,
+            permissions: Object.fromEntries(
+              Object.entries(draftPermissions).filter(([key, value]) =>
+                getInheritedPermissions(selectedStaff, customRoles, draftCustomRoleId)[key] !== value
+              )
+            ),
             name: draftName,
             customRoleId: draftCustomRoleId || null,
           }),
@@ -1281,7 +1313,7 @@ export default function AccessControlPage() {
                       />
                       <p className="mt-2 text-xs text-slate-500">Update the name displayed across the staff directory and hospital workspace, then save changes below.</p>
                       <label htmlFor="staff-custom-role" className="mb-2 mt-4 block text-xs font-semibold text-slate-700">Custom role (optional)</label>
-                      <select id="staff-custom-role" value={draftCustomRoleId} onChange={(event) => setDraftCustomRoleId(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                      <select id="staff-custom-role" value={draftCustomRoleId} onChange={(event) => { const nextRoleId = event.target.value; setDraftCustomRoleId(nextRoleId); setDraftPermissions(getPermissionsForStaff(selectedStaff, customRoles, nextRoleId || null)); }} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
                         <option value="">Use predefined role only</option>
                         {customRoles.filter((role) => role.is_active && role.base_role === selectedStaff.role).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
                       </select>
