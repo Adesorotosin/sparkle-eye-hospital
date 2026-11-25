@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
-import { PERMISSION_KEYS } from "@/lib/permissions";
+import { PERMISSION_CATALOG, PERMISSION_KEYS } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -16,7 +16,7 @@ export async function GET() {
     await requireRole(["IT_ADMIN"]);
     const { data, error } = await supabaseServer.from("custom_roles").select("id,name,slug,description,base_role,permissions,is_active,created_at,updated_at").order("name");
     if (error) throw error;
-    return json({ roles: data ?? [], permissions: PERMISSION_KEYS });
+    return json({ roles: data ?? [], permissions: PERMISSION_CATALOG.filter((item) => !item.group.startsWith("Legacy")) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     return json({ error: message === "UNAUTHENTICATED" ? "Authentication required." : "You cannot manage roles." }, message === "UNAUTHENTICATED" ? 401 : 403);
