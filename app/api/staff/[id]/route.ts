@@ -181,13 +181,14 @@ export async function PATCH(
     }
 
     if (currentUser.role !== "IT_ADMIN") {
+      const basePermissions = resolvePermissions(existing.role, {}, {});
       const targetPermissions = resolvePermissions(
         existing.role,
         targetCustomRolePermissions,
         (permissions === undefined ? existing.permissions ?? {} : permissions) as Record<string, boolean>
       );
       const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
-        enabled === true && currentUser.permissions[permission] !== true
+        enabled === true && basePermissions[permission] !== true && currentUser.permissions[permission] !== true
       );
       if (escalated.length) {
         return NextResponse.json({ error: "You cannot manage an account with permissions beyond your own." }, { status: 403 });
