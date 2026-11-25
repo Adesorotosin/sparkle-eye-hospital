@@ -392,6 +392,7 @@ function getInheritedPermissions(
     "staff.manage": "user_account_management",
     "audit.view": "audit_log_access",
     "settings.manage": "system_configuration",
+    "reports.view": "view_financial_reports",
   };
   const legacyFromCustom = Object.fromEntries(
     Object.entries(canonicalToLegacy)
