@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 
 import { requirePermission } from "@/lib/server-auth";
-import { PERMISSION_KEYS } from "@/lib/permissions";
+import { PERMISSION_KEYS, resolvePermissions } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
@@ -91,7 +91,8 @@ export async function PATCH(
         role,
         is_active,
         deleted_at,
-        permissions
+        permissions,
+        custom_role_id
       `)
       .eq("id", id)
       .maybeSingle();
@@ -109,6 +110,10 @@ export async function PATCH(
       );
     }
 
+    if (currentUser.role !== "IT_ADMIN" && existing.role === "IT_ADMIN") {
+      return NextResponse.json({ error: "Only an IT administrator can manage another IT administrator." }, { status: 403 });
+    }
+
     if (existing.id === currentUser.id && (permissions !== undefined || customRoleId !== undefined)) {
       return NextResponse.json(
         { error: "You cannot change your own access permissions or assigned role." },
@@ -117,7 +122,7 @@ export async function PATCH(
     }
 
     // Prevent an IT admin from suspending or reactivating their own account.
-    // Permission changes to their own account are still allowed.
+    // Access changes to their own account are denied.
     if (
       isActive !== undefined &&
       existing.id === currentUser.id
@@ -149,19 +154,44 @@ export async function PATCH(
       updates.name = name.trim();
     }
 
+    let targetCustomRolePermissions: Record<string, boolean> = {};
+    const targetCustomRoleId = customRoleId === undefined ? existing.custom_role_id : customRoleId;
     if (customRoleId !== undefined) {
       if (customRoleId !== null && typeof customRoleId !== "string") {
         return NextResponse.json({ error: "customRoleId must be a role ID or null." }, { status: 400 });
       }
       if (customRoleId) {
         const { data: customRole, error: roleError } = await supabaseServer
-          .from("custom_roles").select("id,base_role,is_active").eq("id", customRoleId).maybeSingle();
+          .from("custom_roles").select("id,base_role,is_active,permissions").eq("id", customRoleId).maybeSingle();
         if (roleError) throw roleError;
         if (!customRole || !customRole.is_active || customRole.base_role !== existing.role || existing.role === "IT_ADMIN") {
           return NextResponse.json({ error: "The selected custom role must be active and based on this staff member's predefined role." }, { status: 400 });
         }
+        targetCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
       }
       updates.custom_role_id = customRoleId || null;
+    } else if (targetCustomRoleId) {
+      const { data: customRole, error: roleError } = await supabaseServer
+        .from("custom_roles").select("id,base_role,is_active,permissions").eq("id", targetCustomRoleId).maybeSingle();
+      if (roleError) throw roleError;
+      if (!customRole || !customRole.is_active || customRole.base_role !== existing.role) {
+        return NextResponse.json({ error: "The staff member's assigned custom role is no longer active. Reassign a valid role before updating this account." }, { status: 409 });
+      }
+      targetCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
+    }
+
+    if (currentUser.role !== "IT_ADMIN") {
+      const targetPermissions = resolvePermissions(
+        existing.role,
+        targetCustomRolePermissions,
+        (permissions === undefined ? existing.permissions ?? {} : permissions) as Record<string, boolean>
+      );
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && currentUser.permissions[permission] !== true
+      );
+      if (escalated.length) {
+        return NextResponse.json({ error: "You cannot manage an account with permissions beyond your own." }, { status: 403 });
+      }
     }
 
     const {
