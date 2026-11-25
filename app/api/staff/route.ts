@@ -502,9 +502,10 @@ export async function POST(
     }
 
     if (currentUser.role !== "IT_ADMIN") {
+      const basePermissions = resolvePermissions(cleanRole, {}, {});
       const targetPermissions = resolvePermissions(cleanRole, cleanCustomRolePermissions, cleanPermissions as Record<string, boolean>);
       const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
-        enabled === true && currentUser.permissions[permission] !== true
+        enabled === true && basePermissions[permission] !== true && currentUser.permissions[permission] !== true
       );
       if (escalated.length) {
         return jsonNoStore({ error: "You cannot create a staff account with permissions you do not hold." }, { status: 403 });
