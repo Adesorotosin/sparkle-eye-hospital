@@ -180,7 +180,7 @@ export async function PATCH(
       targetCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
     }
 
-    if (currentUser.role !== "IT_ADMIN") {
+    if (currentUser.role !== "IT_ADMIN" && (permissions !== undefined || customRoleId !== undefined)) {
       const basePermissions = resolvePermissions(existing.role, {}, {});
       const targetPermissions = resolvePermissions(
         existing.role,
@@ -191,7 +191,7 @@ export async function PATCH(
         enabled === true && basePermissions[permission] !== true && currentUser.permissions[permission] !== true
       );
       if (escalated.length) {
-        return NextResponse.json({ error: "You cannot manage an account with permissions beyond your own." }, { status: 403 });
+        return NextResponse.json({ error: "You cannot grant permissions beyond your own authority." }, { status: 403 });
       }
     }
 
