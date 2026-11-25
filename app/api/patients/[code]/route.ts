@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getPatientRecord } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requirePermission } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,8 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    const staff = await requirePermission("patients.view");
+    const staff = await requireRole([...PATIENT_READ_ROLES]);
+    await requirePermission("patients.view");
 
     const resolvedParams = await params;
     const patientCode = resolvedParams?.code?.trim();
@@ -108,7 +109,8 @@ export async function PATCH(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    const staff = await requirePermission("patients.update");
+    const staff = await requireRole([...PATIENT_UPDATE_ROLES]);
+    await requirePermission("patients.update");
 
     const resolvedParams = await params;
     const patientCode = resolvedParams?.code?.trim();
