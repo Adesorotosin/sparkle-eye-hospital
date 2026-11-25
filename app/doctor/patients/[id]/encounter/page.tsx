@@ -17,6 +17,7 @@ import {
   Stethoscope,
   TestTube2,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
