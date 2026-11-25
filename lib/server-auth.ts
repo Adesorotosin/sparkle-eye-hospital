@@ -197,11 +197,13 @@ export async function getAuthenticatedStaff(): Promise<
   const staffPermissions = staff.permissions && typeof staff.permissions === "object" && !Array.isArray(staff.permissions)
     ? staff.permissions as Record<string, boolean>
     : {};
-  const effectivePermissions = resolvePermissions(
-    normalizedRole,
-    customRolePermissions,
-    staffPermissions
-  );
+  const effectivePermissions = staff.custom_role_id && !customRole?.is_active
+    ? {}
+    : resolvePermissions(
+        normalizedRole,
+        customRolePermissions,
+        staffPermissions
+      );
 
   return {
     id: staff.id,
