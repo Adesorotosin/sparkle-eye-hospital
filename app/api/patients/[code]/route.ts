@@ -45,7 +45,7 @@ export async function GET(
     }
 
     const { data: patientRow, error: patientLookupError } = await supabaseServer
-      .from("patients").select("id").eq("patient_code", patientCode).maybeSingle();
+      .from("patients").select("id, patient_code, full_name, age, gender, phone, coverage_plan, address, registration_number, status, is_walk_in, created_at, last_visit_at").eq("patient_code", patientCode).maybeSingle();
     if (patientLookupError) throw patientLookupError;
     if (!patientRow) return NextResponse.json({ error: "Patient not found." }, { status: 404 });
 
@@ -66,6 +66,26 @@ export async function GET(
         console.error("Patient chart access audit failed:", auditError);
         return NextResponse.json({ error: "Patient access could not be audited. Please retry." }, { status: 500 });
       }
+    }
+
+    if (staff.role === "RECEPTIONIST") {
+      return NextResponse.json({
+        patient: {
+          id: patientRow.id,
+          patientId: patientRow.patient_code,
+          fullName: patientRow.full_name,
+          age: patientRow.age,
+          gender: patientRow.gender,
+          phone: patientRow.phone,
+          coveragePlan: patientRow.coverage_plan,
+          address: patientRow.address,
+          registrationNumber: patientRow.registration_number,
+          status: patientRow.status,
+          isWalkIn: patientRow.is_walk_in,
+          createdAt: patientRow.created_at,
+          lastVisitAt: patientRow.last_visit_at,
+        },
+      });
     }
 
     const patient = await getPatientRecord(patientCode);
