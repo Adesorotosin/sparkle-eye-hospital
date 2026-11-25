@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 import { getConfiguredVatPolicy, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
 
@@ -25,6 +25,7 @@ export async function getBillingVatSettings(): Promise<{
 }> {
   try {
     await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage");
     const policy = await getConfiguredVatPolicy();
     return {
       success: true,
@@ -55,6 +56,7 @@ export async function saveBillingVatSettings(input: {
 }> {
   try {
     const staff = await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage");
     const vatRate = Number(input?.vatRate);
 
     if (typeof input?.vatEnabled !== "boolean") {
