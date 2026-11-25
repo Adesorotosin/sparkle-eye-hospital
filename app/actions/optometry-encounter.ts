@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 type EncounterStatus = "draft" | "completed";
 
@@ -97,6 +97,7 @@ export async function saveOptometryEncounter(
       "IT_ADMIN",
       "OPTOMETRIST",
     ]);
+    await requirePermission("clinical.notes.create");
 
     const patientCode = input.patientCode?.trim();
 
