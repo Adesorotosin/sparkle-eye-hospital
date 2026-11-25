@@ -28,7 +28,8 @@ export const PERMISSION_CATALOG = [
   { key: "audit.view", label: "View audit and security logs", group: "Administration" },
   { key: "reports.view", label: "View hospital reports and analytics", group: "Administration" },
   { key: "settings.manage", label: "Manage system settings", group: "Administration" },
-  { key: "notifications.manage", label: "Manage hospital notifications", group: "Administration" },
+  { key: "notifications.view", label: "View sensitive system notifications and alerts", group: "Administration" },
+  { key: "notifications.manage", label: "Create and manage hospital notifications", group: "Administration" },
   { key: "surgery.manage", label: "Access the surgical suite", group: "Clinical" },
   // Backward-compatible keys used by the existing Staff & Access Control screen.
   { key: "view_patient_records", label: "Legacy: View patient records", group: "Legacy permissions" },
