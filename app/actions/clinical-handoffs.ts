@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export type HandoffDestination = "CASHIER" | "RECEPTIONIST";
 export type HandoffType = "TREATMENT_PLAN" | "PROCEDURE" | "FOLLOW_UP" | "PRICING_REVIEW";
@@ -64,6 +64,7 @@ export async function createClinicalHandoff(input: {
 }) {
   try {
     const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("clinical.notes.create");
     const patientCode = input.patientCode?.trim();
     const title = input.title?.trim();
     const details = input.details?.trim();
@@ -184,8 +185,10 @@ export async function getClinicalHandoffs(destination: HandoffDestination) {
   try {
     if (destination === "CASHIER") {
       await requireRole(["IT_ADMIN", "CASHIER"]);
+      await requirePermission("billing.view");
     } else {
       await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+      await requirePermission("appointments.view");
     }
 
     const { data, error } = await supabaseServer
@@ -257,6 +260,7 @@ export async function updateClinicalHandoffStatus(input: {
     const staff = input.destination === "CASHIER"
       ? await requireRole(["IT_ADMIN", "CASHIER"])
       : await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    await requirePermission(input.destination === "CASHIER" ? "billing.collect" : "appointments.manage");
     if (!input.id?.trim()) return { success: false, message: "Request ID is required." };
 
     const updates: Record<string, unknown> = {
