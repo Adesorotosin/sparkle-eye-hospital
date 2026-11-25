@@ -28,6 +28,7 @@ import {
 
 type StaffRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
@@ -57,6 +58,7 @@ type PermissionState =
   | "api_key_management";
 
 const ROLE_LABELS: Record<StaffRole, string> = {
+  HOSPITAL_ADMIN: "Hospital Administrator",
   IT_ADMIN: "IT Administrator",
   OPHTHALMOLOGIST: "Ophthalmologist",
   DOCTOR: "Doctor",
