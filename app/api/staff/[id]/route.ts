@@ -2,7 +2,8 @@
 
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
+import { PERMISSION_KEYS } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
@@ -12,7 +13,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await requireRole(["IT_ADMIN"]);
+    const currentUser = await requirePermission("staff.manage");
 
     const { id } = await params;
 
@@ -64,7 +65,10 @@ export async function PATCH(
       (
         typeof permissions !== "object" ||
         permissions === null ||
-        Array.isArray(permissions)
+        Array.isArray(permissions) ||
+        !Object.entries(permissions as Record<string, unknown>).every(([key, value]) =>
+          PERMISSION_KEYS.includes(key as (typeof PERMISSION_KEYS)[number]) && typeof value === "boolean"
+        )
       )
     ) {
       return NextResponse.json(
@@ -102,6 +106,13 @@ export async function PATCH(
           error: `Staff member with id "${id}" not found`,
         },
         { status: 404 }
+      );
+    }
+
+    if (existing.id === currentUser.id && (permissions !== undefined || customRoleId !== undefined)) {
+      return NextResponse.json(
+        { error: "You cannot change your own access permissions or assigned role." },
+        { status: 403 }
       );
     }
 
@@ -200,6 +211,9 @@ export async function PATCH(
 
     if (name !== undefined) {
       messageParts.push("name updated");
+    }
+    if (customRoleId !== undefined) {
+      messageParts.push("custom role updated");
     }
 
     try {
