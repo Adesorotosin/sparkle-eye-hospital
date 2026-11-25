@@ -120,6 +120,8 @@ export function resolvePermissions(
     user_account_management: "staff.manage",
     audit_log_access: "audit.view",
     system_configuration: "settings.manage",
+    view_financial_reports: "reports.view",
+    revenue_dashboard: "reports.view",
   };
   for (const [legacy, canonical] of Object.entries(legacyAliases)) {
     if (Object.prototype.hasOwnProperty.call(custom, legacy)) effective[canonical] = custom[legacy];
