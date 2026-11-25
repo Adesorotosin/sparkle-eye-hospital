@@ -51,11 +51,7 @@ export async function GET(
   request: Request
 ) {
   try {
-   await requireRole([
-  "IT_ADMIN",
-  "DOCTOR",
-  "OPHTHALMOLOGIST",
-]);
+    await requirePermission("audit.view");
 
     const { searchParams } =
       new URL(request.url);
