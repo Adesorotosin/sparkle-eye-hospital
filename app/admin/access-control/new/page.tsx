@@ -533,6 +533,7 @@ export default function OnboardStaffPage() {
 
     const departmentByRole: Record<StaffRole, string> = {
       IT_ADMIN: "Information Technology",
+      HOSPITAL_ADMIN: "Hospital Administration",
       OPHTHALMOLOGIST: "Ophthalmology",
       DOCTOR: "Clinical Services",
       PHARMACIST: "Pharmacy",
