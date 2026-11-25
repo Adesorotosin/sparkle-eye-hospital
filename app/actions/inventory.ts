@@ -244,7 +244,7 @@ export async function issueInventoryStock(input: {
 }) {
   try {
     const staff = await requireRole([...INVENTORY_STOCK_ROLES]);
-    await requirePermission("inventory.manage");
+    await requirePermission("inventory.issue");
     if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
       return { success: false, message: "Select an item and enter a whole-number quantity greater than zero." };
     }
