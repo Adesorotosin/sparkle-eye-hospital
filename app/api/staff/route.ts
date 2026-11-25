@@ -3,7 +3,8 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
+import { PERMISSION_KEYS } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
@@ -52,10 +53,9 @@ function isValidPermissions(
     return false;
   }
 
-  return Object.values(
-    value as Record<string, unknown>
-  ).every(
-    (permission) =>
+  return Object.entries(value as Record<string, unknown>).every(
+    ([key, permission]) =>
+      PERMISSION_KEYS.includes(key as (typeof PERMISSION_KEYS)[number]) &&
       typeof permission === "boolean"
   );
 }
@@ -104,7 +104,7 @@ function jsonNoStore(
 // --- GET: List staff for Admin > Access Control ---
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("staff.view");
 
     const {
       data: staff,
@@ -186,7 +186,7 @@ export async function POST(
 ) {
   try {
     const currentUser =
-      await requireRole(["IT_ADMIN"]);
+      await requirePermission("staff.manage");
 
     let body: unknown;
 
@@ -541,6 +541,7 @@ export async function POST(
         department,
         assigned_facilities,
         permissions,
+        custom_role_id,
         is_active,
         deleted_at,
         created_at
