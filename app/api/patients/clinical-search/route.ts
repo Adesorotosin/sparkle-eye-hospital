@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(["RECEPTIONIST"]);
+    const staff = await requireRole(["RECEPTIONIST"]);
+    await requirePermission("patients.view");
     const term = (request.nextUrl.searchParams.get("q") ?? "").trim().slice(0, 80);
     if (term.length < 2) {
       return NextResponse.json({ patients: [], message: "Enter at least 2 characters." });
@@ -17,15 +18,20 @@ export async function GET(request: NextRequest) {
     if (!["all", "diagnosis", "symptoms"].includes(scope)) {
       return NextResponse.json({ error: "Invalid clinical search scope." }, { status: 400 });
     }
+    const canSearchClinical = staff.permissions["clinical.view"] === true;
+    if (scope !== "all" && !canSearchClinical) {
+      return NextResponse.json({ error: "Clinical-history search requires clinical-view permission." }, { status: 403 });
+    }
+    const searchClinical = canSearchClinical;
     const [nameRes, codeRes, phoneRes, regRes, diagnosisRes, complaintRes, historyRes, triageRes] = await Promise.all([
       scope === "all" ? supabaseServer.from("patients").select("id").ilike("full_name", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
       scope === "all" ? supabaseServer.from("patients").select("id").ilike("patient_code", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
       scope === "all" ? supabaseServer.from("patients").select("id").ilike("phone", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
       scope === "all" ? supabaseServer.from("patients").select("id").ilike("registration_number", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
-      scope !== "symptoms" ? supabaseServer.from("encounters").select("patient_id, diagnosis").ilike("diagnosis", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
-      scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      searchClinical && scope !== "symptoms" ? supabaseServer.from("encounters").select("patient_id, diagnosis").ilike("diagnosis", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      searchClinical && scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
       scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("history_of_presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
-      scope !== "diagnosis" ? supabaseServer.from("vitals").select("patient_id, primary_complaint").ilike("primary_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      searchClinical && scope !== "diagnosis" ? supabaseServer.from("vitals").select("patient_id, primary_complaint").ilike("primary_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
     const failures = [nameRes, codeRes, phoneRes, regRes, diagnosisRes, complaintRes, historyRes, triageRes].filter(result => result.error);
     if (failures.length) throw failures[0].error;
