@@ -9,6 +9,7 @@ import {
 import { logActivity } from "@/lib/activity-log";
 import {
   requireRole,
+  requirePermission,
   type UserRole,
 } from "@/lib/server-auth";
 
@@ -75,15 +76,21 @@ const LAB_ORDER_VIEW_ROLES: UserRole[] = [
 ];
 
 async function getLabStaff() {
-  return requireRole(LAB_STAFF_ROLES);
+  const staff = await requireRole(LAB_STAFF_ROLES);
+  await requirePermission("clinical.results.update");
+  return staff;
 }
 
 async function getLabOrderCreators() {
-  return requireRole(LAB_ORDER_CREATE_ROLES);
+  const staff = await requireRole(LAB_ORDER_CREATE_ROLES);
+  await requirePermission("clinical.diagnostics.order");
+  return staff;
 }
 
 async function getLabOrderViewers() {
-  return requireRole(LAB_ORDER_VIEW_ROLES);
+  const staff = await requireRole(LAB_ORDER_VIEW_ROLES);
+  await requirePermission("clinical.results.view");
+  return staff;
 }
 
 async function findPatient(patientCode: string) {
@@ -459,6 +466,7 @@ export async function createVisitingLabOrder(
 ): Promise<LabOrderResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "LAB_SCIENTIST"]);
+    await requirePermission("clinical.results.update");
     const fullName = input.fullName?.trim();
     const sourceCenter = input.sourceCenter?.trim();
     const testCode = input.testCode?.trim().toUpperCase();
