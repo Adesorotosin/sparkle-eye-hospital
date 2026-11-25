@@ -386,7 +386,7 @@ export async function createPharmacyPrescription(
       await requireRole([
         ...PHARMACY_WRITE_ROLES,
       ]);
-    await requirePermission("clinical.prescriptions.create");
+    await requirePermission("pharmacy.dispense");
 
     const patientCode =
       input.patientCode?.trim();
