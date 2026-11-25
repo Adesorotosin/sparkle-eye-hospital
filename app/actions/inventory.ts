@@ -14,7 +14,8 @@ const INVENTORY_READ_ROLES = [
   "INVENTORY_MANAGER",
 ] as const;
 
-const INVENTORY_MANAGER_ROLES = ["IT_ADMIN"] as const;
+const INVENTORY_ITEM_CREATE_ROLES = ["IT_ADMIN"] as const;
+const INVENTORY_MANAGER_ROLES = ["IT_ADMIN", "INVENTORY_MANAGER"] as const;
 const INVENTORY_STOCK_ROLES = [
   "IT_ADMIN",
   "OPTICIAN",
@@ -140,7 +141,7 @@ export async function createInventoryItem(input: {
   unitCost: number;
 }) {
   try {
-    const staff = await requireRole([...INVENTORY_MANAGER_ROLES]);
+    const staff = await requireRole([...INVENTORY_ITEM_CREATE_ROLES]);
     await requirePermission("inventory.manage");
     const sku = input.sku?.trim().toUpperCase();
     const name = input.name?.trim();
