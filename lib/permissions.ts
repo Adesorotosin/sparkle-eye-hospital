@@ -51,43 +51,43 @@ export const PERMISSION_KEYS = PERMISSION_CATALOG.map((item) => item.key) as Per
 const all = (...keys: PermissionKey[]) => Object.fromEntries(keys.map((key) => [key, true])) as Record<string, boolean>;
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
-  IT_ADMIN: all(...PERMISSION_KEYS),
+  IT_ADMIN: { ...all(...PERMISSION_KEYS), controlled_substance_override: false },
   OPHTHALMOLOGIST: all(
-    "patients.view","clinical.view","clinical.notes.create","clinical.notes.update",
+    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
     "clinical.results.view","appointments.view","appointments.manage","optical.orders.view",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   DOCTOR: all(
-    "patients.view","clinical.view","clinical.notes.create","clinical.notes.update",
+    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
     "clinical.results.view","appointments.view","appointments.manage",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   NURSE: all(
-    "patients.view","clinical.view","clinical.notes.create","clinical.results.view","nursing.triage",
+    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.results.view","clinical.prescriptions.view","nursing.triage","inventory.view",
     "appointments.view","view_patient_records","edit_clinical_notes","view_lab_results"
   ),
   RECEPTIONIST: all(
-    "patients.view","patients.register","patients.update","appointments.view","appointments.manage",
+    "patients.view","patients.register","patients.update","appointments.view","appointments.manage","inventory.view",
     "view_patient_records"
   ),
   CASHIER: all(
-    "patients.view","billing.view","billing.collect","view_patient_records",
+    "patients.view","appointments.view","billing.view","billing.collect","view_patient_records",
     "view_financial_reports","insurance_claims_access","revenue_dashboard"
   ),
   PHARMACIST: all(
-    "patients.view","clinical.prescriptions.view","pharmacy.dispense","inventory.view",
+    "patients.view","patients.update","clinical.prescriptions.view","pharmacy.dispense","inventory.view",
     "view_patient_records","view_lab_results","pharmacy_dispensing_approval"
   ),
-  OPTICIAN: all("patients.view","optical.orders.view","optical.orders.manage","inventory.view","view_patient_records"),
+  OPTICIAN: all("patients.view","optical.orders.view","optical.orders.manage","inventory.view","appointments.view","view_patient_records"),
   OPTOMETRIST: all(
     "patients.view","clinical.view","clinical.notes.create","clinical.diagnostics.order",
     "clinical.results.view","optical.orders.view","optical.orders.manage","appointments.view",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results"
   ),
   LAB_SCIENTIST: all(
-    "patients.view","clinical.results.view","clinical.results.update","appointments.view",
+    "patients.view","clinical.results.view","clinical.results.update","appointments.view","inventory.view",
     "view_patient_records","view_lab_results"
   ),
   INVENTORY_MANAGER: all("inventory.view","inventory.manage"),
