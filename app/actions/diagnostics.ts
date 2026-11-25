@@ -21,7 +21,7 @@ export type DiagnosticQueueItem = {
 
 export async function getDiagnosticQueue() {
   try {
-    await requireRole(["IT_ADMIN", "NURSE", "RECEPTIONIST", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requireRole(["IT_ADMIN", "NURSE", "DOCTOR", "OPHTHALMOLOGIST"]);
     await requirePermission("clinical.results.view");
 
     const { data, error } = await supabaseServer
