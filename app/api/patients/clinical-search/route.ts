@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       scope === "all" ? supabaseServer.from("patients").select("id").ilike("registration_number", pattern).limit(100) : Promise.resolve({ data: [], error: null }),
       searchClinical && scope !== "symptoms" ? supabaseServer.from("encounters").select("patient_id, diagnosis").ilike("diagnosis", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
       searchClinical && scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
-      scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("history_of_presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
+      searchClinical && scope !== "diagnosis" ? supabaseServer.from("encounters").select("patient_id, presenting_complaint, history_of_presenting_complaint").ilike("history_of_presenting_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
       searchClinical && scope !== "diagnosis" ? supabaseServer.from("vitals").select("patient_id, primary_complaint").ilike("primary_complaint", pattern).limit(200) : Promise.resolve({ data: [], error: null }),
     ]);
     const failures = [nameRes, codeRes, phoneRes, regRes, diagnosisRes, complaintRes, historyRes, triageRes].filter(result => result.error);
