@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 function normalizeDepartmentName(value: unknown) {
@@ -22,7 +22,7 @@ function normalizeDepartmentName(value: unknown) {
 // GET — load departments with actual active staff counts.
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage");
 
     const [
       { data: departments, error: departmentsError },
@@ -128,7 +128,7 @@ export async function GET() {
 // POST — create a department.
 export async function POST(request: Request) {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requirePermission("settings.manage");
 
     let body: unknown;
 
@@ -274,7 +274,7 @@ export async function POST(request: Request) {
 // DELETE — remove a department only when no active staff are assigned.
 export async function DELETE(request: Request) {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requirePermission("settings.manage");
 
     const url = new URL(request.url);
     const departmentId =
