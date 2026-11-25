@@ -399,6 +399,10 @@ function getInheritedPermissions(
       .filter(([canonical]) => Object.prototype.hasOwnProperty.call(customPermissions, canonical))
       .map(([canonical, legacy]) => [legacy, customPermissions[canonical]])
   );
+  if (Object.prototype.hasOwnProperty.call(customPermissions, "reports.view")) {
+    legacyFromCustom.view_financial_reports = customPermissions["reports.view"];
+    legacyFromCustom.revenue_dashboard = customPermissions["reports.view"];
+  }
   return {
     ...(DEFAULT_PERMISSIONS[staff.role] ?? {}),
     ...legacyFromCustom,
