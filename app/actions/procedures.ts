@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getOrCreateDraftInvoice, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole, requirePermission } from "@/lib/server-auth";
+import { requireRole, requirePermission, requireAnyPermission } from "@/lib/server-auth";
 
 export type ProcedurePrice = {
   id: string;
@@ -31,7 +31,7 @@ type ProcedureRegistrationSummary = {
 
 export async function getProcedurePriceCatalog() {
   try {
-    await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
+    await requireAnyPermission(["appointments.view", "settings.manage"]);
     await requirePermission("appointments.view");
     const { data, error } = await supabaseServer
       .from("procedure_price_catalog")
@@ -77,7 +77,7 @@ export async function createProcedurePrice(input: {
   price: number;
 }) {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requirePermission("settings.manage")
     await requirePermission("settings.manage");
     const name = input.name?.trim();
     const category = input.category?.trim();
@@ -121,7 +121,7 @@ export async function updateProcedurePrice(input: {
   active: boolean;
 }) {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage")
     await requirePermission("settings.manage");
     const price = Number(input.price);
     if (!input.id || !Number.isFinite(price) || price < 0) {
