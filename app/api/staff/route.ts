@@ -122,6 +122,7 @@ export async function GET() {
         department,
         assigned_facilities,
         permissions,
+        custom_role_id,
         is_active,
         deleted_at,
         created_at
@@ -226,6 +227,7 @@ export async function POST(
       department,
       assignedFacilities,
       permissions,
+      customRoleId,
     } =
       body as Record<string, unknown>;
 
@@ -482,6 +484,17 @@ export async function POST(
         ? {}
         : permissions;
 
+    let cleanCustomRoleId: string | null = null;
+    if (customRoleId !== undefined && customRoleId !== null && customRoleId !== "") {
+      if (typeof customRoleId !== "string") return jsonNoStore({ error: "Invalid custom role." }, { status: 400 });
+      const { data: customRole, error: customRoleError } = await supabaseServer.from("custom_roles").select("id,base_role,is_active").eq("id", customRoleId).maybeSingle();
+      if (customRoleError) throw customRoleError;
+      if (!customRole || !customRole.is_active || customRole.base_role !== cleanRole || cleanRole === "IT_ADMIN") {
+        return jsonNoStore({ error: "The selected custom role must be active and based on the staff member's predefined role." }, { status: 400 });
+      }
+      cleanCustomRoleId = customRole.id;
+    }
+
     // -----------------------------------------
     // Hash password before database insertion
     // -----------------------------------------
@@ -514,6 +527,7 @@ export async function POST(
           cleanFacilities,
         permissions:
           cleanPermissions,
+        custom_role_id: cleanCustomRoleId,
         is_active: true,
       })
       .select(`
