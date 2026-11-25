@@ -14,6 +14,7 @@ create table staff (
   email text unique not null,
   role text not null check (role in (
     'IT_ADMIN',
+    'HOSPITAL_ADMIN',
     'OPHTHALMOLOGIST',
     'DOCTOR',
     'OPTOMETRIST',
@@ -44,7 +45,7 @@ create table custom_roles (
   slug text not null unique,
   description text,
   base_role text not null check (base_role in (
-    'OPHTHALMOLOGIST','DOCTOR','PHARMACIST','NURSE','CASHIER',
+    'HOSPITAL_ADMIN','OPHTHALMOLOGIST','DOCTOR','PHARMACIST','NURSE','CASHIER',
     'RECEPTIONIST','LAB_SCIENTIST','OPTICIAN','OPTOMETRIST','INVENTORY_MANAGER'
   )),
   permissions jsonb not null default '{}'::jsonb check (jsonb_typeof(permissions) = 'object'),
