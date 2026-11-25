@@ -348,6 +348,10 @@ export async function DELETE(
       );
     }
 
+    if (currentUser.role !== "IT_ADMIN" && existing.role === "IT_ADMIN") {
+      return NextResponse.json({ error: "Only an IT administrator can deactivate another IT administrator." }, { status: 403 });
+    }
+
     // Prevent an IT admin from deleting/deactivating their own account.
     if (existing.id === currentUser.id) {
       return NextResponse.json(
