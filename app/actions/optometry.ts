@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export type OptometryActionResponse = {
   success: boolean;
@@ -75,6 +75,7 @@ export async function getOptometryQueue(): Promise<{
       "IT_ADMIN",
       "OPTOMETRIST",
     ]);
+    await requirePermission("clinical.view");
 
     const { data, error } = await supabaseServer
       .from("patients")
@@ -199,6 +200,7 @@ export async function registerVisitingOptometryPatient(input: {
 }): Promise<OptometryActionResponse & { patientCode?: string }> {
   try {
     const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    await requirePermission("patients.register");
     const fullName = input.fullName?.trim();
     if (!fullName) return { success: false, message: "Patient full name is required." };
 
@@ -300,6 +302,7 @@ export async function addVisitingPatientToQueue(
 ): Promise<OptometryActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "OPTOMETRIST"]);
+    await requirePermission("appointments.manage");
     const normalizedCode = patientCode?.trim();
     if (!normalizedCode) return { success: false, message: "Enter the registered patient's code." };
 
@@ -351,6 +354,7 @@ export async function startOptometryExam(
       "IT_ADMIN",
       "OPTOMETRIST",
     ]);
+    await requirePermission("clinical.notes.create");
 
     const normalizedCode =
       patientCode?.trim();
@@ -467,6 +471,7 @@ export async function getOptometryPatient(
       "DOCTOR",
       "OPHTHALMOLOGIST",
     ]);
+    await requirePermission("clinical.view");
 
     const normalizedCode =
       patientCode?.trim();
