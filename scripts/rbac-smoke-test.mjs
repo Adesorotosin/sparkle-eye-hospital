@@ -39,9 +39,11 @@ assert.equal(hospitalAdmin["reports.view"], true, "Hospital administrators can v
 assert.equal(hospitalAdmin["patients.view"], undefined, "Hospital administrators do not inherit patient chart access.");
 assert.equal(hospitalAdmin["clinical.view"], undefined, "Hospital administrators do not inherit clinical access.");
 assert.equal(hospitalAdmin["billing.view"], undefined, "Hospital administrators do not inherit cashier access.");
+assert.equal(hospitalAdmin["notifications.view"], undefined, "Hospital administrators cannot view sensitive system notification alerts by default.");
 
 const admin = resolvePermissions("IT_ADMIN", {}, {});
 assert.equal(admin["roles.manage"], true);
+assert.equal(admin["notifications.view"], true, "IT administrators can view sensitive system alerts.");
 assert.equal(admin.controlled_substance_override, false, "System administration does not grant professional controlled-substance authority.");
 
 console.log("RBAC smoke tests passed.");
