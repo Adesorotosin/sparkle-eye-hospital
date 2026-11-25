@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { PERMISSION_CATALOG, PERMISSION_KEYS } from "@/lib/permissions";
+import { PERMISSION_CATALOG, PERMISSION_KEYS, resolvePermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -14,7 +14,7 @@ function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a
 
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("roles.manage");
     const { data, error } = await supabaseServer.from("custom_roles").select("id,name,slug,description,base_role,permissions,is_active,created_at,updated_at").order("name");
     if (error) throw error;
     return json({ roles: data ?? [], permissions: PERMISSION_CATALOG.filter((item) => !item.group.startsWith("Legacy")) });
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireRole(["IT_ADMIN"]);
+    const actor = await requirePermission("roles.manage");
     const body = await request.json();
     const name = typeof body.name === "string" ? body.name.trim() : "";
     const baseRole = body.baseRole;
@@ -36,6 +36,14 @@ export async function POST(request: Request) {
     const allowed = ["HOSPITAL_ADMIN","OPHTHALMOLOGIST","DOCTOR","PHARMACIST","NURSE","CASHIER","RECEPTIONIST","LAB_SCIENTIST","OPTICIAN","OPTOMETRIST","INVENTORY_MANAGER"];
     if (!name || name.length > 80 || !slug || !allowed.includes(baseRole) || !validPermissions(permissions)) return json({ error: "Provide a role name, valid predefined base role, and supported boolean permissions." }, 400);
     if (baseRole === "IT_ADMIN") return json({ error: "Custom roles cannot inherit IT administrator authority." }, 400);
+    const basePermissions = resolvePermissions(baseRole, {}, {});
+    const targetPermissions = resolvePermissions(baseRole, permissions, {});
+    if (actor.role !== "IT_ADMIN") {
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && basePermissions[permission] !== true && actor.permissions[permission] !== true
+      );
+      if (escalated.length) return json({ error: "You cannot add permissions beyond your own authority to a custom role." }, 403);
+    }
     const { data, error } = await supabaseServer.from("custom_roles").insert({ name, slug, description, base_role: baseRole, permissions, created_by: actor.id, updated_by: actor.id }).select("id,name,slug,description,base_role,permissions,is_active,created_at,updated_at").single();
     if (error) {
       if (error.code === "23505") return json({ error: "A custom role with that name already exists." }, 409);
