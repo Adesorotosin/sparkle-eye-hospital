@@ -32,6 +32,14 @@ const receptionist = resolvePermissions("RECEPTIONIST", {}, {});
 assert.equal(receptionist["patients.register"], true);
 assert.equal(receptionist["clinical.view"], undefined, "Reception must not inherit clinical chart access.");
 
+const hospitalAdmin = resolvePermissions("HOSPITAL_ADMIN", {}, {});
+assert.equal(hospitalAdmin["staff.manage"], true, "Hospital administrators can manage staff.");
+assert.equal(hospitalAdmin["roles.manage"], true, "Hospital administrators can manage custom roles.");
+assert.equal(hospitalAdmin["reports.view"], true, "Hospital administrators can view operational reports.");
+assert.equal(hospitalAdmin["patients.view"], undefined, "Hospital administrators do not inherit patient chart access.");
+assert.equal(hospitalAdmin["clinical.view"], undefined, "Hospital administrators do not inherit clinical access.");
+assert.equal(hospitalAdmin["billing.view"], undefined, "Hospital administrators do not inherit cashier access.");
+
 const admin = resolvePermissions("IT_ADMIN", {}, {});
 assert.equal(admin["roles.manage"], true);
 assert.equal(admin.controlled_substance_override, false, "System administration does not grant professional controlled-substance authority.");
