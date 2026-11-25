@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requirePermission } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { registerPatient } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
@@ -21,7 +21,8 @@ const PATIENT_CREATE_ROLES = [
 
 export async function GET(request: NextRequest) {
   try {
-    const staff = await requirePermission("patients.view");
+    const staff = await requireRole([...PATIENT_READ_ROLES]);
+    await requirePermission("patients.view");
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search")?.trim() || "";
@@ -131,7 +132,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const staff = await requirePermission("patients.register");
+    const staff = await requireRole([...PATIENT_CREATE_ROLES]);
+    await requirePermission("patients.register");
 
     const body = await request.json();
 
