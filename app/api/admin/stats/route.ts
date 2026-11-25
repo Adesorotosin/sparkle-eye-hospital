@@ -2,13 +2,13 @@
 
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 // --- GET: Real headline numbers for the Admin dashboard ---
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("reports.view");
 
     const [
       { data: paidInvoices, error: revenueError },

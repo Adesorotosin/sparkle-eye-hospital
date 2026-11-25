@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export interface OptometryReferralResponse {
   success: boolean;
@@ -19,6 +19,7 @@ export async function referPatientToOptometry(
       "OPHTHALMOLOGIST",
       "DOCTOR",
     ]);
+    await requirePermission("clinical.diagnostics.order");
 
     const normalizedCode = patientCode?.trim();
 

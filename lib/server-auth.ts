@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { resolvePermissions } from "@/lib/permissions";
 
 import {
   generateSessionToken,
@@ -12,6 +13,7 @@ import {
 
 export type UserRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
@@ -32,6 +34,9 @@ export interface AuthenticatedStaff {
   role: UserRole;
   title: string | null;
   department: string | null;
+  permissions: Record<string, boolean>;
+  customRoleId: string | null;
+  customRoleName: string | null;
 }
 
 export function normalizeRole(value: string): string {
@@ -132,6 +137,9 @@ export async function getAuthenticatedStaff(): Promise<
           role,
           title,
           department,
+          permissions,
+          custom_role_id,
+          custom_role:custom_roles!staff_custom_role_id_fkey (name, permissions, is_active),
           is_active,
           deleted_at
         )
@@ -179,17 +187,37 @@ export async function getAuthenticatedStaff(): Promise<
     return null;
   }
 
+  const customRole = Array.isArray(staff.custom_role)
+    ? staff.custom_role[0]
+    : staff.custom_role;
+
+  const normalizedRole = normalizeRole(staff.role);
+  const customRolePermissions = customRole?.is_active && customRole.permissions && typeof customRole.permissions === "object"
+    ? customRole.permissions as Record<string, boolean>
+    : {};
+  const staffPermissions = staff.permissions && typeof staff.permissions === "object" && !Array.isArray(staff.permissions)
+    ? staff.permissions as Record<string, boolean>
+    : {};
+  const effectivePermissions = staff.custom_role_id && !customRole?.is_active
+    ? {}
+    : resolvePermissions(
+        normalizedRole,
+        customRolePermissions,
+        staffPermissions
+      );
+
   return {
     id: staff.id,
     staffId: staff.staff_id,
     username: staff.username,
     name: staff.name,
     email: staff.email,
-    role: normalizeRole(
-      staff.role
-    ) as UserRole,
+    role: normalizedRole as UserRole,
     title: staff.title,
     department: staff.department,
+    permissions: effectivePermissions,
+    customRoleId: staff.custom_role_id ?? null,
+    customRoleName: customRole?.is_active ? customRole.name : null,
   };
 }
 
@@ -214,6 +242,20 @@ export async function requireRole(
     throw new Error("FORBIDDEN");
   }
 
+  return staff;
+}
+
+export async function requirePermission(permission: string): Promise<AuthenticatedStaff> {
+  const staff = await requireAuth();
+  if (staff.permissions[permission] !== true) throw new Error("FORBIDDEN");
+  return staff;
+}
+
+export async function requireAnyPermission(permissions: string[]): Promise<AuthenticatedStaff> {
+  const staff = await requireAuth();
+  if (!permissions.some((permission) => staff.permissions[permission] === true)) {
+    throw new Error("FORBIDDEN");
+  }
   return staff;
 }
 

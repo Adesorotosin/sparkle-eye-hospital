@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 function jsonNoStore(body: unknown, init?: ResponseInit) {
@@ -10,7 +10,7 @@ function jsonNoStore(body: unknown, init?: ResponseInit) {
 
 export async function GET() {
   try {
-    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    const staff = await requirePermission("appointments.view");
 
     const { data, error } = await supabaseServer
       .from("staff")

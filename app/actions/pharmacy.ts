@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 import { recalcInvoice } from "@/lib/patient-flow";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 const PHARMACY_READ_ROLES = [
   "IT_ADMIN",
@@ -60,6 +60,7 @@ export async function getPharmacyPatient(
 ) {
   try {
     await requireRole([...PHARMACY_READ_ROLES]);
+    await requirePermission("clinical.prescriptions.view");
 
     const code = patientCode?.trim();
 
@@ -214,6 +215,7 @@ export async function getPharmacyPatient(
 export async function getPharmacyQueue() {
   try {
     await requireRole([...PHARMACY_READ_ROLES]);
+    await requirePermission("clinical.prescriptions.view");
 
     const {
       data: prescriptions,
@@ -384,6 +386,7 @@ export async function createPharmacyPrescription(
       await requireRole([
         ...PHARMACY_WRITE_ROLES,
       ]);
+    await requirePermission("pharmacy.dispense");
 
     const patientCode =
       input.patientCode?.trim();
@@ -575,6 +578,7 @@ export async function createPharmacyPrescription(
 export async function dispensePatientPrescriptions(patientCode: string) {
   try {
     const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    await requirePermission("pharmacy.dispense");
 
     const code = patientCode?.trim();
 
@@ -683,6 +687,7 @@ export async function deferPrescriptionsDueToCost(
 ) {
   try {
     const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    await requirePermission("pharmacy.dispense");
     const code = patientCode?.trim();
     const ids = [...new Set((prescriptionIds ?? []).map((id) => id.trim()).filter(Boolean))];
 
@@ -760,6 +765,7 @@ export async function deferPrescriptionsDueToCost(
 export async function restoreDeferredPrescriptionToBill(prescriptionId: string) {
   try {
     const staff = await requireRole([...PHARMACY_WRITE_ROLES]);
+    await requirePermission("pharmacy.dispense");
     const id = prescriptionId?.trim();
     if (!id) return { success: false, message: "Prescription ID is required." };
 
@@ -833,6 +839,7 @@ export async function restoreDeferredPrescriptionToBill(prescriptionId: string) 
 export async function markPrescriptionRequestReviewed(prescriptionId: string) {
   try {
     await requireRole([...PHARMACY_WRITE_ROLES]);
+    await requirePermission("pharmacy.dispense");
     const id = prescriptionId?.trim();
     if (!id) return { success: false, message: "Prescription request ID is required." };
 

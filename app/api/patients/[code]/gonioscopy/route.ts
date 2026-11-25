@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getPatientByCode } from "@/lib/patient-flow";
 
@@ -13,7 +13,8 @@ export async function PATCH(
   }
 ) {
   try {
-    await requireRole(["IT_ADMIN", "OPHTHALMOLOGIST", "DOCTOR"]);
+    await requireRole(["IT_ADMIN","OPHTHALMOLOGIST","DOCTOR"]);
+    await requirePermission("clinical.notes.update");
 
     const { code } = await params;
     const patientCode = code?.trim();

@@ -1,0 +1,49 @@
+import assert from "node:assert/strict";
+import { resolvePermissions } from "../lib/permissions.ts";
+
+const doctor = resolvePermissions("DOCTOR", {}, {});
+assert.equal(doctor["clinical.view"], true, "Doctors inherit clinical view.");
+assert.equal(doctor["clinical.prescriptions.create"], true, "Doctors inherit prescribing.");
+
+const restrictedDoctor = resolvePermissions(
+  "DOCTOR",
+  { "clinical.prescriptions.create": false, "inventory.view": true },
+  {}
+);
+assert.equal(restrictedDoctor["clinical.prescriptions.create"], false, "Custom role can deny a base permission.");
+assert.equal(restrictedDoctor["inventory.view"], true, "Custom role can add a permission.");
+
+const individualOverride = resolvePermissions(
+  "DOCTOR",
+  { "clinical.view": false },
+  { "clinical.view": true }
+);
+assert.equal(individualOverride["clinical.view"], true, "Staff-specific overrides take precedence.");
+
+const legacyOverride = resolvePermissions(
+  "DOCTOR",
+  {},
+  { view_patient_records: false, edit_clinical_notes: false }
+);
+assert.equal(legacyOverride["patients.view"], false, "Legacy patient-view overrides map to the canonical permission.");
+assert.equal(legacyOverride["clinical.notes.update"], false, "Legacy clinical-note overrides map to the canonical permission.");
+
+const receptionist = resolvePermissions("RECEPTIONIST", {}, {});
+assert.equal(receptionist["patients.register"], true);
+assert.equal(receptionist["clinical.view"], undefined, "Reception must not inherit clinical chart access.");
+
+const hospitalAdmin = resolvePermissions("HOSPITAL_ADMIN", {}, {});
+assert.equal(hospitalAdmin["staff.manage"], true, "Hospital administrators can manage staff.");
+assert.equal(hospitalAdmin["roles.manage"], true, "Hospital administrators can manage custom roles.");
+assert.equal(hospitalAdmin["reports.view"], true, "Hospital administrators can view operational reports.");
+assert.equal(hospitalAdmin["patients.view"], undefined, "Hospital administrators do not inherit patient chart access.");
+assert.equal(hospitalAdmin["clinical.view"], undefined, "Hospital administrators do not inherit clinical access.");
+assert.equal(hospitalAdmin["billing.view"], undefined, "Hospital administrators do not inherit cashier access.");
+assert.equal(hospitalAdmin["notifications.view"], undefined, "Hospital administrators cannot view sensitive system notification alerts by default.");
+
+const admin = resolvePermissions("IT_ADMIN", {}, {});
+assert.equal(admin["roles.manage"], true);
+assert.equal(admin["notifications.view"], true, "IT administrators can view sensitive system alerts.");
+assert.equal(admin.controlled_substance_override, false, "System administration does not grant professional controlled-substance authority.");
+
+console.log("RBAC smoke tests passed.");

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 const INVENTORY_READ_ROLES = [
   "IT_ADMIN",
@@ -14,7 +14,8 @@ const INVENTORY_READ_ROLES = [
   "INVENTORY_MANAGER",
 ] as const;
 
-const INVENTORY_MANAGER_ROLES = ["IT_ADMIN"] as const;
+const INVENTORY_ITEM_CREATE_ROLES = ["IT_ADMIN"] as const;
+const INVENTORY_MANAGER_ROLES = ["IT_ADMIN", "INVENTORY_MANAGER"] as const;
 const INVENTORY_STOCK_ROLES = [
   "IT_ADMIN",
   "OPTICIAN",
@@ -83,6 +84,7 @@ function refreshInventoryPaths() {
 export async function getInventoryData() {
   try {
     const staff = await requireRole([...INVENTORY_READ_ROLES]);
+    await requirePermission("inventory.view");
     const [itemsResult, suppliersResult, movementsResult] = await Promise.all([
       supabaseServer
         .from("inventory_items")
@@ -139,7 +141,8 @@ export async function createInventoryItem(input: {
   unitCost: number;
 }) {
   try {
-    const staff = await requireRole([...INVENTORY_MANAGER_ROLES]);
+    const staff = await requireRole([...INVENTORY_ITEM_CREATE_ROLES]);
+    await requirePermission("inventory.manage");
     const sku = input.sku?.trim().toUpperCase();
     const name = input.name?.trim();
     const category = input.category?.trim();
@@ -191,6 +194,7 @@ export async function receiveInventoryStock(input: {
 }) {
   try {
     const staff = await requireRole([...INVENTORY_MANAGER_ROLES]);
+    await requirePermission("inventory.manage");
     if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
       return { success: false, message: "Select an item and enter a whole-number quantity greater than zero." };
     }
@@ -241,6 +245,7 @@ export async function issueInventoryStock(input: {
 }) {
   try {
     const staff = await requireRole([...INVENTORY_STOCK_ROLES]);
+    await requirePermission("inventory.issue");
     if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
       return { success: false, message: "Select an item and enter a whole-number quantity greater than zero." };
     }
@@ -303,6 +308,7 @@ export async function recordPharmacyDailySale(input: {
 }) {
   try {
     const staff = await requireRole(["IT_ADMIN", "PHARMACIST"]);
+    await requirePermission("pharmacy.dispense");
     if (!input.itemId || !Number.isInteger(input.quantity) || input.quantity <= 0) {
       return { success: false, message: "Select a pharmacy item and enter a whole-number quantity greater than zero." };
     }
@@ -348,6 +354,7 @@ export async function createInventorySupplier(input: {
 }) {
   try {
     const staff = await requireRole([...INVENTORY_MANAGER_ROLES]);
+    await requirePermission("inventory.manage");
     const name = input.name?.trim();
     if (!name) return { success: false, message: "Supplier name is required." };
     const { error } = await supabaseServer.from("inventory_suppliers").insert({

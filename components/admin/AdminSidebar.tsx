@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,16 +29,36 @@ export default function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null);
+  const [staffProfile, setStaffProfile] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load permissions.");
+        return response.json();
+      })
+      .then((data) => {
+        if (active) {
+          setPermissions(data?.staff?.permissions ?? {});
+          setStaffProfile(data?.staff ? { name: data.staff.name, role: String(data.staff.role).replace(/_/g, " ") } : null);
+        }
+      })
+      .catch(() => { if (active) setPermissions({}); });
+    return () => { active = false; };
+  }, []);
 
   const navItems = [
-    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
-    { name: "Staff & Access Control", href: "/admin/access-control", icon: Users },
-    { name: "Audit Logs", href: "/admin/audit", icon: ShieldAlert },
-    { name: "Reports & Analytics", href: "/admin/reports", icon: BarChart3 },
-    { name: "Notifications & Alerts", href: "/admin/notifications", icon: Bell },
-    { name: "Inventory Overview", href: "/admin#inventory-overview", icon: Boxes },
-    { name: "Settings", href: "/admin/settings", icon: Settings },
-    { name: "Procedure Prices", href: "/admin/procedure-prices", icon: Tags },
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard, permission: "reports.view" },
+    { name: "Staff & Access Control", href: "/admin/access-control", icon: Users, permission: "staff.view" },
+    { name: "Custom Roles", href: "/admin/roles", icon: ShieldAlert, permission: "roles.manage" },
+    { name: "Audit Logs", href: "/admin/audit", icon: ShieldAlert, permission: "audit.view" },
+    { name: "Reports & Analytics", href: "/admin/reports", icon: BarChart3, permission: "reports.view" },
+    { name: "Notifications & Alerts", href: "/admin/notifications", icon: Bell, permission: "notifications.manage" },
+    { name: "Inventory Overview", href: "/admin#inventory-overview", icon: Boxes, permission: "inventory.view" },
+    { name: "Settings", href: "/admin/settings", icon: Settings, permission: "settings.manage" },
+    { name: "Procedure Prices", href: "/admin/procedure-prices", icon: Tags, permission: "settings.manage" },
   ];
 
   const isActive = (href: string) => {
@@ -94,7 +114,7 @@ export default function AdminSidebar({
 
         {/* Sidebar Navigation Links */}
         <nav className="p-3 space-y-1.5">
-          {navItems.map((item) => {
+          {(permissions ? navItems.filter((item) => permissions[item.permission] === true) : []).map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
             return (
@@ -158,10 +178,10 @@ export default function AdminSidebar({
             {!collapsed && (
               <div className="text-left truncate">
                 <p className="text-xs font-semibold leading-tight text-white truncate">
-                  Dr. Alabi Benson
+                  {staffProfile?.name ?? "Hospital Staff"}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate">
-                  Chief Administrator
+                <p className="text-[10px] text-slate-400 truncate capitalize">
+                  {staffProfile?.role ?? "Authorised staff"}
                 </p>
               </div>
             )}

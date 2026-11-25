@@ -15,6 +15,7 @@ import {
   ChevronDown,
   TestTube2,
   BadgeCheck,
+  type LucideIcon,
 } from "lucide-react";
 
 type ActivePatient = {
@@ -31,6 +32,23 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
 
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [activePatient, setActivePatient] = useState<ActivePatient | null>(null);
+  const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load staff permissions.");
+        return response.json();
+      })
+      .then((data) => {
+        if (active) setPermissions(data?.staff?.permissions ?? {});
+      })
+      .catch(() => {
+        if (active) setPermissions({});
+      });
+    return () => { active = false; };
+  }, []);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize the active encounter banner with route changes.
   useEffect(() => {
@@ -87,14 +105,14 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     window.location.href = "/";
   };
 
-  const navItems = [
-    { name: "Overview", href: "/doctor", icon: LayoutDashboard },
-    { name: "Patient Records", href: "/doctor/patients", icon: Users },
-    { name: "Investigation Room", href: "/diagnostics", icon: TestTube2 },
-    { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope },
-    { name: "Appointments", href: "/appointments", icon: Calendar },
-    { name: "Optical Inventory", href: "/inventory", icon: Package },
-    { name: "Optical Charge Approvals", href: "/doctor/optical-approvals", icon: BadgeCheck },
+  const navItems: Array<{ name: string; href: string; icon: LucideIcon; permission?: string; anyPermission?: string[] }> = [
+    { name: "Overview", href: "/doctor", icon: LayoutDashboard, permission: "clinical.view" },
+    { name: "Patient Records", href: "/doctor/patients", icon: Users, permission: "patients.view" },
+    { name: "Investigation Room", href: "/diagnostics", icon: TestTube2, anyPermission: ["clinical.diagnostics.order", "clinical.results.view"] },
+    { name: "Surgical Suite", href: "/doctor/surgery", icon: Stethoscope, permission: "surgery.manage" },
+    { name: "Appointments", href: "/appointments", icon: Calendar, permission: "appointments.view" },
+    { name: "Optical Inventory", href: "/inventory", icon: Package, permission: "inventory.view" },
+    { name: "Optical Charge Approvals", href: "/doctor/optical-approvals", icon: BadgeCheck, permission: "optical.orders.manage" },
   ];
 
   const allergyItems = (activePatient?.allergies ?? "")
@@ -144,7 +162,10 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
               Menu
             </span>
 
-            {navItems.map((item) => {
+            {(permissions ? navItems.filter((item) =>
+              (!item.permission || permissions[item.permission] === true) &&
+              (!item.anyPermission || item.anyPermission.some((permission) => permissions[permission] === true))
+            ) : []).map((item) => {
               const Icon = item.icon;
 
               const isActive =

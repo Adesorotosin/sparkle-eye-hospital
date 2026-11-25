@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 type DateRange =
@@ -564,9 +564,7 @@ export async function POST(
   request: Request
 ) {
   try {
-    const staff = await requireRole([
-      "IT_ADMIN",
-    ]);
+    const staff = await requirePermission("reports.view");
 
     let body: ReportRequestBody;
 

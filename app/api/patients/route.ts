@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { registerPatient } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
@@ -22,6 +22,7 @@ const PATIENT_CREATE_ROLES = [
 export async function GET(request: NextRequest) {
   try {
     const staff = await requireRole([...PATIENT_READ_ROLES]);
+    await requirePermission("patients.view");
 
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search")?.trim() || "";
@@ -92,14 +93,14 @@ export async function GET(request: NextRequest) {
       dateOfBirth: patient.date_of_birth ?? null,
       gender: patient.gender,
       phone: patient.phone,
-      allergies: staff.role === "RECEPTIONIST" ? null : patient.allergies,
+      allergies: staff.permissions["clinical.view"] === true || staff.role === "PHARMACIST" ? patient.allergies : null,
       address: patient.address ?? null,
       nextOfKin: patient.next_of_kin ?? null,
       nextOfKinPhone: patient.next_of_kin_phone ?? null,
       status: patient.status,
       isWalkIn: patient.is_walk_in,
       lastVisitAt: patient.last_visit_at,
-      primaryComplaint: staff.role === "RECEPTIONIST" ? null : patient.primary_complaint ?? null,
+      primaryComplaint: staff.permissions["clinical.view"] === true ? patient.primary_complaint ?? null : null,
     }));
 
     return NextResponse.json({ patients });
@@ -132,6 +133,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const staff = await requireRole([...PATIENT_CREATE_ROLES]);
+    await requirePermission("patients.register");
 
     const body = await request.json();
 

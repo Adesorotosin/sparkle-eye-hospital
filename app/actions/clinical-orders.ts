@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export type DiagnosticOrderInput = {
   patientCode: string;
@@ -72,6 +72,7 @@ export async function createDiagnosticOrder(
       "OPHTHALMOLOGIST",
       "DOCTOR",
     ]);
+    await requirePermission("clinical.diagnostics.order");
 
     const name = input.name?.trim();
     const price = Number(input.price);
@@ -236,6 +237,7 @@ export async function createExternalDiagnosticOrder(input: {
       "DOCTOR",
       "OPHTHALMOLOGIST",
     ]);
+    await requirePermission("clinical.diagnostics.order");
 
     const fullName = input.fullName?.trim();
     const referringCenter = input.referringCenter?.trim();
@@ -376,6 +378,7 @@ export async function createPrescription(
       "OPHTHALMOLOGIST",
       "DOCTOR",
     ]);
+    await requirePermission("clinical.prescriptions.create");
 
     const prescriptionText = input.prescriptionText?.trim();
     if (!prescriptionText) {

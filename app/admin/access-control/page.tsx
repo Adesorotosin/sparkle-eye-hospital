@@ -33,10 +33,13 @@ interface StaffMember {
   department: string | null;
   assigned_facilities: string[] | string | null;
   permissions: Record<string, boolean> | null;
+  custom_role_id?: string | null;
   is_active: boolean;
   deleted_at: string | null;
   created_at: string;
 }
+
+interface CustomRoleOption { id: string; name: string; base_role: string; is_active: boolean; permissions: Record<string, boolean>; }
 
 interface PermissionGroup {
   id: string;
@@ -146,6 +149,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
+  HOSPITAL_ADMIN: "Hospital Administrator",
   IT_ADMIN: "IT Administrator",
   OPHTHALMOLOGIST: "Ophthalmologist",
   DOCTOR: "Doctor",
@@ -156,6 +160,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_STYLES: Record<string, string> = {
+  HOSPITAL_ADMIN: "bg-indigo-50 text-indigo-700 border-indigo-200",
   IT_ADMIN:
     "bg-red-50 text-red-700 border-red-200",
   OPHTHALMOLOGIST:
@@ -176,6 +181,23 @@ const DEFAULT_PERMISSIONS: Record<
   string,
   Record<string, boolean>
 > = {
+  HOSPITAL_ADMIN: {
+    view_patient_records: false,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: true,
+    insurance_claims_access: false,
+    revenue_dashboard: true,
+    approve_refunds: false,
+    user_account_management: true,
+    system_configuration: true,
+    audit_log_access: true,
+    api_key_management: false,
+  },
   IT_ADMIN: {
     view_patient_records: true,
     edit_clinical_notes: true,
@@ -350,15 +372,51 @@ function getFacilitiesText(
   return facilities || "Not assigned";
 }
 
-function getPermissionsForStaff(
-  staff: StaffMember | null
+function getInheritedPermissions(
+  staff: StaffMember | null,
+  customRoles: CustomRoleOption[] = [],
+  customRoleId?: string | null
 ) {
-  if (!staff) {
-    return {};
+  if (!staff) return {};
+  const selectedRoleId = customRoleId === undefined ? staff.custom_role_id : customRoleId;
+  const customRole = customRoles.find((role) => role.id === selectedRoleId && role.is_active);
+  const customPermissions = customRole?.permissions ?? {};
+  const canonicalToLegacy: Record<string, string> = {
+    "patients.view": "view_patient_records",
+    "clinical.notes.update": "edit_clinical_notes",
+    "clinical.diagnostics.order": "order_diagnostics",
+    "clinical.results.view": "view_lab_results",
+    "clinical.prescriptions.create": "issue_prescriptions",
+    "pharmacy.dispense": "pharmacy_dispensing_approval",
+    "billing.refund": "approve_refunds",
+    "staff.manage": "user_account_management",
+    "audit.view": "audit_log_access",
+    "settings.manage": "system_configuration",
+    "reports.view": "view_financial_reports",
+  };
+  const legacyFromCustom = Object.fromEntries(
+    Object.entries(canonicalToLegacy)
+      .filter(([canonical]) => Object.prototype.hasOwnProperty.call(customPermissions, canonical))
+      .map(([canonical, legacy]) => [legacy, customPermissions[canonical]])
+  );
+  if (Object.prototype.hasOwnProperty.call(customPermissions, "reports.view")) {
+    legacyFromCustom.view_financial_reports = customPermissions["reports.view"];
+    legacyFromCustom.revenue_dashboard = customPermissions["reports.view"];
   }
-
   return {
     ...(DEFAULT_PERMISSIONS[staff.role] ?? {}),
+    ...legacyFromCustom,
+  };
+}
+
+function getPermissionsForStaff(
+  staff: StaffMember | null,
+  customRoles: CustomRoleOption[] = [],
+  customRoleId?: string | null
+) {
+  if (!staff) return {};
+  return {
+    ...getInheritedPermissions(staff, customRoles, customRoleId),
     ...(staff.permissions ?? {}),
   };
 }
@@ -374,6 +432,8 @@ export default function AccessControlPage() {
   const [draftPermissions, setDraftPermissions] =
     useState<Record<string, boolean>>({});
   const [draftName, setDraftName] = useState("");
+  const [customRoles, setCustomRoles] = useState<CustomRoleOption[]>([]);
+  const [draftCustomRoleId, setDraftCustomRoleId] = useState("");
 
   const [searchTerm, setSearchTerm] =
     useState("");
@@ -510,6 +570,12 @@ export default function AccessControlPage() {
 
       setStaffList(staff);
 
+      const rolesResponse = await fetch("/api/admin/roles", { cache: "no-store" });
+      if (rolesResponse.ok) {
+        const rolesData = await rolesResponse.json();
+        setCustomRoles(Array.isArray(rolesData.roles) ? rolesData.roles : []);
+      }
+
       if (staff.length > 0) {
         const firstActive =
           staff.find(
@@ -552,16 +618,19 @@ export default function AccessControlPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable permission draft when the selected staff member changes.
       setDraftPermissions(
         getPermissionsForStaff(
-          selectedStaff
+          selectedStaff,
+          customRoles
         )
       );
       setDraftName(selectedStaff.name);
+      setDraftCustomRoleId(selectedStaff.custom_role_id ?? "");
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the editable permission draft when no staff member is selected.
       setDraftPermissions({});
       setDraftName("");
+      setDraftCustomRoleId("");
     }
-  }, [selectedStaff]);
+  }, [selectedStaff, customRoles]);
 
   function togglePermission(
     key: string
@@ -591,8 +660,13 @@ export default function AccessControlPage() {
               "application/json",
           },
           body: JSON.stringify({
-            permissions: draftPermissions,
+            permissions: Object.fromEntries(
+              Object.entries(draftPermissions).filter(([key, value]) =>
+                getInheritedPermissions(selectedStaff, customRoles, draftCustomRoleId)[key] !== value
+              )
+            ),
             name: draftName,
+            customRoleId: draftCustomRoleId || null,
           }),
         }
       );
@@ -912,6 +986,7 @@ export default function AccessControlPage() {
               </p>
             </div>
 
+            <a href="/admin/roles" className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-[#CBD5E1] text-sm font-semibold text-[#334155] hover:bg-slate-50">Manage Custom Roles</a>
             <a
               href="/admin/access-control/new"
               className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-semibold shadow-sm transition-colors"
@@ -1261,6 +1336,12 @@ export default function AccessControlPage() {
                         placeholder="Enter staff full name"
                       />
                       <p className="mt-2 text-xs text-slate-500">Update the name displayed across the staff directory and hospital workspace, then save changes below.</p>
+                      <label htmlFor="staff-custom-role" className="mb-2 mt-4 block text-xs font-semibold text-slate-700">Custom role (optional)</label>
+                      <select id="staff-custom-role" value={draftCustomRoleId} onChange={(event) => { const nextRoleId = event.target.value; setDraftCustomRoleId(nextRoleId); setDraftPermissions(getPermissionsForStaff(selectedStaff, customRoles, nextRoleId || null)); }} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="">Use predefined role only</option>
+                        {customRoles.filter((role) => role.is_active && role.base_role === selectedStaff.role).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                      </select>
+                      <p className="mt-2 text-xs text-slate-500">Only active custom roles based on {getRoleLabel(selectedStaff.role)} can be assigned.</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 pt-5 border-t border-[#E2E8F0]">

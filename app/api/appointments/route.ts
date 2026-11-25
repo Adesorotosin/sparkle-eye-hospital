@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 
 const APPOINTMENT_STATUSES = [
   "scheduled",
@@ -62,13 +62,8 @@ function toAppointment(row: Record<string, unknown>) {
 
 export async function GET(request: Request) {
   try {
-    const staff = await requireRole([
-      "IT_ADMIN",
-      "RECEPTIONIST",
-      "OPHTHALMOLOGIST",
-      "DOCTOR",
-      "NURSE",
-    ]);
+    const staff = await requireRole(["IT_ADMIN","RECEPTIONIST","OPHTHALMOLOGIST","DOCTOR","NURSE"]);
+    await requirePermission("appointments.view");
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
@@ -144,7 +139,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    const staff = await requireRole(["IT_ADMIN","RECEPTIONIST"]);
+    await requirePermission("appointments.manage");
     const body = await request.json();
 
     const id = typeof body?.id === "string" ? body.id.trim() : "";
@@ -243,6 +239,7 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   try {
     const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    await requirePermission("appointments.manage");
     const body = await request.json();
 
     const patientName =

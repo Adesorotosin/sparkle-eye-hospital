@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 const DEFAULT_MODULES = {
@@ -193,7 +193,7 @@ function sanitizeOperationalHours(value: unknown) {
 // GET — load persisted admin settings.
 export async function GET() {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requirePermission("settings.manage");
 
     const [
       { data: settings, error: settingsError },
@@ -323,7 +323,7 @@ export async function GET() {
 // PATCH — save persisted system settings.
 export async function PATCH(request: Request) {
   try {
-    const staff = await requireRole(["IT_ADMIN"]);
+    const staff = await requirePermission("settings.manage");
 
     let body: unknown;
 

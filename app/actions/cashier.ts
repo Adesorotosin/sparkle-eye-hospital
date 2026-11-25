@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export interface CashierQueueItem {
   id: string;
@@ -62,6 +62,7 @@ export async function getCashierDashboard(): Promise<{
       "IT_ADMIN",
       "CASHIER",
     ]);
+    await requirePermission("billing.view");
 
     const { start, end } =
       getLagosDayRange();

@@ -3,12 +3,14 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
+import { PERMISSION_KEYS, resolvePermissions } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
 const ALLOWED_ROLES = [
   "IT_ADMIN",
+  "HOSPITAL_ADMIN",
   "OPHTHALMOLOGIST",
   "DOCTOR",
   "PHARMACIST",
@@ -52,10 +54,9 @@ function isValidPermissions(
     return false;
   }
 
-  return Object.values(
-    value as Record<string, unknown>
-  ).every(
-    (permission) =>
+  return Object.entries(value as Record<string, unknown>).every(
+    ([key, permission]) =>
+      PERMISSION_KEYS.includes(key as (typeof PERMISSION_KEYS)[number]) &&
       typeof permission === "boolean"
   );
 }
@@ -104,7 +105,7 @@ function jsonNoStore(
 // --- GET: List staff for Admin > Access Control ---
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("staff.view");
 
     const {
       data: staff,
@@ -122,6 +123,7 @@ export async function GET() {
         department,
         assigned_facilities,
         permissions,
+        custom_role_id,
         is_active,
         deleted_at,
         created_at
@@ -185,7 +187,7 @@ export async function POST(
 ) {
   try {
     const currentUser =
-      await requireRole(["IT_ADMIN"]);
+      await requirePermission("staff.manage");
 
     let body: unknown;
 
@@ -226,6 +228,7 @@ export async function POST(
       department,
       assignedFacilities,
       permissions,
+      customRoleId,
     } =
       body as Record<string, unknown>;
 
@@ -398,6 +401,9 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (currentUser.role !== "IT_ADMIN" && cleanRole === "IT_ADMIN") {
+      return jsonNoStore({ error: "Only an IT administrator can create another IT administrator." }, { status: 403 });
+    }
 
     // -----------------------------------------
     // Optional field validation
@@ -482,6 +488,30 @@ export async function POST(
         ? {}
         : permissions;
 
+    let cleanCustomRoleId: string | null = null;
+    let cleanCustomRolePermissions: Record<string, boolean> = {};
+    if (customRoleId !== undefined && customRoleId !== null && customRoleId !== "") {
+      if (typeof customRoleId !== "string") return jsonNoStore({ error: "Invalid custom role." }, { status: 400 });
+      const { data: customRole, error: customRoleError } = await supabaseServer.from("custom_roles").select("id,base_role,is_active,permissions").eq("id", customRoleId).maybeSingle();
+      if (customRoleError) throw customRoleError;
+      if (!customRole || !customRole.is_active || customRole.base_role !== cleanRole || cleanRole === "IT_ADMIN") {
+        return jsonNoStore({ error: "The selected custom role must be active and based on the staff member's predefined role." }, { status: 400 });
+      }
+      cleanCustomRoleId = customRole.id;
+      cleanCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
+    }
+
+    if (currentUser.role !== "IT_ADMIN") {
+      const basePermissions = resolvePermissions(cleanRole, {}, {});
+      const targetPermissions = resolvePermissions(cleanRole, cleanCustomRolePermissions, cleanPermissions as Record<string, boolean>);
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && basePermissions[permission] !== true && currentUser.permissions[permission] !== true
+      );
+      if (escalated.length) {
+        return jsonNoStore({ error: "You cannot create a staff account with permissions you do not hold." }, { status: 403 });
+      }
+    }
+
     // -----------------------------------------
     // Hash password before database insertion
     // -----------------------------------------
@@ -514,6 +544,7 @@ export async function POST(
           cleanFacilities,
         permissions:
           cleanPermissions,
+        custom_role_id: cleanCustomRoleId,
         is_active: true,
       })
       .select(`
@@ -527,6 +558,7 @@ export async function POST(
         department,
         assigned_facilities,
         permissions,
+        custom_role_id,
         is_active,
         deleted_at,
         created_at

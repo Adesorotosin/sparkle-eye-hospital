@@ -14,6 +14,7 @@ create table staff (
   email text unique not null,
   role text not null check (role in (
     'IT_ADMIN',
+    'HOSPITAL_ADMIN',
     'OPHTHALMOLOGIST',
     'DOCTOR',
     'OPTOMETRIST',
@@ -36,7 +37,37 @@ create table staff (
 );
 
 -- ============================================================
--- PATIENTS
+-- CUSTOM STAFF ROLES (hybrid role-based access control)
+-- ============================================================
+create table custom_roles (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  description text,
+  base_role text not null check (base_role in (
+    'HOSPITAL_ADMIN','OPHTHALMOLOGIST','DOCTOR','PHARMACIST','NURSE','CASHIER',
+    'RECEPTIONIST','LAB_SCIENTIST','OPTICIAN','OPTOMETRIST','INVENTORY_MANAGER'
+  )),
+  permissions jsonb not null default '{}'::jsonb check (jsonb_typeof(permissions) = 'object'),
+  is_active boolean not null default true,
+  created_by uuid references staff(id) on delete set null,
+  updated_by uuid references staff(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint custom_roles_name_nonempty check (length(btrim(name)) > 0),
+  constraint custom_roles_slug_format check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+);
+
+alter table staff
+  add column custom_role_id uuid references custom_roles(id) on delete set null;
+
+create index idx_staff_custom_role_id on staff(custom_role_id) where custom_role_id is not null;
+create index idx_custom_roles_active on custom_roles(is_active, name);
+create index idx_custom_roles_created_by on custom_roles(created_by) where created_by is not null;
+create index idx_custom_roles_updated_by on custom_roles(updated_by) where updated_by is not null;
+
+alter table custom_roles enable row level security;
+
 -- ============================================================
 create table patients (
   id uuid primary key default gen_random_uuid(),

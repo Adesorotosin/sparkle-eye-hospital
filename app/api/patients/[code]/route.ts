@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getPatientRecord } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,7 @@ export async function GET(
 ) {
   try {
     const staff = await requireRole([...PATIENT_READ_ROLES]);
+    await requirePermission("patients.view");
 
     const resolvedParams = await params;
     const patientCode = resolvedParams?.code?.trim();
@@ -44,7 +45,7 @@ export async function GET(
     }
 
     const { data: patientRow, error: patientLookupError } = await supabaseServer
-      .from("patients").select("id").eq("patient_code", patientCode).maybeSingle();
+      .from("patients").select("id, patient_code, full_name, age, gender, phone, coverage_plan, address, registration_number, status, is_walk_in, created_at, last_visit_at, allergies").eq("patient_code", patientCode).maybeSingle();
     if (patientLookupError) throw patientLookupError;
     if (!patientRow) return NextResponse.json({ error: "Patient not found." }, { status: 404 });
 
@@ -65,6 +66,27 @@ export async function GET(
         console.error("Patient chart access audit failed:", auditError);
         return NextResponse.json({ error: "Patient access could not be audited. Please retry." }, { status: 500 });
       }
+    }
+
+    if (staff.permissions["clinical.view"] !== true) {
+      return NextResponse.json({
+        patient: {
+          id: patientRow.id,
+          patientId: patientRow.patient_code,
+          fullName: patientRow.full_name,
+          age: patientRow.age,
+          gender: patientRow.gender,
+          phone: patientRow.phone,
+          coveragePlan: patientRow.coverage_plan,
+          address: patientRow.address,
+          registrationNumber: patientRow.registration_number,
+          status: patientRow.status,
+          isWalkIn: patientRow.is_walk_in,
+          createdAt: patientRow.created_at,
+          lastVisitAt: patientRow.last_visit_at,
+          allergies: staff.role === "PHARMACIST" ? patientRow.allergies : null,
+        },
+      });
     }
 
     const patient = await getPatientRecord(patientCode);
@@ -109,6 +131,7 @@ export async function PATCH(
 ) {
   try {
     const staff = await requireRole([...PATIENT_UPDATE_ROLES]);
+    await requirePermission("patients.update");
 
     const resolvedParams = await params;
     const patientCode = resolvedParams?.code?.trim();

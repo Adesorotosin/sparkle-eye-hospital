@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 type Row = Record<string, unknown>;
@@ -26,7 +26,7 @@ function firstDate(row: Row, keys: string[]): Date | null {
 
 export async function GET() {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("reports.view");
 
     const [invoiceResult, patientResult] = await Promise.all([
       supabaseServer.from("invoices").select("*"),

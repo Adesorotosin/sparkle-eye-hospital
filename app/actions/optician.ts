@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 type OpticalOrderStatus =
   | "referred"
@@ -157,6 +157,7 @@ export async function getOpticianQueue(): Promise<{
       "OPTICIAN",
       "INVENTORY_MANAGER",
     ]);
+    await requirePermission("optical.orders.view");
 
     const {
       data: orders,
@@ -516,6 +517,7 @@ export async function createOpticalOrder(
       "DOCTOR",
       "OPHTHALMOLOGIST",
     ]);
+    await requirePermission("optical.orders.manage");
 
     const normalizedCode =
       patientCode?.trim();
@@ -758,6 +760,7 @@ export async function startOpticianMeasurements(
       "IT_ADMIN",
       "INVENTORY_MANAGER",
     ]);
+    await requirePermission("optical.orders.manage");
 
     const normalizedId =
       orderId?.trim();
@@ -927,6 +930,7 @@ export async function getOpticianPatient(
       "IT_ADMIN",
       "OPTICIAN",
     ]);
+    await requirePermission("optical.orders.view");
 
     const normalizedCode =
       patientCode?.trim();
@@ -1301,6 +1305,7 @@ export async function saveOpticalOrder(
       "IT_ADMIN",
       "INVENTORY_MANAGER",
     ]);
+    await requirePermission("optical.orders.manage");
 
     const orderId =
       input.orderId?.trim();
@@ -1512,6 +1517,7 @@ export interface OpticalChargeApprovalItem {
 export async function submitOpticalChargeForApproval(orderId: string): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
+    await requirePermission("inventory.manage");
     const normalizedId = orderId?.trim();
     if (!normalizedId) return { success: false, message: "Optical order ID is required." };
 
@@ -1574,6 +1580,7 @@ export async function submitOpticalChargeForApproval(orderId: string): Promise<O
 export async function getPendingOpticalChargeApprovals(): Promise<{ success: boolean; message?: string; items: OpticalChargeApprovalItem[] }> {
   try {
     await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("optical.orders.view");
     const { data: orders, error } = await supabaseServer
       .from("optical_orders")
       .select("id, patient_id, status, optical_charge, frame_selection, lens_type, lens_material, lens_coating, charge_approval_status, charge_submitted_at, patients(patient_code, full_name)")
@@ -1613,6 +1620,7 @@ export async function decideOpticalChargeApproval(
 ): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("optical.orders.manage");
     const normalizedId = orderId?.trim();
     if (!normalizedId) return { success: false, message: "Optical order ID is required." };
     const normalizedNote = note.trim();
@@ -1698,6 +1706,7 @@ export async function markOpticalOrderReady(
 ): Promise<OpticianActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
+    await requirePermission("inventory.manage");
     const normalizedId = orderId?.trim();
     if (!normalizedId) {
       return { success: false, message: "Optical order ID is required." };
@@ -1781,6 +1790,7 @@ export async function markOpticalOrderReady(
  */
 export async function markOpticalOrderCollected(orderId: string) {
   const user = await requireRole(["IT_ADMIN", "INVENTORY_MANAGER"]);
+    await requirePermission("inventory.manage");
 
   const { data: order, error: orderError } = await supabaseServer
     .from("optical_orders")

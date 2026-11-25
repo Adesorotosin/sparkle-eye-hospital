@@ -2,6 +2,7 @@
 
 export type UserRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
@@ -23,7 +24,7 @@ export interface UserSession {
 
 // Central route access policy used by middleware and server-side checks.
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  "/admin": ["IT_ADMIN"],
+  "/admin": ["IT_ADMIN", "HOSPITAL_ADMIN"],
   "/audit": ["IT_ADMIN"],
 
   "/doctor": [

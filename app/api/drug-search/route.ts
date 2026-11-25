@@ -7,6 +7,7 @@
 // https://clinicaltables.nlm.nih.gov/
 
 import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/server-auth";
 
 const MAX_QUERY_LENGTH = 100;
 const MAX_SUGGESTIONS = 8;
@@ -14,6 +15,7 @@ const REQUEST_TIMEOUT_MS = 5000;
 
 export async function GET(request: Request) {
   try {
+    await requirePermission("clinical.prescriptions.view");
     const { searchParams } = new URL(request.url);
     const term = searchParams.get("q")?.trim() ?? "";
 
@@ -89,6 +91,8 @@ export async function GET(request: Request) {
       }
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "UNAUTHENTICATED") return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    if (error instanceof Error && error.message === "FORBIDDEN") return NextResponse.json({ error: "You are not authorized to search medications." }, { status: 403 });
     if (
       error instanceof Error &&
       error.name === "AbortError"

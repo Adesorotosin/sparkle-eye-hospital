@@ -28,6 +28,7 @@ import {
 
 type StaffRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
@@ -57,6 +58,7 @@ type PermissionState =
   | "api_key_management";
 
 const ROLE_LABELS: Record<StaffRole, string> = {
+  HOSPITAL_ADMIN: "Hospital Administrator",
   IT_ADMIN: "IT Administrator",
   OPHTHALMOLOGIST: "Ophthalmologist",
   DOCTOR: "Doctor",
@@ -71,6 +73,23 @@ const ROLE_LABELS: Record<StaffRole, string> = {
 };
 
 const ROLE_DEFAULTS: Record<StaffRole, Record<string, boolean>> = {
+  HOSPITAL_ADMIN: {
+    view_patient_records: false,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: true,
+    insurance_claims_access: false,
+    revenue_dashboard: true,
+    approve_refunds: false,
+    user_account_management: true,
+    system_configuration: true,
+    audit_log_access: true,
+    api_key_management: false,
+  },
   IT_ADMIN: {
     view_patient_records: true,
     edit_clinical_notes: true,
@@ -514,6 +533,7 @@ export default function OnboardStaffPage() {
 
     const departmentByRole: Record<StaffRole, string> = {
       IT_ADMIN: "Information Technology",
+      HOSPITAL_ADMIN: "Hospital Administration",
       OPHTHALMOLOGIST: "Ophthalmology",
       DOCTOR: "Clinical Services",
       PHARMACIST: "Pharmacy",
@@ -622,7 +642,11 @@ export default function OnboardStaffPage() {
             .split(",")
             .map((facility) => facility.trim())
             .filter(Boolean),
-          permissions,
+          permissions: Object.fromEntries(
+            Object.entries(permissions).filter(([key, value]) =>
+              ROLE_DEFAULTS[selectedRole]?.[key] !== value
+            )
+          ),
         }),
       });
 
