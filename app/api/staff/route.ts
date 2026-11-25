@@ -10,6 +10,7 @@ import { logActivity } from "@/lib/activity-log";
 
 const ALLOWED_ROLES = [
   "IT_ADMIN",
+  "HOSPITAL_ADMIN",
   "OPHTHALMOLOGIST",
   "DOCTOR",
   "PHARMACIST",
