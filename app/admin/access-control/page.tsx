@@ -33,10 +33,13 @@ interface StaffMember {
   department: string | null;
   assigned_facilities: string[] | string | null;
   permissions: Record<string, boolean> | null;
+  custom_role_id?: string | null;
   is_active: boolean;
   deleted_at: string | null;
   created_at: string;
 }
+
+interface CustomRoleOption { id: string; name: string; base_role: string; is_active: boolean; permissions: Record<string, boolean>; }
 
 interface PermissionGroup {
   id: string;
@@ -351,14 +354,17 @@ function getFacilitiesText(
 }
 
 function getPermissionsForStaff(
-  staff: StaffMember | null
+  staff: StaffMember | null,
+  customRoles: CustomRoleOption[] = []
 ) {
   if (!staff) {
     return {};
   }
 
+  const customRole = customRoles.find((role) => role.id === staff.custom_role_id && role.is_active);
   return {
     ...(DEFAULT_PERMISSIONS[staff.role] ?? {}),
+    ...(customRole?.permissions ?? {}),
     ...(staff.permissions ?? {}),
   };
 }
@@ -374,6 +380,8 @@ export default function AccessControlPage() {
   const [draftPermissions, setDraftPermissions] =
     useState<Record<string, boolean>>({});
   const [draftName, setDraftName] = useState("");
+  const [customRoles, setCustomRoles] = useState<CustomRoleOption[]>([]);
+  const [draftCustomRoleId, setDraftCustomRoleId] = useState("");
 
   const [searchTerm, setSearchTerm] =
     useState("");
@@ -510,6 +518,12 @@ export default function AccessControlPage() {
 
       setStaffList(staff);
 
+      const rolesResponse = await fetch("/api/admin/roles", { cache: "no-store" });
+      if (rolesResponse.ok) {
+        const rolesData = await rolesResponse.json();
+        setCustomRoles(Array.isArray(rolesData.roles) ? rolesData.roles : []);
+      }
+
       if (staff.length > 0) {
         const firstActive =
           staff.find(
@@ -552,16 +566,19 @@ export default function AccessControlPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editable permission draft when the selected staff member changes.
       setDraftPermissions(
         getPermissionsForStaff(
-          selectedStaff
+          selectedStaff,
+          customRoles
         )
       );
       setDraftName(selectedStaff.name);
+      setDraftCustomRoleId(selectedStaff.custom_role_id ?? "");
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the editable permission draft when no staff member is selected.
       setDraftPermissions({});
       setDraftName("");
+      setDraftCustomRoleId("");
     }
-  }, [selectedStaff]);
+  }, [selectedStaff, customRoles]);
 
   function togglePermission(
     key: string
@@ -593,6 +610,7 @@ export default function AccessControlPage() {
           body: JSON.stringify({
             permissions: draftPermissions,
             name: draftName,
+            customRoleId: draftCustomRoleId || null,
           }),
         }
       );
@@ -1262,6 +1280,12 @@ export default function AccessControlPage() {
                         placeholder="Enter staff full name"
                       />
                       <p className="mt-2 text-xs text-slate-500">Update the name displayed across the staff directory and hospital workspace, then save changes below.</p>
+                      <label htmlFor="staff-custom-role" className="mb-2 mt-4 block text-xs font-semibold text-slate-700">Custom role (optional)</label>
+                      <select id="staff-custom-role" value={draftCustomRoleId} onChange={(event) => setDraftCustomRoleId(event.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="">Use predefined role only</option>
+                        {customRoles.filter((role) => role.is_active && role.base_role === selectedStaff.role).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                      </select>
+                      <p className="mt-2 text-xs text-slate-500">Only active custom roles based on {getRoleLabel(selectedStaff.role)} can be assigned.</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 pt-5 border-t border-[#E2E8F0]">
