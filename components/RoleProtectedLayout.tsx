@@ -15,14 +15,11 @@ export default async function RoleProtectedLayout({
 }) {
   const staff = await getAuthenticatedStaff();
   if (!staff) redirect("/");
-  const roleAllowed = allowedRoles ? allowedRoles.includes(staff.role) : false;
-  const permissionAllowed = requiredPermission
-    ? staff.permissions[requiredPermission] === true
-    : false;
-  const anyPermissionAllowed = requiredAnyPermission
-    ? requiredAnyPermission.some((permission) => staff.permissions[permission] === true)
-    : false;
-  if (!roleAllowed && !permissionAllowed && !anyPermissionAllowed) {
+  const roleAllowed = !allowedRoles || allowedRoles.includes(staff.role);
+  const permissionAllowed = !requiredPermission || staff.permissions[requiredPermission] === true;
+  const anyPermissionAllowed = !requiredAnyPermission ||
+    requiredAnyPermission.some((permission) => staff.permissions[permission] === true);
+  if (!roleAllowed || !permissionAllowed || !anyPermissionAllowed) {
     redirect(staff.role === "RECEPTIONIST" ? "/receptionist" : "/");
   }
   return children;
