@@ -641,7 +641,11 @@ export default function OnboardStaffPage() {
             .split(",")
             .map((facility) => facility.trim())
             .filter(Boolean),
-          permissions,
+          permissions: Object.fromEntries(
+            Object.entries(permissions).filter(([key, value]) =>
+              ROLE_DEFAULTS[selectedRole]?.[key] !== value
+            )
+          ),
         }),
       });
 
