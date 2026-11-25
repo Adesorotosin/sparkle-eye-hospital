@@ -794,8 +794,7 @@ create index idx_auth_sessions_expires_at
 alter table auth_sessions enable row level security;
 
 -- No public/anon policies.
--- Only the server-side Supabase secret key can access sessions.)
-);
+-- Only the server-side Supabase secret key can access sessions.
 
 alter table staff
   add column custom_role_id uuid references custom_roles(id) on delete set null;
