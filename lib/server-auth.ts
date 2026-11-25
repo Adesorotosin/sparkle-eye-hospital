@@ -137,7 +137,7 @@ export async function getAuthenticatedStaff(): Promise<
           department,
           permissions,
           custom_role_id,
-          custom_role:custom_role_id (name, permissions, is_active),
+          custom_role:custom_roles!staff_custom_role_id_fkey (name, permissions, is_active),
           is_active,
           deleted_at
         )
