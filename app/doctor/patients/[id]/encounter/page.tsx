@@ -17,7 +17,6 @@ import {
   Stethoscope,
   TestTube2,
   UserRound,
-  Wallet,
 } from "lucide-react";
 import { saveConsultationEncounter } from "@/app/actions/consultation";
 import { referPatientToOptometry } from "@/app/actions/optometry-referral";
@@ -26,7 +25,6 @@ import { createDiagnosticOrder, createPrescription } from "@/app/actions/clinica
 import { createOpticalOrder, type DoctorSpectaclePrescription } from "@/app/actions/optician";
 import { getOptometryPatient } from "@/app/actions/optometry";
 import { createClinicalHandoff } from "@/app/actions/clinical-handoffs";
-import { applyBillingDiscount, type DiscountType } from "@/app/actions/billing";
 
 type Refraction = {
   sphere: string;
@@ -319,10 +317,6 @@ export default function DoctorEncounterPage() {
   const patientCode = params?.id ?? "";
   const [isPending, startTransition] = useTransition();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [discountType, setDiscountType] = useState<DiscountType>("percentage");
-  const [discountValue, setDiscountValue] = useState("");
-  const [discountReason, setDiscountReason] = useState("");
-  const [discountSaving, setDiscountSaving] = useState(false);
 
   const [loadedPatientCode, setLoadedPatientCode] = useState<string | null>(null);
   const loading = Boolean(patientCode) && loadedPatientCode !== patientCode;
@@ -795,41 +789,6 @@ export default function DoctorEncounterPage() {
     });
   };
 
-  const handleApplyDiscount = async () => {
-    if (!patient?.patientId) return;
-    const value = Number(discountValue);
-    if (!Number.isFinite(value) || value <= 0) {
-      setError("Enter a valid discount amount or percentage.");
-      return;
-    }
-    if (!discountReason.trim()) {
-      setError("A reason is required for every patient discount.");
-      return;
-    }
-    setDiscountSaving(true);
-    setError("");
-    setMessage("");
-    try {
-      const result = await applyBillingDiscount({
-        patientCode: patient.patientId,
-        discountType,
-        value,
-        reason: discountReason.trim(),
-      });
-      if (!result.success) throw new Error(result.message);
-      setMessage(result.message);
-      setDiscountValue("");
-      setDiscountReason("");
-      const refreshed = await fetch(`/api/patients/${encodeURIComponent(patient.patientId)}`, { cache: "no-store" });
-      const refreshedData = await refreshed.json();
-      if (refreshed.ok && refreshedData?.patient) setPatient(refreshedData.patient as Patient);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to apply the discount.");
-    } finally {
-      setDiscountSaving(false);
-    }
-  };
-
   const completedOptometryEncounter = optometryAssessmentCompleted
     ? optometryResult?.previousOptometryEncounter ?? null
     : null;
@@ -911,7 +870,6 @@ export default function DoctorEncounterPage() {
               ["requests", "Clinical requests"],
               ["results", "Results / feedback"],
               ["appointment", "Appointment"],
-              ["discount", "Patient discount"],
             ].map(([id, label]) => (
               <a key={id} href={`#${id}`} className="block rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-700">
                 {label}
@@ -951,36 +909,6 @@ export default function DoctorEncounterPage() {
               </div>
             )}
           </section>
-
-          <Section id="discount" title="Patient discount" icon={<Wallet className="h-5 w-5" />}>
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">Apply a fixed or percentage discount to the patient&apos;s current unpaid invoice. A reason is required and the action is recorded in the audit trail.</p>
-              {patient.invoice ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 text-sm">
-                  <span className="text-gray-600">Invoice {patient.invoice.invoiceNo}</span>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${patient.invoice.status === "paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>{patient.invoice.status.replace(/_/g, " ")}</span>
-                </div>
-              ) : <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">No current invoice is available. A discount can be applied after an invoice has been created.</p>}
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="block text-sm font-medium text-gray-700">Discount type
-                  <select value={discountType} onChange={event => setDiscountType(event.target.value as DiscountType)} className={inputClass}>
-                    <option value="percentage">Percentage (%)</option>
-                    <option value="fixed">Fixed amount (₦)</option>
-                  </select>
-                </label>
-                <label className="block text-sm font-medium text-gray-700">Discount {discountType === "percentage" ? "percentage" : "amount"}
-                  <input type="number" min="0.01" max={discountType === "percentage" ? 100 : undefined} step="0.01" value={discountValue} onChange={event => setDiscountValue(event.target.value)} className={inputClass} placeholder={discountType === "percentage" ? "e.g. 10" : "e.g. 5000"} />
-                </label>
-                <label className="block text-sm font-medium text-gray-700 md:col-span-2">Reason for discount
-                  <textarea rows={2} value={discountReason} onChange={event => setDiscountReason(event.target.value)} className={inputClass} placeholder="Explain why this patient is receiving a discount" />
-                </label>
-              </div>
-              <button type="button" onClick={() => void handleApplyDiscount()} disabled={discountSaving || !patient.invoice || patient.invoice.status === "paid"} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                {discountSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />} Apply discount
-              </button>
-              <p className="text-xs text-gray-500">Paid invoices cannot be discounted. Discounts are capped at the invoice subtotal; VAT and the final balance are recalculated by the billing service.</p>
-            </div>
-          </Section>
 
           <Section id="nurse" title="Nurse documentation" icon={<HeartPulse className="h-5 w-5" />}>
             {patient.vitals ? (

@@ -21,11 +21,13 @@ export async function PATCH(
     const {
       isActive,
       permissions,
+      name,
     } = body;
 
     if (
       isActive === undefined &&
-      permissions === undefined
+      permissions === undefined &&
+      name === undefined
     ) {
       return NextResponse.json(
         {
@@ -44,6 +46,13 @@ export async function PATCH(
         {
           error: "'isActive' must be a boolean.",
         },
+        { status: 400 }
+      );
+    }
+
+    if (name !== undefined && (typeof name !== "string" || !name.trim() || name.trim().length > 200)) {
+      return NextResponse.json(
+        { error: "'name' must be a non-empty string of at most 200 characters." },
         { status: 400 }
       );
     }
@@ -123,6 +132,10 @@ export async function PATCH(
       updates.permissions = permissions;
     }
 
+    if (name !== undefined) {
+      updates.name = name.trim();
+    }
+
     const {
       data: updatedStaff,
       error: updateError,
@@ -165,6 +178,10 @@ export async function PATCH(
       messageParts.push(
         "permissions updated"
       );
+    }
+
+    if (name !== undefined) {
+      messageParts.push("name updated");
     }
 
     try {

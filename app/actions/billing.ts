@@ -231,7 +231,7 @@ export async function applyBillingDiscount(input: {
   adminPin?: string;
 }): Promise<BillingActionResponse> {
   try {
-    const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    const staff = await requireRole(["IT_ADMIN"]);
 
     const {
       patientCode,
