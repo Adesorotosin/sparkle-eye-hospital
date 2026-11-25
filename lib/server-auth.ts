@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { resolvePermissions } from "@/lib/permissions";
 
 import {
   generateSessionToken,
@@ -189,12 +190,18 @@ export async function getAuthenticatedStaff(): Promise<
     ? staff.custom_role[0]
     : staff.custom_role;
 
+  const normalizedRole = normalizeRole(staff.role);
   const customRolePermissions = customRole?.is_active && customRole.permissions && typeof customRole.permissions === "object"
     ? customRole.permissions as Record<string, boolean>
     : {};
-  const staffPermissions = staff.permissions && typeof staff.permissions === "object"
+  const staffPermissions = staff.permissions && typeof staff.permissions === "object" && !Array.isArray(staff.permissions)
     ? staff.permissions as Record<string, boolean>
     : {};
+  const effectivePermissions = resolvePermissions(
+    normalizedRole,
+    customRolePermissions,
+    staffPermissions
+  );
 
   return {
     id: staff.id,
@@ -202,12 +209,10 @@ export async function getAuthenticatedStaff(): Promise<
     username: staff.username,
     name: staff.name,
     email: staff.email,
-    role: normalizeRole(
-      staff.role
-    ) as UserRole,
+    role: normalizedRole as UserRole,
     title: staff.title,
     department: staff.department,
-    permissions: { ...customRolePermissions, ...staffPermissions },
+    permissions: effectivePermissions,
     customRoleId: staff.custom_role_id ?? null,
     customRoleName: customRole?.is_active ? customRole.name : null,
   };
@@ -239,8 +244,15 @@ export async function requireRole(
 
 export async function requirePermission(permission: string): Promise<AuthenticatedStaff> {
   const staff = await requireAuth();
-  if (staff.role === "IT_ADMIN") return staff;
   if (staff.permissions[permission] !== true) throw new Error("FORBIDDEN");
+  return staff;
+}
+
+export async function requireAnyPermission(permissions: string[]): Promise<AuthenticatedStaff> {
+  const staff = await requireAuth();
+  if (!permissions.some((permission) => staff.permissions[permission] === true)) {
+    throw new Error("FORBIDDEN");
+  }
   return staff;
 }
 
