@@ -27,6 +27,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
     if (body.isActive !== undefined) {
       if (typeof body.isActive !== "boolean") return json({ error: "isActive must be boolean." }, 400);
+      if (body.isActive === false) {
+        const { count, error: countError } = await supabaseServer
+          .from("staff").select("id", { count: "exact", head: true }).eq("custom_role_id", id);
+        if (countError) throw countError;
+        if ((count ?? 0) > 0) return json({ error: "Reassign staff members before deactivating this role. Assigned staff access fails closed if a role becomes inactive." }, 409);
+      }
       updates.is_active = body.isActive;
     }
     if (Object.keys(updates).length === 3 && body.name === undefined && body.description === undefined && body.permissions === undefined && body.isActive === undefined) return json({ error: "No changes supplied." }, 400);
