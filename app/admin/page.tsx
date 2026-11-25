@@ -100,6 +100,7 @@ export default function AdminDashboard() {
           <Link href="/admin/reports" className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-400">
             <span><strong className="block text-sm">Reports</strong><span className="mt-1 block text-xs text-slate-500">View financial and operational reports</span></span><ClipboardList className="h-4 w-4 text-slate-400" />
           </Link>
+          <Link href="/admin/patient-access" className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-400"><span><strong className="block text-sm">Doctor & patient access</strong><span className="mt-1 block text-xs text-slate-500">Assign patients and manage shared or emergency access</span></span><ArrowUpRight className="h-4 w-4 text-slate-400" /></Link>
           <Link href="/admin/access-control" className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-400">
             <span><strong className="block text-sm">Staff access</strong><span className="mt-1 block text-xs text-slate-500">Manage roles and permissions</span></span><Users className="h-4 w-4 text-slate-400" />
           </Link>

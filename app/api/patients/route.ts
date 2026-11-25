@@ -26,11 +26,44 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search")?.trim() || "";
 
+    // Doctors see only patients assigned to them, patients they have
+    // previously treated, or patients with an active shared/emergency grant.
+    // Other clinical/admin roles retain their existing workflow access.
+    let accessiblePatientIds: string[] | null = null;
+
+    if (staff.role === "DOCTOR" || staff.role === "OPHTHALMOLOGIST") {
+      const { data: accessibleIds, error: accessError } =
+        await supabaseServer.rpc("get_doctor_accessible_patient_ids", {
+          p_doctor_staff_id: staff.id,
+        });
+
+      if (accessError) {
+        console.error("Doctor patient access lookup failed:", accessError);
+        return NextResponse.json(
+          { error: "Unable to verify patient access." },
+          { status: 500 }
+        );
+      }
+
+      const doctorPatientIds = (accessibleIds ?? []).filter(
+        (id: unknown): id is string => typeof id === "string"
+      );
+
+      if (doctorPatientIds.length === 0) {
+        return NextResponse.json({ patients: [] });
+      }
+      accessiblePatientIds = doctorPatientIds;
+    }
+
     let query = supabaseServer
       .from("patients")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
+
+    if (accessiblePatientIds) {
+      query = query.in("id", accessiblePatientIds);
+    }
 
     if (search) {
       query = query.or(

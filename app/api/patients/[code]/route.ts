@@ -31,7 +31,7 @@ export async function GET(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    await requireRole([...PATIENT_READ_ROLES]);
+    const staff = await requireRole([...PATIENT_READ_ROLES]);
 
     const resolvedParams = await params;
     const patientCode = resolvedParams?.code?.trim();
@@ -41,6 +41,30 @@ export async function GET(
         { error: "Patient code is required." },
         { status: 400 }
       );
+    }
+
+    const { data: patientRow, error: patientLookupError } = await supabaseServer
+      .from("patients").select("id").eq("patient_code", patientCode).maybeSingle();
+    if (patientLookupError) throw patientLookupError;
+    if (!patientRow) return NextResponse.json({ error: "Patient not found." }, { status: 404 });
+
+    if (staff.role === "DOCTOR" || staff.role === "OPHTHALMOLOGIST") {
+      const { data: allowed, error: accessError } = await supabaseServer.rpc("can_doctor_access_patient", {
+        p_doctor_staff_id: staff.id, p_patient_id: patientRow.id,
+      });
+      if (accessError) {
+        console.error("Patient chart access check failed:", accessError);
+        return NextResponse.json({ error: "Unable to verify patient access." }, { status: 500 });
+      }
+      if (allowed !== true) return NextResponse.json({ error: "You are not authorised to view this patient record." }, { status: 403 });
+      const { error: auditError } = await supabaseServer.from("patient_access_audit").insert({
+        patient_id: patientRow.id, doctor_staff_id: staff.id, performed_by: staff.id,
+        action: "PATIENT_RECORD_ACCESSED", reason: "Doctor opened patient chart",
+      });
+      if (auditError) {
+        console.error("Patient chart access audit failed:", auditError);
+        return NextResponse.json({ error: "Patient access could not be audited. Please retry." }, { status: 500 });
+      }
     }
 
     const patient = await getPatientRecord(patientCode);
@@ -94,6 +118,18 @@ export async function PATCH(
         { error: "Patient code is required." },
         { status: 400 }
       );
+    }
+
+    const { data: patientRow, error: patientLookupError } = await supabaseServer
+      .from("patients").select("id").eq("patient_code", patientCode).maybeSingle();
+    if (patientLookupError) throw patientLookupError;
+    if (!patientRow) return NextResponse.json({ error: "Patient not found." }, { status: 404 });
+    if (staff.role === "DOCTOR" || staff.role === "OPHTHALMOLOGIST") {
+      const { data: allowed, error: accessError } = await supabaseServer.rpc("can_doctor_access_patient", {
+        p_doctor_staff_id: staff.id, p_patient_id: patientRow.id,
+      });
+      if (accessError) throw accessError;
+      if (allowed !== true) return NextResponse.json({ error: "You are not authorised to update this patient." }, { status: 403 });
     }
 
     const body = await request.json();
