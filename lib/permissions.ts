@@ -26,6 +26,7 @@ export const PERMISSION_CATALOG = [
   { key: "staff.manage", label: "Create and manage staff accounts", group: "Administration" },
   { key: "roles.manage", label: "Create and manage roles", group: "Administration" },
   { key: "audit.view", label: "View audit and security logs", group: "Administration" },
+  { key: "reports.view", label: "View hospital reports and analytics", group: "Administration" },
   { key: "settings.manage", label: "Manage system settings", group: "Administration" },
   { key: "notifications.manage", label: "Manage hospital notifications", group: "Administration" },
   { key: "surgery.manage", label: "Access the surgical suite", group: "Clinical" },
@@ -54,6 +55,7 @@ const all = (...keys: PermissionKey[]) => Object.fromEntries(keys.map((key) => [
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
   IT_ADMIN: { ...all(...PERMISSION_KEYS), controlled_substance_override: false },
+  HOSPITAL_ADMIN: all("staff.view","staff.manage","roles.manage","audit.view","reports.view","settings.manage","notifications.manage","inventory.view"),
   OPHTHALMOLOGIST: all(
     "surgery.manage","patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
