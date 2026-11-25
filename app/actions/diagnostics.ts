@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export type DiagnosticQueueItem = {
   id: string;
@@ -22,6 +22,7 @@ export type DiagnosticQueueItem = {
 export async function getDiagnosticQueue() {
   try {
     await requireRole(["IT_ADMIN", "NURSE", "RECEPTIONIST", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("clinical.results.view");
 
     const { data, error } = await supabaseServer
       .from("diagnostic_orders")
@@ -72,6 +73,7 @@ export async function completeDiagnosticOrder(input: {
 }) {
   try {
     const staff = await requireRole(["IT_ADMIN", "NURSE", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("clinical.results.update");
 
     if (!input.id?.trim()) return { success: false, message: "Diagnostic order is required." };
     if (!input.findings?.trim()) return { success: false, message: "Please enter the investigation findings." };
