@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
@@ -67,9 +67,7 @@ export async function POST(
   }
 ) {
   try {
-    const currentUser = await requireRole([
-      "IT_ADMIN",
-    ]);
+    const currentUser = await requirePermission("staff.manage");
 
     const { id } = await params;
 
