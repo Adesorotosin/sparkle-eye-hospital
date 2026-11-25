@@ -19,6 +19,7 @@ export const PERMISSION_CATALOG = [
   { key: "optical.orders.manage", label: "Manage optical orders", group: "Optical" },
   { key: "inventory.view", label: "View inventory", group: "Inventory" },
   { key: "inventory.manage", label: "Manage stock and procurement", group: "Inventory" },
+  { key: "inventory.issue", label: "Issue stock to authorised departments", group: "Inventory" },
   { key: "appointments.view", label: "View appointments", group: "Scheduling" },
   { key: "appointments.manage", label: "Create and manage appointments", group: "Scheduling" },
   { key: "staff.view", label: "View staff directory", group: "Administration" },
@@ -66,7 +67,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> =
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   NURSE: all(
-    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.results.view","clinical.prescriptions.view","clinical.results.update","clinical.diagnostics.order","nursing.triage","inventory.view",
+    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.results.view","clinical.prescriptions.view","clinical.results.update","clinical.diagnostics.order","nursing.triage","inventory.view","inventory.issue",
     "appointments.view","view_patient_records","edit_clinical_notes","view_lab_results"
   ),
   RECEPTIONIST: all(
@@ -81,17 +82,17 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> =
     "patients.view","patients.update","clinical.prescriptions.view","pharmacy.dispense","inventory.view",
     "view_patient_records","view_lab_results","pharmacy_dispensing_approval"
   ),
-  OPTICIAN: all("patients.view","optical.orders.view","optical.orders.manage","inventory.view","appointments.view","view_patient_records"),
+  OPTICIAN: all("patients.view","optical.orders.view","optical.orders.manage","inventory.view","inventory.issue","appointments.view","view_patient_records"),
   OPTOMETRIST: all(
     "patients.view","patients.register","clinical.view","clinical.notes.create","clinical.diagnostics.order",
     "clinical.results.view","optical.orders.view","optical.orders.manage","appointments.view",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results"
   ),
   LAB_SCIENTIST: all(
-    "patients.view","clinical.results.view","clinical.results.update","appointments.view","inventory.view",
+    "patients.view","clinical.results.view","clinical.results.update","appointments.view","inventory.view","inventory.issue",
     "view_patient_records","view_lab_results"
   ),
-  INVENTORY_MANAGER: all("inventory.view","inventory.manage"),
+  INVENTORY_MANAGER: all("inventory.view","inventory.manage","inventory.issue"),
 };
 
 export function resolvePermissions(
