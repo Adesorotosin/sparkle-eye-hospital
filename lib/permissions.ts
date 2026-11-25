@@ -55,13 +55,13 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> =
   OPHTHALMOLOGIST: all(
     "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
-    "clinical.results.view","appointments.view","appointments.manage","optical.orders.view","optical.orders.manage","optical.orders.view","optical.orders.manage",
+    "clinical.results.view","appointments.view","appointments.manage","optical.orders.view","optical.orders.manage",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   DOCTOR: all(
     "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
-    "clinical.results.view","appointments.view","appointments.manage",
+    "clinical.results.view","appointments.view","appointments.manage","optical.orders.view","optical.orders.manage",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   NURSE: all(
