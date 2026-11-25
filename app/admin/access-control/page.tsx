@@ -373,6 +373,7 @@ export default function AccessControlPage() {
 
   const [draftPermissions, setDraftPermissions] =
     useState<Record<string, boolean>>({});
+  const [draftName, setDraftName] = useState("");
 
   const [searchTerm, setSearchTerm] =
     useState("");
@@ -554,9 +555,11 @@ export default function AccessControlPage() {
           selectedStaff
         )
       );
+      setDraftName(selectedStaff.name);
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clear the editable permission draft when no staff member is selected.
       setDraftPermissions({});
+      setDraftName("");
     }
   }, [selectedStaff]);
 
@@ -588,8 +591,8 @@ export default function AccessControlPage() {
               "application/json",
           },
           body: JSON.stringify({
-            permissions:
-              draftPermissions,
+            permissions: draftPermissions,
+            name: draftName,
           }),
         }
       );
@@ -618,7 +621,7 @@ export default function AccessControlPage() {
       );
 
       setNotification(
-        "Permissions saved successfully."
+        "Staff details and permissions saved successfully."
       );
     } catch (error) {
       console.error(
@@ -1246,6 +1249,20 @@ export default function AccessControlPage() {
                       </div>
                     </div>
 
+                    <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
+                      <label htmlFor="staff-display-name" className="mb-2 block text-xs font-semibold text-slate-700">Staff full name</label>
+                      <input
+                        id="staff-display-name"
+                        type="text"
+                        maxLength={200}
+                        value={draftName}
+                        onChange={(event) => setDraftName(event.target.value)}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                        placeholder="Enter staff full name"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">Update the name displayed across the staff directory and hospital workspace, then save changes below.</p>
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5 pt-5 border-t border-[#E2E8F0]">
                       <div>
                         <p className="text-[11px] uppercase tracking-wide font-semibold text-[#94A3B8]">
@@ -1416,7 +1433,7 @@ export default function AccessControlPage() {
 
                         {saving
                           ? "Saving..."
-                          : "Save Permissions"}
+                          : "Save Changes"}
                       </button>
                     </div>
                   </div>
