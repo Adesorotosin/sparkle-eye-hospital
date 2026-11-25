@@ -1,4 +1,2 @@
 import RoleProtectedLayout from "@/components/RoleProtectedLayout";
-export default function ModuleLayout({ children }: { children: React.ReactNode }) {
-  return <RoleProtectedLayout requiredPermission="billing.view">{children}</RoleProtectedLayout>;
-}
+export default function ModuleLayout({ children }: { children: React.ReactNode }) { return <RoleProtectedLayout allowedRoles={["CASHIER","IT_ADMIN"]} requiredPermission="billing.view">{children}</RoleProtectedLayout>; }
