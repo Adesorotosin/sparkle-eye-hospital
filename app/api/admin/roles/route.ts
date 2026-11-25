@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const description = typeof body.description === "string" ? body.description.trim() : null;
     const permissions = body.permissions ?? {};
     const slug = slugify(name);
-    const allowed = ["IT_ADMIN","OPHTHALMOLOGIST","DOCTOR","PHARMACIST","NURSE","CASHIER","RECEPTIONIST","LAB_SCIENTIST","OPTICIAN","OPTOMETRIST","INVENTORY_MANAGER"];
+    const allowed = ["HOSPITAL_ADMIN","OPHTHALMOLOGIST","DOCTOR","PHARMACIST","NURSE","CASHIER","RECEPTIONIST","LAB_SCIENTIST","OPTICIAN","OPTOMETRIST","INVENTORY_MANAGER"];
     if (!name || name.length > 80 || !slug || !allowed.includes(baseRole) || !validPermissions(permissions)) return json({ error: "Provide a role name, valid predefined base role, and supported boolean permissions." }, 400);
     if (baseRole === "IT_ADMIN") return json({ error: "Custom roles cannot inherit IT administrator authority." }, 400);
     const { data, error } = await supabaseServer.from("custom_roles").insert({ name, slug, description, base_role: baseRole, permissions, created_by: actor.id, updated_by: actor.id }).select("id,name,slug,description,base_role,permissions,is_active,created_at,updated_at").single();
