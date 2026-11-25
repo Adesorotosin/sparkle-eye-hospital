@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export interface ConsultationFormData {
   patientId: string;
@@ -66,6 +66,7 @@ export async function saveConsultationEncounter(
       "OPHTHALMOLOGIST",
       "DOCTOR",
     ]);
+    await requirePermission("clinical.notes.create");
 
     if (!formData.patientId?.trim()) {
       return {
