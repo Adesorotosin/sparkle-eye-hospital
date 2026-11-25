@@ -149,6 +149,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
+  HOSPITAL_ADMIN: "Hospital Administrator",
   IT_ADMIN: "IT Administrator",
   OPHTHALMOLOGIST: "Ophthalmologist",
   DOCTOR: "Doctor",
