@@ -15,6 +15,7 @@ import {
   ChevronDown,
   TestTube2,
   BadgeCheck,
+  type LucideIcon,
 } from "lucide-react";
 
 type ActivePatient = {
@@ -104,7 +105,7 @@ export default function DoctorLayout({ children }: { children: React.ReactNode }
     window.location.href = "/";
   };
 
-  const navItems = [
+  const navItems: Array<{ name: string; href: string; icon: LucideIcon; permission?: string; anyPermission?: string[] }> = [
     { name: "Overview", href: "/doctor", icon: LayoutDashboard, permission: "clinical.view" },
     { name: "Patient Records", href: "/doctor/patients", icon: Users, permission: "patients.view" },
     { name: "Investigation Room", href: "/diagnostics", icon: TestTube2, anyPermission: ["clinical.diagnostics.order", "clinical.results.view"] },
