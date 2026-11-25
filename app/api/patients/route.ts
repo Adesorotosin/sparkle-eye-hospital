@@ -45,13 +45,14 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      accessiblePatientIds = (accessibleIds ?? []).filter(
-        (id): id is string => typeof id === "string"
+      const doctorPatientIds = (accessibleIds ?? []).filter(
+        (id: unknown): id is string => typeof id === "string"
       );
 
-      if (accessiblePatientIds.length === 0) {
+      if (doctorPatientIds.length === 0) {
         return NextResponse.json({ patients: [] });
       }
+      accessiblePatientIds = doctorPatientIds;
     }
 
     let query = supabaseServer
