@@ -27,6 +27,7 @@ export const PERMISSION_CATALOG = [
   { key: "audit.view", label: "View audit and security logs", group: "Administration" },
   { key: "settings.manage", label: "Manage system settings", group: "Administration" },
   { key: "notifications.manage", label: "Manage hospital notifications", group: "Administration" },
+  { key: "surgery.manage", label: "Access the surgical suite", group: "Clinical" },
   // Backward-compatible keys used by the existing Staff & Access Control screen.
   { key: "view_patient_records", label: "Legacy: View patient records", group: "Legacy permissions" },
   { key: "edit_clinical_notes", label: "Legacy: Edit clinical notes", group: "Legacy permissions" },
@@ -53,13 +54,13 @@ const all = (...keys: PermissionKey[]) => Object.fromEntries(keys.map((key) => [
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, Record<string, boolean>> = {
   IT_ADMIN: { ...all(...PERMISSION_KEYS), controlled_substance_override: false },
   OPHTHALMOLOGIST: all(
-    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
+    "surgery.manage","patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
     "clinical.results.view","clinical.results.update","appointments.view","appointments.manage","optical.orders.view","optical.orders.manage",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
   ),
   DOCTOR: all(
-    "patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
+    "surgery.manage","patients.view","patients.update","clinical.view","clinical.notes.create","clinical.notes.update","nursing.triage",
     "clinical.prescriptions.view","clinical.prescriptions.create","clinical.diagnostics.order",
     "clinical.results.view","appointments.view","appointments.manage","optical.orders.view","optical.orders.manage",
     "view_patient_records","edit_clinical_notes","order_diagnostics","view_lab_results","issue_prescriptions"
