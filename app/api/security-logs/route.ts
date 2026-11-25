@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server";
 
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 
 type SecurityLogRow = {
@@ -57,7 +57,7 @@ export async function GET(
   request: Request
 ) {
   try {
-    await requireRole(["IT_ADMIN"]);
+    await requirePermission("audit.view");
 
     const { searchParams } =
       new URL(request.url);
