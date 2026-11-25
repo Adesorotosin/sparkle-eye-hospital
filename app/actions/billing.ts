@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getPatientRecord, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 import type { PatientRecord } from "@/types/hospital";
 
 export type BillingPaymentMethod =
@@ -72,6 +72,7 @@ export async function getBillingPatient(
   try {
     // Billing records are restricted to cashiers and administrators.
     await requireRole(["IT_ADMIN", "CASHIER"]);
+    await requirePermission("billing.view");
     if (patientCode?.trim()) {
       const { data: patient, error } = await supabaseServer
         .from("patients")
@@ -232,6 +233,7 @@ export async function applyBillingDiscount(input: {
 }): Promise<BillingActionResponse> {
   try {
     const staff = await requireRole(["IT_ADMIN"]);
+    await requirePermission("billing.refund");
 
     const {
       patientCode,
@@ -487,6 +489,7 @@ export async function processBillingPayment(input: {
       "IT_ADMIN",
       "CASHIER",
     ]);
+    await requirePermission("billing.collect");
 
     const amountRendered = Number(
       input.amountRendered
