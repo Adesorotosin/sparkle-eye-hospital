@@ -98,9 +98,28 @@ export function resolvePermissions(
   customRolePermissions: Record<string, boolean> | null | undefined,
   staffPermissions: Record<string, boolean> | null | undefined
 ): Record<string, boolean> {
-  return {
+  const custom = customRolePermissions ?? {};
+  const individual = staffPermissions ?? {};
+  const effective: Record<string, boolean> = {
     ...(ROLE_DEFAULT_PERMISSIONS[role] ?? {}),
-    ...(customRolePermissions ?? {}),
-    ...(staffPermissions ?? {}),
+    ...custom,
+    ...individual,
   };
+  const legacyAliases: Record<string, string> = {
+    view_patient_records: "patients.view",
+    edit_clinical_notes: "clinical.notes.update",
+    order_diagnostics: "clinical.diagnostics.order",
+    view_lab_results: "clinical.results.view",
+    issue_prescriptions: "clinical.prescriptions.create",
+    pharmacy_dispensing_approval: "pharmacy.dispense",
+    approve_refunds: "billing.refund",
+    user_account_management: "staff.manage",
+    audit_log_access: "audit.view",
+    system_configuration: "settings.manage",
+  };
+  for (const [legacy, canonical] of Object.entries(legacyAliases)) {
+    if (Object.prototype.hasOwnProperty.call(custom, legacy)) effective[canonical] = custom[legacy];
+    if (Object.prototype.hasOwnProperty.call(individual, legacy)) effective[canonical] = individual[legacy];
+  }
+  return effective;
 }
