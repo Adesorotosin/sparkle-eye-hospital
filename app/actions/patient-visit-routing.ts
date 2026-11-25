@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole, type UserRole } from "@/lib/server-auth";
+import { requireRole, requirePermission, type UserRole } from "@/lib/server-auth";
 
 export type VisitDestination =
   | "TRIAGE"
@@ -66,6 +66,7 @@ export async function createPatientVisitRoute(input: {
 }) {
   try {
     const staff = await requireRole(["IT_ADMIN", "RECEPTIONIST"]);
+    await requirePermission("appointments.manage");
     const patientCode = input.patientCode?.trim();
     const reason = input.reason?.trim() || null;
 
@@ -152,6 +153,15 @@ export async function getPatientVisitRoutes(destination: VisitDestination) {
       return { success: false, routes: [] as PatientVisitRoute[], message: "Invalid queue destination." };
     }
     await requireRole(DESTINATION_ROLES[destination]);
+    const destinationPermission: Record<VisitDestination, string> = {
+      TRIAGE: "nursing.triage",
+      DOCTOR: "clinical.view",
+      PHARMACY: "clinical.prescriptions.view",
+      LABORATORY: "clinical.results.view",
+      DIAGNOSTICS: "clinical.diagnostics.order",
+      OPTOMETRY: "clinical.view",
+    };
+    await requirePermission(destinationPermission[destination]);
 
     const { data, error } = await supabaseServer
       .from("patient_visit_routes")
@@ -188,6 +198,15 @@ export async function updatePatientVisitRoute(input: {
       return { success: false, message: "Choose a valid arrival request and status." };
     }
     const staff = await requireRole(DESTINATION_ROLES[input.destination]);
+    const destinationPermission: Record<VisitDestination, string> = {
+      TRIAGE: "nursing.triage",
+      DOCTOR: "clinical.view",
+      PHARMACY: "clinical.prescriptions.view",
+      LABORATORY: "clinical.results.view",
+      DIAGNOSTICS: "clinical.diagnostics.order",
+      OPTOMETRY: "clinical.view",
+    };
+    await requirePermission(destinationPermission[input.destination]);
     const handledAt = input.status === "completed" ? new Date().toISOString() : null;
     const { data, error } = await supabaseServer
       .from("patient_visit_routes")
