@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { PERMISSION_KEYS } from "@/lib/permissions";
+import { PERMISSION_KEYS, resolvePermissions } from "@/lib/permissions";
 
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
 function validPermissions(value: unknown): value is Record<string, boolean> {
@@ -13,11 +13,25 @@ function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await requireRole(["IT_ADMIN"]);
+    const actor = await requirePermission("roles.manage");
     const { id } = await params;
     const body = await request.json();
     const hasChanges = body.name !== undefined || body.description !== undefined || body.permissions !== undefined || body.isActive !== undefined;
     if (!hasChanges) return json({ error: "No changes supplied." }, 400);
+    const { data: currentRole, error: currentRoleError } = await supabaseServer
+      .from("custom_roles").select("base_role").eq("id", id).maybeSingle();
+    if (currentRoleError) throw currentRoleError;
+    if (!currentRole) return json({ error: "Custom role not found." }, 404);
+
+    if (body.permissions !== undefined && actor.role !== "IT_ADMIN") {
+      const basePermissions = resolvePermissions(currentRole.base_role, {}, {});
+      const targetPermissions = resolvePermissions(currentRole.base_role, body.permissions, {});
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && basePermissions[permission] !== true && actor.permissions[permission] !== true
+      );
+      if (escalated.length) return json({ error: "You cannot add permissions beyond your own authority to a custom role." }, 403);
+    }
+
     const updates: Record<string, unknown> = { updated_by: actor.id, updated_at: new Date().toISOString() };
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim() || body.name.trim().length > 80) return json({ error: "Role name must be 1–80 characters." }, 400);
@@ -61,7 +75,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await requireRole(["IT_ADMIN"]);
+    const actor = await requirePermission("roles.manage");
     const { id } = await params;
     const { count, error: countError } = await supabaseServer.from("staff").select("id", { count: "exact", head: true }).eq("custom_role_id", id);
     if (countError) throw countError;
