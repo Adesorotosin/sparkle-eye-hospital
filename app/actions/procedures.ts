@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getOrCreateDraftInvoice, recalcInvoice } from "@/lib/patient-flow";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 
 export type ProcedurePrice = {
   id: string;
@@ -32,6 +32,7 @@ type ProcedureRegistrationSummary = {
 export async function getProcedurePriceCatalog() {
   try {
     await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
+    await requirePermission("clinical.view");
     const { data, error } = await supabaseServer
       .from("procedure_price_catalog")
       .select("id, code, name, category, price, active")
@@ -77,6 +78,7 @@ export async function createProcedurePrice(input: {
 }) {
   try {
     const staff = await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage");
     const name = input.name?.trim();
     const category = input.category?.trim();
     const price = Number(input.price);
@@ -120,6 +122,7 @@ export async function updateProcedurePrice(input: {
 }) {
   try {
     await requireRole(["IT_ADMIN"]);
+    await requirePermission("settings.manage");
     const price = Number(input.price);
     if (!input.id || !Number.isFinite(price) || price < 0) {
       return { success: false, message: "Enter a valid price." };
@@ -160,6 +163,7 @@ export type ProcedureRegistrationInput = {
 export async function registerProcedure(input: ProcedureRegistrationInput) {
   try {
     const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
+    await requirePermission("clinical.notes.create");
     const patientCode = input.patientCode?.trim();
     const procedureCode = input.procedureCode?.trim();
 
@@ -258,6 +262,7 @@ export async function registerProcedure(input: ProcedureRegistrationInput) {
 export async function getRecentProcedures() {
   try {
     await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST", "RECEPTIONIST"]);
+    await requirePermission("clinical.view");
     const { data, error } = await supabaseServer
       .from("procedure_orders")
       .select("id, procedure_name, referral_type, order_reference, scheduled_date, price, status, created_at, patients!inner(patient_code, registration_number, full_name)")
