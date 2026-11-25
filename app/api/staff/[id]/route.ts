@@ -22,12 +22,14 @@ export async function PATCH(
       isActive,
       permissions,
       name,
+      customRoleId,
     } = body;
 
     if (
       isActive === undefined &&
       permissions === undefined &&
-      name === undefined
+      name === undefined &&
+      customRoleId === undefined
     ) {
       return NextResponse.json(
         {
@@ -136,6 +138,21 @@ export async function PATCH(
       updates.name = name.trim();
     }
 
+    if (customRoleId !== undefined) {
+      if (customRoleId !== null && typeof customRoleId !== "string") {
+        return NextResponse.json({ error: "customRoleId must be a role ID or null." }, { status: 400 });
+      }
+      if (customRoleId) {
+        const { data: customRole, error: roleError } = await supabaseServer
+          .from("custom_roles").select("id,base_role,is_active").eq("id", customRoleId).maybeSingle();
+        if (roleError) throw roleError;
+        if (!customRole || !customRole.is_active || customRole.base_role !== existing.role || existing.role === "IT_ADMIN") {
+          return NextResponse.json({ error: "The selected custom role must be active and based on this staff member's predefined role." }, { status: 400 });
+        }
+      }
+      updates.custom_role_id = customRoleId || null;
+    }
+
     const {
       data: updatedStaff,
       error: updateError,
@@ -154,6 +171,7 @@ export async function PATCH(
         department,
         assigned_facilities,
         permissions,
+        custom_role_id,
         is_active,
         deleted_at,
         created_at
