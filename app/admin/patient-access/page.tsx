@@ -1,5 +1,5 @@
 "use client";
-import { useCallback,useEffect,useState } from "react";
+import { useCallback,useEffect,useState,type FormEvent } from "react";
 import Link from "next/link";
 type P={id:string;patient_code:string|null;full_name:string}; type D={id:string;staff_id:string;name:string;role:string}; type G={id:string;patient_id:string;doctor_staff_id:string;grant_type:string;reason:string;expires_at:string|null;revoked_at:string|null}; type A={id:string;patient_id:string;doctor_staff_id:string;assignment_reason:string;ended_at:string|null}; type E={id:string;patient_id:string;doctor_staff_id:string;action:string;reason:string;created_at:string}; type Data={patients:P[];doctors:D[];grants:G[];assignments:A[];audit:E[]};
 export default function PatientAccessPage(){
@@ -8,7 +8,7 @@ const load=useCallback(async()=>{const r=await fetch("/api/admin/patient-access"
 useEffect(()=>{load().catch(e=>setError(e.message))},[load]);
 const patientName=(id:string)=>data?.patients.find(p=>p.id===id)?.full_name||"Patient"; const doctorName=(id:string)=>data?.doctors.find(d=>d.id===id)?.name||"Doctor";
 async function send(payload:Record<string,unknown>){setBusy(true);setError("");setNotice("");try{const r=await fetch("/api/admin/patient-access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const j=await r.json();if(!r.ok)throw Error(j.error||"Operation failed");setNotice("Patient access change saved and audited.");setReason("");await load()}catch(e){setError(e instanceof Error?e.message:"Operation failed")}finally{setBusy(false)}}
-async function submit(e:React.FormEvent){e.preventDefault();await send({action,patientId,doctorStaffId:doctorId,reason,grantType,durationHours:Number(hours)})}
+async function submit(e:FormEvent){e.preventDefault();await send({action,patientId,doctorStaffId:doctorId,reason,grantType,durationHours:Number(hours)})}
 return <main className="mx-auto max-w-7xl space-y-6 p-5 text-slate-800 md:p-8"><header><Link href="/admin" className="text-sm font-semibold text-slate-500">← Admin dashboard</Link><h1 className="mt-2 text-2xl font-extrabold text-slate-900">Doctor & patient access</h1><p className="mt-1 text-sm text-slate-500">Manage primary assignments, shared-care and emergency access, and review audit events.</p></header>
 {error&&<p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}{notice&&<p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{notice}</p>}
 <section className="rounded-2xl border bg-white p-5"><h2 className="font-bold">Create or change access</h2><form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-2">
