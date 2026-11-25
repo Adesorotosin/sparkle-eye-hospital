@@ -54,7 +54,17 @@ create table custom_roles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint custom_roles_name_nonempty check (length(btrim(name)) > 0),
-  constraint custom_roles_slug_format check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*
+  constraint custom_roles_slug_format check (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$')
+);
+
+alter table staff
+  add column custom_role_id uuid references custom_roles(id) on delete set null;
+
+create index idx_staff_custom_role_id on staff(custom_role_id) where custom_role_id is not null;
+create index idx_custom_roles_active on custom_roles(is_active, name);
+
+alter table custom_roles enable row level security;
+
 -- ============================================================
 create table patients (
   id uuid primary key default gen_random_uuid(),
