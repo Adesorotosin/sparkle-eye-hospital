@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requirePermission } from "@/lib/server-auth";
+import { requirePermission, requireRole } from "@/lib/server-auth";
 import { supabaseServer } from "@/lib/supabase-server";
 import {
   getPatientByCode,
@@ -17,7 +17,8 @@ export async function POST(
   }
 ) {
   try {
-    const staff = await requirePermission("nursing.triage");
+    const staff = await requireRole(["IT_ADMIN","OPHTHALMOLOGIST","DOCTOR","NURSE"]);
+    await requirePermission("nursing.triage");
 
     const { code } = await params;
 
