@@ -12,7 +12,7 @@ function nextSku(existingCount: number, prefix: string) {
 // --- GET: List inventory items ---
 export async function GET(request: Request) {
   try {
-    await requireRole(["IT_ADMIN","PHARMACIST","RECEPTIONIST","CASHIER","INVENTORY_MANAGER"]);
+    await requireRole(["IT_ADMIN","PHARMACIST","OPTICIAN","LAB_SCIENTIST","NURSE","INVENTORY_MANAGER"]);
     await requirePermission("inventory.view");
 
     const { searchParams } = new URL(request.url);
