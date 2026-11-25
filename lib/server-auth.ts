@@ -13,6 +13,7 @@ import {
 
 export type UserRole =
   | "IT_ADMIN"
+  | "HOSPITAL_ADMIN"
   | "OPHTHALMOLOGIST"
   | "DOCTOR"
   | "PHARMACIST"
