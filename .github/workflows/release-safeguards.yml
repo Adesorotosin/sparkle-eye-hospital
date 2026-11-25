@@ -136,7 +136,8 @@ jobs:
             supabase/migrations/20261022210000_atomic_optical_order_billing.sql \
             supabase/migrations/20261022220000_login_rate_limiting.sql \\
             supabase/migrations/20261125214000_hybrid_role_based_access.sql \\
-            supabase/migrations/20261125215000_disallow_it_admin_custom_role_base.sql
+            supabase/migrations/20261125215000_disallow_it_admin_custom_role_base.sql \\
+            supabase/migrations/20261125222000_add_hospital_admin_role.sql
           do
             echo "Applying $migration"
             psql -v ON_ERROR_STOP=1 -f "$migration"
