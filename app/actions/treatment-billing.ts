@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireRole } from "@/lib/server-auth";
+import { requireRole, requirePermission } from "@/lib/server-auth";
 import { logActivity } from "@/lib/activity-log";
 
 export type TreatmentBillingRequest = {
@@ -22,6 +22,7 @@ export async function sendTreatmentPlanToCashier(input: {
 }): Promise<{ success: boolean; message: string; id?: string }> {
   try {
     const staff = await requireRole(["IT_ADMIN", "DOCTOR", "OPHTHALMOLOGIST"]);
+    await requirePermission("clinical.notes.create");
     const patientCode = input.patientCode?.trim();
     const encounterId = input.encounterId?.trim();
 
@@ -156,6 +157,7 @@ export async function getTreatmentBillingRequests(): Promise<{
 }> {
   try {
     await requireRole(["IT_ADMIN", "CASHIER"]);
+    await requirePermission("billing.view");
     const { data: rows, error } = await supabaseServer
       .from("treatment_billing_requests")
       .select("id, patient_id, treatment_plan, requested_by_name, created_at, status, reviewed_by_name")
@@ -198,6 +200,7 @@ export async function getTreatmentBillingRequests(): Promise<{
 export async function markTreatmentBillingRequestReviewed(id: string): Promise<{ success: boolean; message: string }> {
   try {
     const staff = await requireRole(["IT_ADMIN", "CASHIER"]);
+    await requirePermission("billing.collect");
     if (!id?.trim()) return { success: false, message: "Treatment request ID is required." };
 
     const { data: updated, error } = await supabaseServer
