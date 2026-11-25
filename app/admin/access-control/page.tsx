@@ -160,6 +160,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_STYLES: Record<string, string> = {
+  HOSPITAL_ADMIN: "bg-indigo-50 text-indigo-700 border-indigo-200",
   IT_ADMIN:
     "bg-red-50 text-red-700 border-red-200",
   OPHTHALMOLOGIST:
@@ -180,6 +181,23 @@ const DEFAULT_PERMISSIONS: Record<
   string,
   Record<string, boolean>
 > = {
+  HOSPITAL_ADMIN: {
+    view_patient_records: false,
+    edit_clinical_notes: false,
+    order_diagnostics: false,
+    view_lab_results: false,
+    issue_prescriptions: false,
+    controlled_substance_override: false,
+    pharmacy_dispensing_approval: false,
+    view_financial_reports: false,
+    insurance_claims_access: false,
+    revenue_dashboard: false,
+    approve_refunds: false,
+    user_account_management: true,
+    system_configuration: true,
+    audit_log_access: true,
+    api_key_management: false,
+  },
   IT_ADMIN: {
     view_patient_records: true,
     edit_clinical_notes: true,
