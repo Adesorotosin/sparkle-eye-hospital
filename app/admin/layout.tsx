@@ -9,7 +9,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       "audit.view",
       "reports.view",
       "notifications.manage",
-      "inventory.view",
       "settings.manage",
     ]}>
       {children}
