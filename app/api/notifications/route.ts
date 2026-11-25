@@ -405,9 +405,7 @@ export async function POST(
   request: Request
 ) {
   try {
-    const staff = await requireRole([
-      "IT_ADMIN",
-    ]);
+    const staff = await requirePermission("notifications.manage");
 
     let body: unknown;
 
