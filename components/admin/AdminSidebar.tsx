@@ -30,6 +30,7 @@ export default function AdminSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [permissions, setPermissions] = useState<Record<string, boolean> | null>(null);
+  const [staffProfile, setStaffProfile] = useState<{ name: string; role: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -38,7 +39,12 @@ export default function AdminSidebar({
         if (!response.ok) throw new Error("Unable to load permissions.");
         return response.json();
       })
-      .then((data) => { if (active) setPermissions(data?.staff?.permissions ?? {}); })
+      .then((data) => {
+        if (active) {
+          setPermissions(data?.staff?.permissions ?? {});
+          setStaffProfile(data?.staff ? { name: data.staff.name, role: String(data.staff.role).replace(/_/g, " ") } : null);
+        }
+      })
       .catch(() => { if (active) setPermissions({}); });
     return () => { active = false; };
   }, []);
@@ -172,10 +178,10 @@ export default function AdminSidebar({
             {!collapsed && (
               <div className="text-left truncate">
                 <p className="text-xs font-semibold leading-tight text-white truncate">
-                  Dr. Alabi Benson
+                  {staffProfile?.name ?? "Hospital Staff"}
                 </p>
-                <p className="text-[10px] text-slate-400 truncate">
-                  Chief Administrator
+                <p className="text-[10px] text-slate-400 truncate capitalize">
+                  {staffProfile?.role ?? "Authorised staff"}
                 </p>
               </div>
             )}
