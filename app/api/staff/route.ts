@@ -463,16 +463,6 @@ export async function POST(
       );
     }
 
-    if (currentUser.role !== "IT_ADMIN") {
-      const targetPermissions = resolvePermissions(cleanRole, cleanCustomRolePermissions, cleanPermissions as Record<string, boolean>);
-      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
-        enabled === true && currentUser.permissions[permission] !== true
-      );
-      if (escalated.length) {
-        return jsonNoStore({ error: "You cannot create a staff account with permissions you do not hold." }, { status: 403 });
-      }
-    }
-
     // -----------------------------------------
     // Normalize optional fields
     // -----------------------------------------
@@ -508,6 +498,16 @@ export async function POST(
       }
       cleanCustomRoleId = customRole.id;
       cleanCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
+    }
+
+    if (currentUser.role !== "IT_ADMIN") {
+      const targetPermissions = resolvePermissions(cleanRole, cleanCustomRolePermissions, cleanPermissions as Record<string, boolean>);
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && currentUser.permissions[permission] !== true
+      );
+      if (escalated.length) {
+        return jsonNoStore({ error: "You cannot create a staff account with permissions you do not hold." }, { status: 403 });
+      }
     }
 
     // -----------------------------------------
