@@ -63,6 +63,8 @@ alter table staff
 
 create index idx_staff_custom_role_id on staff(custom_role_id) where custom_role_id is not null;
 create index idx_custom_roles_active on custom_roles(is_active, name);
+create index idx_custom_roles_created_by on custom_roles(created_by) where created_by is not null;
+create index idx_custom_roles_updated_by on custom_roles(updated_by) where updated_by is not null;
 
 alter table custom_roles enable row level security;
 
