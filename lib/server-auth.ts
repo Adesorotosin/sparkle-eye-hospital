@@ -32,6 +32,9 @@ export interface AuthenticatedStaff {
   role: UserRole;
   title: string | null;
   department: string | null;
+  permissions: Record<string, boolean>;
+  customRoleId: string | null;
+  customRoleName: string | null;
 }
 
 export function normalizeRole(value: string): string {
@@ -132,6 +135,9 @@ export async function getAuthenticatedStaff(): Promise<
           role,
           title,
           department,
+          permissions,
+          custom_role_id,
+          custom_role:custom_role_id (name, permissions, is_active),
           is_active,
           deleted_at
         )
@@ -179,6 +185,17 @@ export async function getAuthenticatedStaff(): Promise<
     return null;
   }
 
+  const customRole = Array.isArray(staff.custom_role)
+    ? staff.custom_role[0]
+    : staff.custom_role;
+
+  const customRolePermissions = customRole?.is_active && customRole.permissions && typeof customRole.permissions === "object"
+    ? customRole.permissions as Record<string, boolean>
+    : {};
+  const staffPermissions = staff.permissions && typeof staff.permissions === "object"
+    ? staff.permissions as Record<string, boolean>
+    : {};
+
   return {
     id: staff.id,
     staffId: staff.staff_id,
@@ -190,6 +207,9 @@ export async function getAuthenticatedStaff(): Promise<
     ) as UserRole,
     title: staff.title,
     department: staff.department,
+    permissions: { ...customRolePermissions, ...staffPermissions },
+    customRoleId: staff.custom_role_id ?? null,
+    customRoleName: customRole?.is_active ? customRole.name : null,
   };
 }
 
@@ -214,6 +234,13 @@ export async function requireRole(
     throw new Error("FORBIDDEN");
   }
 
+  return staff;
+}
+
+export async function requirePermission(permission: string): Promise<AuthenticatedStaff> {
+  const staff = await requireAuth();
+  if (staff.role === "IT_ADMIN") return staff;
+  if (staff.permissions[permission] !== true) throw new Error("FORBIDDEN");
   return staff;
 }
 
