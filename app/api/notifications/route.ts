@@ -139,7 +139,7 @@ function normalizeNotification(
 // ------------------------------------------------------------
 export async function GET() {
   try {
-    await requirePermission("notifications.manage");
+    await requirePermission("notifications.view");
 
     const [
       manualRes,
