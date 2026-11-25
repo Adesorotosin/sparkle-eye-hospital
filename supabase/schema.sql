@@ -796,14 +796,6 @@ alter table auth_sessions enable row level security;
 -- No public/anon policies.
 -- Only the server-side Supabase secret key can access sessions.
 
-alter table staff
-  add column custom_role_id uuid references custom_roles(id) on delete set null;
-
-create index idx_staff_custom_role_id on staff(custom_role_id) where custom_role_id is not null;
-create index idx_custom_roles_active on custom_roles(is_active, name);
-
-alter table custom_roles enable row level security;
-
 -- ============================================================
 -- PATIENTS
 -- ============================================================
