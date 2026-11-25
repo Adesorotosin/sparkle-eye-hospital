@@ -111,6 +111,10 @@ export async function POST(
       );
     }
 
+    if (currentUser.role !== "IT_ADMIN" && staff.role === "IT_ADMIN") {
+      return NextResponse.json({ error: "Only an IT administrator can reset another IT administrator's password." }, { status: 403 });
+    }
+
     if (!staff.is_active || staff.deleted_at) {
       return NextResponse.json(
         {
