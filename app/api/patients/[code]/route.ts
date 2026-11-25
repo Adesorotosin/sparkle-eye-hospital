@@ -45,7 +45,7 @@ export async function GET(
     }
 
     const { data: patientRow, error: patientLookupError } = await supabaseServer
-      .from("patients").select("id, patient_code, full_name, age, gender, phone, coverage_plan, address, registration_number, status, is_walk_in, created_at, last_visit_at").eq("patient_code", patientCode).maybeSingle();
+      .from("patients").select("id, patient_code, full_name, age, gender, phone, coverage_plan, address, registration_number, status, is_walk_in, created_at, last_visit_at, allergies").eq("patient_code", patientCode).maybeSingle();
     if (patientLookupError) throw patientLookupError;
     if (!patientRow) return NextResponse.json({ error: "Patient not found." }, { status: 404 });
 
@@ -68,7 +68,7 @@ export async function GET(
       }
     }
 
-    if (staff.role === "RECEPTIONIST") {
+    if (staff.permissions["clinical.view"] !== true) {
       return NextResponse.json({
         patient: {
           id: patientRow.id,
@@ -84,6 +84,7 @@ export async function GET(
           isWalkIn: patientRow.is_walk_in,
           createdAt: patientRow.created_at,
           lastVisitAt: patientRow.last_visit_at,
+          allergies: staff.role === "PHARMACIST" ? patientRow.allergies : null,
         },
       });
     }
