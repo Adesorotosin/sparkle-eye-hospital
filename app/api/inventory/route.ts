@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
-import { requireRole } from "@/lib/server-auth";
+import { requirePermission } from "@/lib/server-auth";
 
 function nextSku(existingCount: number, prefix: string) {
   return `${prefix}-${String(existingCount + 1).padStart(3, "0")}`;
@@ -12,13 +12,7 @@ function nextSku(existingCount: number, prefix: string) {
 // --- GET: List inventory items ---
 export async function GET(request: Request) {
   try {
-    await requireRole([
-      "IT_ADMIN",
-      "PHARMACIST",
-      "RECEPTIONIST",
-      "CASHIER",
-      "INVENTORY_MANAGER",
-    ]);
+    await requirePermission("inventory.view");
 
     const { searchParams } = new URL(request.url);
     const domain = searchParams.get("domain");
