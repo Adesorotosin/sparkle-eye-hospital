@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 
 import { requirePermission } from "@/lib/server-auth";
-import { PERMISSION_KEYS } from "@/lib/permissions";
+import { PERMISSION_KEYS, resolvePermissions } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/activity-log";
 
@@ -400,6 +400,9 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (currentUser.role !== "IT_ADMIN" && cleanRole === "IT_ADMIN") {
+      return jsonNoStore({ error: "Only an IT administrator can create another IT administrator." }, { status: 403 });
+    }
 
     // -----------------------------------------
     // Optional field validation
@@ -460,6 +463,16 @@ export async function POST(
       );
     }
 
+    if (currentUser.role !== "IT_ADMIN") {
+      const targetPermissions = resolvePermissions(cleanRole, cleanCustomRolePermissions, cleanPermissions as Record<string, boolean>);
+      const escalated = Object.entries(targetPermissions).filter(([permission, enabled]) =>
+        enabled === true && currentUser.permissions[permission] !== true
+      );
+      if (escalated.length) {
+        return jsonNoStore({ error: "You cannot create a staff account with permissions you do not hold." }, { status: 403 });
+      }
+    }
+
     // -----------------------------------------
     // Normalize optional fields
     // -----------------------------------------
@@ -485,14 +498,16 @@ export async function POST(
         : permissions;
 
     let cleanCustomRoleId: string | null = null;
+    let cleanCustomRolePermissions: Record<string, boolean> = {};
     if (customRoleId !== undefined && customRoleId !== null && customRoleId !== "") {
       if (typeof customRoleId !== "string") return jsonNoStore({ error: "Invalid custom role." }, { status: 400 });
-      const { data: customRole, error: customRoleError } = await supabaseServer.from("custom_roles").select("id,base_role,is_active").eq("id", customRoleId).maybeSingle();
+      const { data: customRole, error: customRoleError } = await supabaseServer.from("custom_roles").select("id,base_role,is_active,permissions").eq("id", customRoleId).maybeSingle();
       if (customRoleError) throw customRoleError;
       if (!customRole || !customRole.is_active || customRole.base_role !== cleanRole || cleanRole === "IT_ADMIN") {
         return jsonNoStore({ error: "The selected custom role must be active and based on the staff member's predefined role." }, { status: 400 });
       }
       cleanCustomRoleId = customRole.id;
+      cleanCustomRolePermissions = (customRole.permissions ?? {}) as Record<string, boolean>;
     }
 
     // -----------------------------------------
