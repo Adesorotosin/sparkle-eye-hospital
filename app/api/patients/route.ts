@@ -93,14 +93,14 @@ export async function GET(request: NextRequest) {
       dateOfBirth: patient.date_of_birth ?? null,
       gender: patient.gender,
       phone: patient.phone,
-      allergies: staff.role === "RECEPTIONIST" ? null : patient.allergies,
+      allergies: staff.permissions["clinical.view"] === true || staff.role === "PHARMACIST" ? patient.allergies : null,
       address: patient.address ?? null,
       nextOfKin: patient.next_of_kin ?? null,
       nextOfKinPhone: patient.next_of_kin_phone ?? null,
       status: patient.status,
       isWalkIn: patient.is_walk_in,
       lastVisitAt: patient.last_visit_at,
-      primaryComplaint: staff.role === "RECEPTIONIST" ? null : patient.primary_complaint ?? null,
+      primaryComplaint: staff.permissions["clinical.view"] === true ? patient.primary_complaint ?? null : null,
     }));
 
     return NextResponse.json({ patients });
