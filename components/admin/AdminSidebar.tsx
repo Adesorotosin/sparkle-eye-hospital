@@ -41,8 +41,15 @@ export default function AdminSidebar({
       })
       .then((data) => {
         if (active) {
-          setPermissions(data?.staff?.permissions ?? {});
-          setStaffProfile(data?.staff ? { name: data.staff.name, role: String(data.staff.role).replace(/_/g, " ") } : null);
+          // /api/auth/me returns the authenticated profile under "user".
+          // Reading "staff" here silently produced an empty sidebar for every user.
+          const staff = data?.user;
+          if (!staff) throw new Error("Authenticated staff profile missing.");
+          setPermissions(staff.permissions ?? {});
+          setStaffProfile({
+            name: staff.name ?? "Hospital Staff",
+            role: String(staff.role ?? "Authorised staff").replace(/_/g, " "),
+          });
         }
       })
       .catch(() => { if (active) setPermissions({}); });
