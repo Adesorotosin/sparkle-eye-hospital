@@ -176,7 +176,7 @@ export default function SessionLockScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex min-h-screen items-center justify-center overflow-y-auto bg-[#071226] px-4 py-8 font-sans antialiased">
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-[#071226] px-3 py-3 font-sans antialiased sm:px-4 sm:py-4">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl" />
         <div className="absolute -bottom-40 -right-24 h-[30rem] w-[30rem] rounded-full bg-cyan-400/10 blur-3xl" />
@@ -187,28 +187,28 @@ export default function SessionLockScreen({
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-lock-title"
-        className="relative w-full max-w-[440px] overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_32px_100px_rgba(0,0,0,0.38)]"
+        className="relative my-auto w-full max-w-[400px] overflow-y-auto overscroll-contain rounded-[24px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.38)] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)]"
       >
-        <div className="flex flex-col items-center px-7 pb-7 pt-8 text-center sm:px-9 sm:pb-8 sm:pt-9">
+        <div className="flex flex-col items-center px-5 pb-4 pt-4 text-center sm:px-7 sm:pb-5 sm:pt-5">
           <Image
             src="/Logo.png"
             alt="Sparkle Eye Hospital"
             width={172}
             height={76}
             priority
-            className="mb-5 h-[66px] w-[172px] object-contain"
+            className="mb-3 h-11 w-[138px] object-contain sm:mb-4 sm:h-12 sm:w-[148px]"
           />
 
-          <div className="mb-5 flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.14em] text-indigo-800">
+          <div className="mb-3 flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-indigo-800">
             <LockKeyhole className="h-3.5 w-3.5" />
             Workstation locked
           </div>
 
-          <div className="mb-3 flex h-[68px] w-[68px] items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xl font-extrabold tracking-wide text-[#172554] shadow-sm">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-base font-extrabold tracking-wide text-[#172554] shadow-sm">
             {getInitials(staffName)}
           </div>
 
-          <h1 id="session-lock-title" className="text-[23px] font-bold tracking-tight text-slate-950">
+          <h1 id="session-lock-title" className="text-xl font-bold tracking-tight text-slate-950 sm:text-[21px]">
             {staffName}
           </h1>
           <p className="mt-1 text-sm font-medium text-slate-500">{roleLabel}</p>
@@ -216,8 +216,8 @@ export default function SessionLockScreen({
             <p className="mt-0.5 text-xs text-slate-400">{profile.department}</p>
           )}
 
-          <div className="mt-5 flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200">
+          <div className="mt-3 flex w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200">
               <Activity className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -228,7 +228,7 @@ export default function SessionLockScreen({
             </div>
           </div>
 
-          <form onSubmit={handleUnlock} className="mt-6 w-full space-y-3 text-left">
+          <form onSubmit={handleUnlock} className="mt-4 w-full space-y-2.5 text-left">
             <label htmlFor="session-unlock-password" className="block text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">
               Enter your password to resume
             </label>
@@ -245,7 +245,7 @@ export default function SessionLockScreen({
                   if (error) setError("");
                 }}
                 placeholder="Your account password"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-12 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
               />
               <button
                 type="button"
@@ -266,14 +266,14 @@ export default function SessionLockScreen({
             <button
               type="submit"
               disabled={!password || isUnlocking}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#172554] px-4 text-sm font-bold text-white shadow-lg shadow-indigo-950/15 transition hover:bg-[#1e3a8a] disabled:cursor-not-allowed disabled:opacity-55"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#172554] px-4 text-sm font-bold text-white shadow-lg shadow-indigo-950/15 transition hover:bg-[#1e3a8a] disabled:cursor-not-allowed disabled:opacity-55"
             >
               <ShieldCheck className="h-4 w-4" />
               {isUnlocking ? "Verifying…" : "Unlock workstation"}
             </button>
           </form>
 
-          <div className="mt-5 flex w-full items-center justify-center">
+          <div className="mt-3 flex w-full items-center justify-center">
             <button
               type="button"
               onClick={handleSwitchUser}
@@ -285,7 +285,7 @@ export default function SessionLockScreen({
             </button>
           </div>
 
-          <div className="mt-6 w-full border-t border-slate-100 pt-4">
+          <div className="mt-4 w-full border-t border-slate-100 pt-3">
             <p className="text-[11px] font-medium text-slate-400">{lastActiveLabel}</p>
             <p className="mt-1 text-[10px] text-slate-400">
               Automatically locked after {timeoutMinutes} minutes of inactivity
