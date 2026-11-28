@@ -176,7 +176,7 @@ export default function SessionLockScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain bg-[#071226] px-3 py-3 font-sans antialiased sm:px-4 sm:py-4">
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] items-center justify-center overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden bg-[#071226] px-3 py-3 font-sans antialiased sm:px-4 sm:py-4">
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-indigo-500/15 blur-3xl" />
         <div className="absolute -bottom-40 -right-24 h-[30rem] w-[30rem] rounded-full bg-cyan-400/10 blur-3xl" />
@@ -187,7 +187,7 @@ export default function SessionLockScreen({
         role="dialog"
         aria-modal="true"
         aria-labelledby="session-lock-title"
-        className="relative my-auto w-full max-w-[400px] overflow-y-auto overscroll-contain rounded-[24px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.38)] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)]"
+        className="relative my-auto w-full max-w-[400px] overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-[24px] border border-white/70 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.38)] max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)]"
       >
         <div className="flex flex-col items-center px-5 pb-4 pt-4 text-center sm:px-7 sm:pb-5 sm:pt-5">
           <Image
